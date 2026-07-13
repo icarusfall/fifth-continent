@@ -11,7 +11,7 @@ import {
   STARTING_FLOCK,
   WOOL_PRICE_DOMESTIC,
 } from './balance';
-import { edgeById, nodeById, otherEnd } from './map';
+import { edgeById, isPlaceable, nodeById, otherEnd } from './map';
 import { seedRng } from './rng';
 import { clockOf, isFlooded } from './time';
 import type { Action, Cart, GameState, Store } from './types';
@@ -22,21 +22,12 @@ export function initialState(seed: number): GameState {
     tick: 0,
     rngState: seedRng(seed),
     coin: 0,
+    farm: null,
     flockSize: STARTING_FLOCK,
-    stores: {
-      farm: { fleece: 0 },
-      ryne: {},
-    },
-    carts: [
-      {
-        id: 'cart-1',
-        name: 'The Cart',
-        capacity: CART_CAPACITY,
-        cargo: {},
-        location: { kind: 'node', nodeId: 'farm' },
-      },
-    ],
-    log: [{ tick: 0, text: 'Twelve sheep, one cart, and a price in Ryne.' }],
+    fleeceReady: 0,
+    stores: {},
+    carts: [],
+    log: [{ tick: 0, text: 'The Gault. Choose ground for your farm.' }],
   };
 }
 
@@ -70,14 +61,46 @@ function findCart(state: GameState, cartId: string): Cart | undefined {
 // identically every time.
 
 function applyAction(state: GameState, action: Action): void {
-  const cart = findCart(state, action.cartId);
-  if (!cart) {
-    logEvent(state, `No such cart.`);
-    return;
-  }
-
   switch (action.type) {
+    case 'placeFarm': {
+      if (state.farm !== null) {
+        logEvent(state, 'The farm is already built.');
+        return;
+      }
+      if (!isPlaceable(action.x, action.y)) {
+        logEvent(state, 'That ground will not take a farm.');
+        return;
+      }
+      state.farm = { x: action.x, y: action.y };
+      state.stores.farm = { fleece: 0 };
+      state.carts.push({
+        id: 'cart-1',
+        name: 'The Cart',
+        capacity: CART_CAPACITY,
+        cargo: {},
+        location: { kind: 'node', nodeId: 'farm' },
+      });
+      logEvent(state, 'Walland Farm. Twelve sheep, one cart, and a price in Ryne.');
+      return;
+    }
+
+    case 'shear': {
+      if (state.farm === null) return;
+      if (state.fleeceReady <= 0) {
+        logEvent(state, 'The sheep are shorn bare. Wool grows by dawn.');
+        return;
+      }
+      const qty = state.fleeceReady;
+      state.fleeceReady = 0;
+      state.stores.farm = state.stores.farm ?? {};
+      addToStore(state.stores.farm, 'fleece', qty);
+      logEvent(state, `Sheared ${qty} fleece into the farm store.`);
+      return;
+    }
+
     case 'loadCart': {
+      const cart = findCart(state, action.cartId);
+      if (!cart) return;
       if (cart.location.kind !== 'node') {
         logEvent(state, `${cart.name} cannot be loaded on the road.`);
         return;
@@ -94,6 +117,8 @@ function applyAction(state: GameState, action: Action): void {
     }
 
     case 'unloadCart': {
+      const cart = findCart(state, action.cartId);
+      if (!cart) return;
       if (cart.location.kind !== 'node') {
         logEvent(state, `${cart.name} cannot be unloaded on the road.`);
         return;
@@ -105,16 +130,18 @@ function applyAction(state: GameState, action: Action): void {
       const nodeId = cart.location.nodeId;
       state.stores[nodeId] = state.stores[nodeId] ?? {};
       addToStore(state.stores[nodeId], action.good, qty);
-      logEvent(state, `Unloaded ${qty} ${action.good} at ${nodeById(nodeId).name}.`);
+      logEvent(state, `Unloaded ${qty} ${action.good} at ${nodeById(nodeId, state.farm).name}.`);
       return;
     }
 
     case 'dispatchCart': {
+      const cart = findCart(state, action.cartId);
+      if (!cart) return;
       if (cart.location.kind !== 'node') {
         logEvent(state, `${cart.name} is already on the road.`);
         return;
       }
-      const edge = edgeById(action.edgeId);
+      const edge = edgeById(action.edgeId, state.farm);
       const from = cart.location.nodeId;
       if (edge.a !== from && edge.b !== from) {
         logEvent(state, `${edge.name} does not start here.`);
@@ -136,8 +163,10 @@ function applyAction(state: GameState, action: Action): void {
     }
 
     case 'sell': {
+      const cart = findCart(state, action.cartId);
+      if (!cart) return;
       if (cart.location.kind !== 'node') return;
-      const node = nodeById(cart.location.nodeId);
+      const node = nodeById(cart.location.nodeId, state.farm);
       if (node.kind !== 'market') {
         logEvent(state, `No buyer at ${node.name}.`);
         return;
@@ -158,20 +187,20 @@ function applyAction(state: GameState, action: Action): void {
 
 // ---- Per-tick processes ----
 
-function shearIfDawn(state: GameState): void {
+function growWoolAtDawn(state: GameState): void {
+  if (state.farm === null) return;
   const { hour, minute } = clockOf(state.tick);
   if (hour === SHEARING_HOUR && minute === 0) {
-    const fleece = state.flockSize * FLEECE_PER_HEAD_PER_DAY;
-    state.stores.farm = state.stores.farm ?? {};
-    addToStore(state.stores.farm, 'fleece', fleece);
-    logEvent(state, `Dawn. ${fleece} fleece from the flock.`);
+    const grown = state.flockSize * FLEECE_PER_HEAD_PER_DAY;
+    state.fleeceReady += grown;
+    logEvent(state, `Dawn. The flock carries ${state.fleeceReady} fleece of wool.`);
   }
 }
 
 function moveCarts(state: GameState): void {
   for (const cart of state.carts) {
     if (cart.location.kind !== 'edge') continue;
-    const edge = edgeById(cart.location.edgeId);
+    const edge = edgeById(cart.location.edgeId, state.farm);
 
     // The low road floods at high tide. A cart caught on it halts —
     // it does not drown, it waits, and the player learns about tides.
@@ -190,7 +219,7 @@ function moveCarts(state: GameState): void {
     if (cart.location.progress >= edge.latency) {
       const arrived = cart.location.to;
       cart.location = { kind: 'node', nodeId: arrived };
-      logEvent(state, `${cart.name} arrives at ${nodeById(arrived).name}.`);
+      logEvent(state, `${cart.name} arrives at ${nodeById(arrived, state.farm).name}.`);
     }
   }
 }
@@ -203,7 +232,7 @@ export function tick(state: GameState, actions: Action[]): GameState {
   for (const action of actions) applyAction(next, action);
 
   next.tick += 1;
-  shearIfDawn(next);
+  growWoolAtDawn(next);
   moveCarts(next);
 
   return next;

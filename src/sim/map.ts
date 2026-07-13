@@ -2,17 +2,20 @@
 // 40×30 tile grid. The terrain is visual truth; the logistics graph below is
 // mechanical truth. Roads are edges, not tiles.
 //
-// Legend: c clay upland · . marsh · p pasture · f farmstead · d dyke
-//         t town (Ryne) · s shingle · ~ sea
+// The farm is NOT on this map: the player chooses its ground (spec §6.7).
+// Both roads are generated from the farm site to Ryne along fixed,
+// hand-authored waypoint chains, with latency derived from path length.
+//
+// Legend: c clay upland · . marsh · d dyke · t town (Ryne) · s shingle · ~ sea
 
 import {
-  LOW_ROAD_LATENCY,
-  HIGH_ROAD_LATENCY,
-  LOW_ROAD_EXPOSURE,
-  HIGH_ROAD_EXPOSURE,
   CART_CAPACITY,
+  HIGH_ROAD_EXPOSURE,
+  HIGH_ROAD_TICKS_PER_TILE,
+  LOW_ROAD_EXPOSURE,
+  LOW_ROAD_TICKS_PER_TILE,
 } from './balance';
-import type { MapNode, MapEdge, NodeId, EdgeId } from './types';
+import type { MapEdge, MapNode, NodeId, EdgeId } from './types';
 
 export const MAP_WIDTH = 40;
 export const MAP_HEIGHT = 30;
@@ -29,12 +32,12 @@ export const TERRAIN: readonly string[] = [
   '..................................s~~~~~',                     // row 7
   '..................................s~~~~~',                     // row 8
   '..................................s~~~~~',                     // row 9
-  '.....ppppppppp...................s~~~~~~',                     // row 10
-  '.....ppfffpppp...................s~~~~~~',                     // row 11
-  '.....ppfffpppp...................s~~~~~~',                     // row 12
-  '.....ppppppppp...................s~~~~~~',                     // row 13
-  '.....ppppppppp...................s~~~~~~',                     // row 14
-  '.....ppppppppp..................s~~~~~~~',                     // row 15
+  '.................................s~~~~~~',                     // row 10
+  '.................................s~~~~~~',                     // row 11
+  '.................................s~~~~~~',                     // row 12
+  '.................................s~~~~~~',                     // row 13
+  '.................................s~~~~~~',                     // row 14
+  '................................s~~~~~~~',                     // row 15
   '................................s~~~~~~~',                     // row 16
   '..ddddddddddddddddd.............s~~~~~~~',                     // row 17
   '................................s~~~~~~~',                     // row 18
@@ -51,62 +54,112 @@ export const TERRAIN: readonly string[] = [
   '..............................s~~~~~~~~~',                     // row 29
 ];
 
-export const NODES: readonly MapNode[] = [
-  { id: 'farm', kind: 'farm', name: 'Walland Farm', x: 8, y: 11 },
-  { id: 'ryne', kind: 'market', name: 'Ryne', x: 28, y: 22 },
-  { id: 'customs', kind: 'customs', name: 'The Customs House', x: 26, y: 19 },
+export function terrainAt(x: number, y: number): string {
+  if (x < 0 || y < 0 || x >= MAP_WIDTH || y >= MAP_HEIGHT) return '~';
+  return TERRAIN[y][x];
+}
+
+/** Spec §6.7: a farm may be sited on any marsh tile. */
+export function isPlaceable(x: number, y: number): boolean {
+  return terrainAt(x, y) === '.';
+}
+
+export interface FarmSite {
+  x: number;
+  y: number;
+}
+
+// ---- Fixed nodes ----
+
+export const RYNE: MapNode = { id: 'ryne', kind: 'market', name: 'Ryne', x: 28, y: 22 };
+export const CUSTOMS: MapNode = {
+  id: 'customs',
+  kind: 'customs',
+  name: 'The Customs House',
+  x: 26,
+  y: 19,
+};
+
+export function nodesFor(farm: FarmSite | null): MapNode[] {
+  const fixed = [RYNE, CUSTOMS];
+  if (!farm) return fixed;
+  return [{ id: 'farm', kind: 'farm', name: 'Walland Farm', x: farm.x, y: farm.y }, ...fixed];
+}
+
+// ---- Roads ----
+// Hand-authored waypoint chains from the open marsh to Ryne. The generated
+// edge is [farm, ...chain]; only the first leg varies with placement.
+
+const LOW_ROAD_WAYPOINTS = [
+  { x: 8, y: 17 },
+  { x: 13, y: 22 },
+  { x: 20, y: 25 },
+  { x: 26, y: 25 },
+  { x: 28, y: 23 },
+  { x: 28, y: 22 },
 ];
 
-export const EDGES: readonly MapEdge[] = [
-  {
-    id: 'low-road',
-    name: 'The Low Road',
-    a: 'farm',
-    b: 'ryne',
-    capacity: CART_CAPACITY,
-    latency: LOW_ROAD_LATENCY,
-    exposure: LOW_ROAD_EXPOSURE,
-    condition: 'tideLocked',
-    path: [
-      { x: 8, y: 11 },
-      { x: 8, y: 17 },
-      { x: 13, y: 22 },
-      { x: 20, y: 25 },
-      { x: 26, y: 25 },
-      { x: 28, y: 23 },
-      { x: 28, y: 22 },
-    ],
-  },
-  {
-    id: 'high-road',
-    name: 'The High Road',
-    a: 'farm',
-    b: 'ryne',
-    capacity: CART_CAPACITY,
-    latency: HIGH_ROAD_LATENCY,
-    exposure: HIGH_ROAD_EXPOSURE,
-    condition: 'open',
-    path: [
-      { x: 8, y: 11 },
-      { x: 8, y: 8 },
-      { x: 14, y: 5 },
-      { x: 22, y: 5 },
-      { x: 26, y: 8 },
-      { x: 26, y: 19 }, // past the Customs House door
-      { x: 27, y: 20 },
-      { x: 28, y: 22 },
-    ],
-  },
+const HIGH_ROAD_WAYPOINTS = [
+  { x: 8, y: 8 },
+  { x: 14, y: 5 },
+  { x: 22, y: 5 },
+  { x: 26, y: 8 },
+  { x: 26, y: 19 }, // past the Customs House door
+  { x: 27, y: 20 },
+  { x: 28, y: 22 },
 ];
 
-export function nodeById(id: NodeId): MapNode {
-  const n = NODES.find((n) => n.id === id);
+export function pathTileLength(path: Array<{ x: number; y: number }>): number {
+  let total = 0;
+  for (let i = 1; i < path.length; i++) {
+    total += Math.hypot(path[i].x - path[i - 1].x, path[i].y - path[i - 1].y);
+  }
+  return total;
+}
+
+/** Spec §6.7: roadLatency = max(1, round(pathTileLength × ticksPerTile)). */
+export function roadLatency(path: Array<{ x: number; y: number }>, ticksPerTile: number): number {
+  return Math.max(1, Math.round(pathTileLength(path) * ticksPerTile));
+}
+
+export function edgesFor(farm: FarmSite | null): MapEdge[] {
+  if (!farm) return [];
+  const lowPath = [{ x: farm.x, y: farm.y }, ...LOW_ROAD_WAYPOINTS];
+  const highPath = [{ x: farm.x, y: farm.y }, ...HIGH_ROAD_WAYPOINTS];
+  return [
+    {
+      id: 'low-road',
+      name: 'The Low Road',
+      a: 'farm',
+      b: 'ryne',
+      capacity: CART_CAPACITY,
+      latency: roadLatency(lowPath, LOW_ROAD_TICKS_PER_TILE),
+      exposure: LOW_ROAD_EXPOSURE,
+      condition: 'tideLocked',
+      path: lowPath,
+    },
+    {
+      id: 'high-road',
+      name: 'The High Road',
+      a: 'farm',
+      b: 'ryne',
+      capacity: CART_CAPACITY,
+      latency: roadLatency(highPath, HIGH_ROAD_TICKS_PER_TILE),
+      exposure: HIGH_ROAD_EXPOSURE,
+      condition: 'open',
+      path: highPath,
+    },
+  ];
+}
+
+export function nodeById(id: NodeId, farm: FarmSite | null): MapNode {
+  const n = nodesFor(farm).find((n) => n.id === id);
   if (!n) throw new Error(`Unknown node: ${id}`);
   return n;
 }
 
-export function edgeById(id: EdgeId): MapEdge {
-  const e = EDGES.find((e) => e.id === id);
+export function edgeById(id: EdgeId, farm: FarmSite | null): MapEdge {
+  const e = edgesFor(farm).find((e) => e.id === id);
   if (!e) throw new Error(`Unknown edge: ${id}`);
   return e;
 }

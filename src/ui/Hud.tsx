@@ -40,10 +40,18 @@ export function Hud({ state }: { state: GameState }) {
         <span className="hud-coin">{state.coin}</span>
       </div>
 
-      <div className="hud-block">
-        <span className="hud-label">Fleece at farm</span>
-        <span className="hud-coin">{state.stores.farm?.fleece ?? 0}</span>
-      </div>
+      {state.farm && (
+        <>
+          <div className="hud-block">
+            <span className="hud-label">Fleece in store</span>
+            <span className="hud-coin">{state.stores.farm?.fleece ?? 0}</span>
+          </div>
+          <div className="hud-block">
+            <span className="hud-label">Wool on flock</span>
+            <span className="hud-coin">{state.fleeceReady}</span>
+          </div>
+        </>
+      )}
     </div>
   );
 }

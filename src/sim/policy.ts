@@ -1,23 +1,34 @@
-// A trivial scripted player for headless runs: load the cart at the farm,
-// take the low road when the tide allows (else the high road), sell at Ryne,
-// come home. Used by the 200-game distribution test (spec §13) and the
-// `npm run headless` demo. This is a bot, not an AI — it exists so that
-// balance can be smoke-tested without a browser.
+// A trivial scripted player for headless runs: site the farm, shear at dawn,
+// load the cart, take the low road when the tide allows (else the high road),
+// sell at Ryne, come home. Used by the 200-game distribution test (spec §13)
+// and the `npm run headless` demo. This is a bot, not an AI — it exists so
+// that balance can be smoke-tested without a browser.
 
 import { CART_CAPACITY } from './balance';
 import { isFlooded } from './time';
 import { initialState, tick } from './tick';
 import type { Action, GameState } from './types';
 
+/** The bot's favourite ground — the old default site on the open marsh. */
+export const POLICY_FARM_SITE = { x: 8, y: 11 };
+
 export function greedyCarterPolicy(state: GameState): Action[] {
-  const cart = state.carts[0];
   const actions: Action[] = [];
 
-  if (cart.location.kind !== 'node') return actions;
+  if (state.farm === null) {
+    actions.push({ type: 'placeFarm', ...POLICY_FARM_SITE });
+    return actions;
+  }
+
+  const cart = state.carts[0];
+  if (!cart || cart.location.kind !== 'node') return actions;
 
   if (cart.location.nodeId === 'farm') {
+    if (state.fleeceReady > 0) {
+      actions.push({ type: 'shear' });
+    }
     const fleeceHeld = cart.cargo.fleece ?? 0;
-    const fleeceAtFarm = state.stores.farm?.fleece ?? 0;
+    const fleeceAtFarm = (state.stores.farm?.fleece ?? 0) + state.fleeceReady;
     if (fleeceHeld < CART_CAPACITY && fleeceAtFarm > 0) {
       actions.push({
         type: 'loadCart',

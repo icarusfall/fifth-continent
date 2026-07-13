@@ -1,5 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { EDGES, MAP_HEIGHT, MAP_WIDTH, NODES, TERRAIN, nodeById, otherEnd } from '../map';
+import { HIGH_ROAD_TICKS_PER_TILE, LOW_ROAD_TICKS_PER_TILE } from '../balance';
+import {
+  MAP_HEIGHT,
+  MAP_WIDTH,
+  TERRAIN,
+  edgesFor,
+  isPlaceable,
+  nodeById,
+  nodesFor,
+  otherEnd,
+  pathTileLength,
+  roadLatency,
+} from '../map';
+
+const SITE = { x: 8, y: 11 };
 
 describe('the Gault (hand-authored map)', () => {
   it('is exactly 40×30 tiles', () => {
@@ -10,14 +24,14 @@ describe('the Gault (hand-authored map)', () => {
   });
 
   it('uses only legend characters', () => {
-    const legend = new Set(['c', '.', 'p', 'f', 'd', 't', 's', '~']);
+    const legend = new Set(['c', '.', 'd', 't', 's', '~']);
     for (const row of TERRAIN) {
       for (const ch of row) expect(legend.has(ch), `unknown tile '${ch}'`).toBe(true);
     }
   });
 
-  it('places every node on dry land inside the map', () => {
-    for (const node of NODES) {
+  it('places every fixed node on dry land inside the map', () => {
+    for (const node of nodesFor(null)) {
       expect(node.x).toBeGreaterThanOrEqual(0);
       expect(node.x).toBeLessThan(MAP_WIDTH);
       expect(node.y).toBeGreaterThanOrEqual(0);
@@ -26,22 +40,64 @@ describe('the Gault (hand-authored map)', () => {
       expect(tile, `${node.id} sits on '${tile}'`).not.toBe('~');
     }
   });
+});
+
+describe('farm placement (spec §6.7)', () => {
+  it('accepts marsh and nothing else', () => {
+    expect(isPlaceable(8, 11)).toBe(true); // open marsh
+    expect(isPlaceable(2, 1)).toBe(false); // clay upland
+    expect(isPlaceable(38, 10)).toBe(false); // the sea
+    expect(isPlaceable(28, 22)).toBe(false); // Ryne
+    expect(isPlaceable(5, 17)).toBe(false); // a dyke
+    expect(isPlaceable(-1, 5)).toBe(false); // off the map
+    expect(isPlaceable(5, 400)).toBe(false); // off the map
+  });
+
+  it('there are no nodes or roads before the farm is sited', () => {
+    expect(nodesFor(null).map((n) => n.id)).toEqual(['ryne', 'customs']);
+    expect(edgesFor(null)).toEqual([]);
+  });
+
+  it('siting the farm creates the farm node and both roads', () => {
+    expect(nodeById('farm', SITE)).toMatchObject({ kind: 'farm', ...SITE });
+    expect(edgesFor(SITE).map((e) => e.id).sort()).toEqual(['high-road', 'low-road']);
+  });
+});
+
+describe('roads', () => {
+  const edges = edgesFor(SITE);
+  const low = edges.find((e) => e.id === 'low-road')!;
+  const high = edges.find((e) => e.id === 'high-road')!;
 
   it('every edge connects two real nodes and its path spans them', () => {
-    for (const edge of EDGES) {
-      const a = nodeById(edge.a);
-      const b = nodeById(edge.b);
-      const first = edge.path[0];
-      const last = edge.path[edge.path.length - 1];
-      expect({ x: a.x, y: a.y }).toEqual(first);
-      expect({ x: b.x, y: b.y }).toEqual(last);
+    for (const edge of edges) {
+      const a = nodeById(edge.a, SITE);
+      const b = nodeById(edge.b, SITE);
+      expect({ x: a.x, y: a.y }).toEqual(edge.path[0]);
+      expect({ x: b.x, y: b.y }).toEqual(edge.path[edge.path.length - 1]);
       expect(edge.latency).toBeGreaterThan(0);
     }
   });
 
+  it('derives latency from path length (spec §6.7)', () => {
+    expect(low.latency).toBe(roadLatency(low.path, LOW_ROAD_TICKS_PER_TILE));
+    expect(high.latency).toBe(
+      Math.max(1, Math.round(pathTileLength(high.path) * HIGH_ROAD_TICKS_PER_TILE)),
+    );
+  });
+
+  it('keeps the canonical latencies at the bot’s site (8, 11)', () => {
+    // These are the tuned M1 values; if a waypoint edit moves them, notice.
+    expect(low.latency).toBe(8);
+    expect(high.latency).toBe(20);
+  });
+
+  it('a farm sited farther away takes longer to reach Ryne', () => {
+    const far = edgesFor({ x: 2, y: 6 });
+    expect(far.find((e) => e.id === 'low-road')!.latency).toBeGreaterThan(low.latency);
+  });
+
   it('the low road is tide-locked and faster than the high road', () => {
-    const low = EDGES.find((e) => e.id === 'low-road')!;
-    const high = EDGES.find((e) => e.id === 'high-road')!;
     expect(low.condition).toBe('tideLocked');
     expect(high.condition).toBe('open');
     expect(low.latency).toBeLessThan(high.latency);
@@ -50,7 +106,6 @@ describe('the Gault (hand-authored map)', () => {
   });
 
   it('otherEnd traverses both directions and rejects strangers', () => {
-    const low = EDGES.find((e) => e.id === 'low-road')!;
     expect(otherEnd(low, 'farm')).toBe('ryne');
     expect(otherEnd(low, 'ryne')).toBe('farm');
     expect(() => otherEnd(low, 'customs')).toThrow();

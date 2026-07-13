@@ -74,7 +74,11 @@ export interface GameState {
   tick: number;
   rngState: RngState;
   coin: number;
+  /** Where the player sited the farm; null during the placement phase. */
+  farm: { x: number; y: number } | null;
   flockSize: number;
+  /** Wool on the sheep's backs, grown at dawn, collected by the shear action. */
+  fleeceReady: number;
   /** Goods sitting at nodes (farm store, quay, …). */
   stores: Record<NodeId, Store>;
   carts: Cart[];
@@ -85,6 +89,8 @@ export interface GameState {
 // ---- Actions ----
 
 export type Action =
+  | { type: 'placeFarm'; x: number; y: number }
+  | { type: 'shear' }
   | { type: 'loadCart'; cartId: CartId; good: Good; qty: number }
   | { type: 'unloadCart'; cartId: CartId; good: Good; qty: number }
   | { type: 'dispatchCart'; cartId: CartId; edgeId: EdgeId }

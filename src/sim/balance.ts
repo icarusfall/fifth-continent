@@ -30,9 +30,9 @@ export const SHEARING_HOUR = DAWN_HOUR; // fleece lands in the farm store at daw
 // ---- The cart ----
 export const CART_CAPACITY = 8; // fleece per run; 12 sheep/day forces a second run
 
-// ---- Roads ----
-export const LOW_ROAD_LATENCY = 8; // ticks (~1h20m). Short, flat, floods.
-export const HIGH_ROAD_LATENCY = 20; // ticks (~3h20m). Slow. Passes the Customs House.
+// ---- Roads (spec §6.7: latency = max(1, round(pathTileLength × ticksPerTile))) ----
+export const LOW_ROAD_TICKS_PER_TILE = 0.26; // flat and direct, when the sea allows
+export const HIGH_ROAD_TICKS_PER_TILE = 0.53; // climbs the upland, minds its manners
 export const LOW_ROAD_EXPOSURE = 0.5; // base Heat per unit moved (unused until M3)
 export const HIGH_ROAD_EXPOSURE = 1.0; // the Customs House watches it (unused until M3)
 

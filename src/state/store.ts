@@ -7,7 +7,8 @@ import { create } from 'zustand';
 import { initialState, tick } from '../sim/tick';
 import type { Action, ActionLog, GameState } from '../sim/types';
 
-const SAVE_KEY = 'fifth-continent-save-v1';
+// v2: GameState gained farm placement + fleeceReady; v1 saves are incompatible.
+const SAVE_KEY = 'fifth-continent-save-v2';
 const AUTOSAVE_EVERY_TICKS = 30;
 
 interface SaveFile {
@@ -38,6 +39,7 @@ function loadSave(): SaveFile | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as SaveFile;
     if (parsed.version !== 1 || typeof parsed.state?.tick !== 'number') return null;
+    if (!('farm' in parsed.state) || typeof parsed.state.fleeceReady !== 'number') return null;
     return parsed;
   } catch {
     return null;
@@ -55,7 +57,7 @@ function writeSave(state: GameState, actionLog: ActionLog): void {
 
 const DEFAULT_SEED = 1740;
 
-export const useGameStore = create<GameStore>((set, get) => {
+export const useGameStore = create<GameStore>()((set, get) => {
   const saved = loadSave();
   return {
     state: saved?.state ?? initialState(DEFAULT_SEED),
@@ -94,3 +96,8 @@ export const useGameStore = create<GameStore>((set, get) => {
     },
   };
 });
+
+if (import.meta.env.DEV) {
+  (window as unknown as { __game: unknown }).__game = useGameStore;
+}
+

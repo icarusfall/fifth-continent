@@ -19,11 +19,9 @@ export const HEAT_RED = '#C4453A';
 
 export const TERRAIN_FILL: Record<string, string> = {
   c: CLAY,
-  '.': MARSH_DARK,
-  p: MARSH,
-  f: ROOF,
+  '.': MARSH,
   d: DYKE,
-  t: ROOF,
+  t: CLAY, // Ryne's houses are drawn as assets on top
   s: LIMEWASH,
   '~': SEA,
 };

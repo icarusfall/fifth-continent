@@ -30,12 +30,12 @@ describe(`${GAMES} seeded games, ${DAYS} days each`, () => {
       expect(s.coin).toBeGreaterThan(0); // the carter must earn *something*
       expect(s.coin).toBeLessThanOrEqual(ceiling); // and cannot conjure wool
 
-      // Conservation: fleece sheared = fleece sold + fleece still in the world.
+      // Conservation: fleece grown = fleece sold + fleece still in the world.
       const sold = s.coin / WOOL_PRICE_DOMESTIC;
       const atFarm = s.stores.farm?.fleece ?? 0;
       const atRyne = s.stores.ryne?.fleece ?? 0;
       const onCart = s.carts[0].cargo.fleece ?? 0;
-      expect(sold + atFarm + atRyne + onCart).toBe(totalFleece);
+      expect(sold + atFarm + atRyne + onCart + s.fleeceReady).toBe(totalFleece);
 
       // The cart is somewhere real.
       const loc = s.carts[0].location;

@@ -6,10 +6,17 @@ A single-player, browser-based god/builder game about smuggling, logistics, and
 the two kinds of magic you can use to hide a crime. Design spec and build brief:
 [the-fifth-continent-spec.md](./the-fifth-continent-spec.md).
 
-## Status: Milestone 1 — The Cart ✅ (awaiting review)
+## Status: Milestone 1½ — The Yard ✅ (awaiting review)
 
 Twelve sheep, one cart, two roads. The low road floods at high tide; the high
 road is slow and passes the Customs House. Fleece → Ryne → an insulting price.
+
+The game opens on an empty marsh: choose ground for your farm (a sim action —
+placement is part of the replayable action log). Shear is a player verb.
+Orders are given through popover menus on the assets themselves; routes appear
+only once there is something to move. Rendering is layered Canvas 2D per spec
+§15.1 — painterly blob terrain (no visible grid), wobbly ink coastline, eased
+drag-pan / cursor-anchored zoom camera.
 
 Not yet built (by design — see spec §12): the Dutchman, the Revenue, cover &
 heat, combat, the trees, the market model.

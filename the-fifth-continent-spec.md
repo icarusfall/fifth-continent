@@ -146,6 +146,22 @@ Coin spent on non-productive assets (a fine house, a carriage, a pew) raises **r
 suspicion[node] += observedActivity × officerCompetence × (1 - bribed[officer])
 ```
 
+### 6.7 M1½ — placement, shearing, road latency
+The game opens with an empty marsh and one decision: where the farm goes.
+```
+placeFarm(x, y)   valid iff terrain[y][x] is marsh; creates the farm node,
+                  the flock, and the cart, and generates both road edges
+                  from the farm to Ryne's fixed waypoint chains
+roadLatency       = max(1, round(pathTileLength × ticksPerTile[road]))
+                  ticksPerTile: low road 0.26 (flat, direct), high 0.53 (climbs)
+fleeceReady      += flockSize × FLEECE_PER_HEAD_PER_DAY at dawn (wool on the
+                  sheep's backs, not in the store)
+shear             farmStore.fleece += fleeceReady; fleeceReady = 0 (a player
+                  verb at the farm, not an automatic process)
+```
+"Tend flock" is an inspection verb (flock size, fleece ready) — no formula,
+no effect, until §19.2 gives the flock its real job in M3.
+
 ---
 
 ## 7. THE REVENUE — A LEARNING ADVERSARY
@@ -270,6 +286,12 @@ Three endings, one per tree. All three are, in their way, a kind of loss.
 - Day/night, tide, and the two roads.
 - Minimal SVG render + a clock. Ugly is fine. **Correct and deterministic is not optional.**
 - Replay test: `(seed, actionLog)` → identical final state.
+
+**M1½ — The Yard.** *(Interface pass, no new adversaries.)* Farm placement on
+an open marsh (§6.7), shear as a player verb, popover menus on the assets
+themselves, drag-to-pan / cursor-anchored zoom (§15.2), textured tiles with the
+wobble trick (§15.3), progressive disclosure: routes appear only once there is
+something to move.
 
 **M2 — The Crime.** Dutchman, the beach, inbound goods, cutting house, quality tiers, bidirectional routing.
 **M3 — The Revenue.** `RevenueModel`, suspicion inference, the fogged player-facing intel map, cover & leak, first Riding Officer.
@@ -414,6 +436,10 @@ worldAfter  = screenToWorld(mouse, cam, zoom)
 cam        += worldBefore - worldAfter
 ```
 Also: drag-to-pan (middle mouse or space+drag), edge-scroll, and trackpad pinch (`ctrlKey` on the wheel event).
+
+**The camera is eased.** Pan and zoom set a *target*; the camera lerps toward it
+(~20%/frame) and never snaps. Terrain is painted to the static layer as soft
+overlapping blobs of palette colour — the tile grid must never be visible.
 
 **Semantic zoom / LOD — three bands, and they are a design feature, not an optimisation:**
 - **Far ("the County"):** no buildings, just the route graph — flow volumes as line thickness, Heat as colour. This is the *strategic* view and it is what the Revenue's map looks like too. The player should feel the uncomfortable symmetry.
