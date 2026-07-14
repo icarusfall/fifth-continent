@@ -2,10 +2,13 @@
 // games and asserts the outcome distribution is sane. M1's only "player" is
 // the greedy carter policy; nothing random touches the economy yet, so the
 // distribution is a point — but the harness, and the habit, start here.
+// Fourteen days covers two rent collections (spec §6.8): the bot must
+// survive the squeeze on lawful wool alone.
 
 import { describe, expect, it } from 'vitest';
 import {
   FLEECE_PER_HEAD_PER_DAY,
+  RENT_AMOUNT,
   STARTING_FLOCK,
   TICKS_PER_DAY,
   WOOL_PRICE_DOMESTIC,
@@ -13,25 +16,32 @@ import {
 import { runPolicyGame } from '../policy';
 
 const GAMES = 200;
-const DAYS = 3;
+const DAYS = 14; // two rent dues fall inside this window
 
 describe(`${GAMES} seeded games, ${DAYS} days each`, () => {
-  it('every game ends upright: coin earned, cart intact, books balanced', () => {
+  // 200 × 14 days ≈ 400k ticks: give the harness room to breathe.
+  it('every game ends upright: rent paid, flock intact, books balanced', { timeout: 60_000 }, () => {
     const coins: number[] = [];
 
     for (let seed = 1; seed <= GAMES; seed++) {
       const s = runPolicyGame(seed, TICKS_PER_DAY * DAYS);
 
-      // Theoretical ceiling: every fleece sheared, sold same day.
+      // The bot survives the squeeze on lawful wool alone.
+      expect(s.lost).toBe(false);
+      expect(s.flockSize).toBe(STARTING_FLOCK); // no distraint
+      expect(s.rentPaid).toBe(2 * RENT_AMOUNT); // both dues met in full
+
+      // Theoretical ceiling: every fleece sheared, sold same day, rent paid.
       const totalFleece = STARTING_FLOCK * FLEECE_PER_HEAD_PER_DAY * DAYS;
-      const ceiling = totalFleece * WOOL_PRICE_DOMESTIC;
+      const ceiling = totalFleece * WOOL_PRICE_DOMESTIC - s.rentPaid;
 
       expect(Number.isFinite(s.coin)).toBe(true);
-      expect(s.coin).toBeGreaterThan(0); // the carter must earn *something*
+      expect(s.coin).toBeGreaterThan(0); // solvent after two rents
       expect(s.coin).toBeLessThanOrEqual(ceiling); // and cannot conjure wool
 
-      // Conservation: fleece grown = fleece sold + fleece still in the world.
-      const sold = s.coin / WOOL_PRICE_DOMESTIC;
+      // Conservation: fleece grown = sold + still in the world;
+      // coin earned = coin held + rent paid.
+      const sold = (s.coin + s.rentPaid) / WOOL_PRICE_DOMESTIC;
       const atFarm = s.stores.farm?.fleece ?? 0;
       const atRyne = s.stores.ryne?.fleece ?? 0;
       const onCart = s.carts[0].cargo.fleece ?? 0;
@@ -54,10 +64,8 @@ describe(`${GAMES} seeded games, ${DAYS} days each`, () => {
     // widen this into a real distribution check, don't delete it.
     const distinct = new Set(coins);
     expect(distinct.size).toBe(1);
-    // The tide costs the carter some runs; expect a healthy if imperfect haul
-    // (at least half the theoretical ceiling over three days).
-    expect(coins[0]).toBeGreaterThanOrEqual(
-      (STARTING_FLOCK * FLEECE_PER_HEAD_PER_DAY * DAYS * WOOL_PRICE_DOMESTIC) / 2,
-    );
+    // The margin of a lawful life: solvent, but thin (spec §6.8).
+    expect(coins[0]).toBeGreaterThan(0);
+    expect(coins[0]).toBeLessThan(RENT_AMOUNT);
   });
 });

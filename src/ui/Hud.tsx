@@ -1,6 +1,16 @@
-import { clockOf, dayPhaseOf, isFlooded, tideIsRising, tideLevel } from '../sim/time';
+import { RENT_AMOUNT, TICKS_PER_HOUR } from '../sim/balance';
+import {
+  clockOf,
+  dayPhaseOf,
+  isFlooded,
+  tideIsRising,
+  tideLevel,
+  ticksUntilTideTurn,
+} from '../sim/time';
 import type { GameState } from '../sim/types';
-import { DYKE, LIMEWASH, SEA } from './palette';
+import { DYKE, LIMEWASH, ROOF, SEA } from './palette';
+
+import { spanOf } from './format';
 
 const PHASE_GLYPH = { day: '☀', dusk: '🌗', night: '☾' } as const;
 
@@ -31,7 +41,9 @@ export function Hud({ state }: { state: GameState }) {
           />
         </div>
         <span className="hud-note" style={{ color: flooded ? LIMEWASH : undefined }}>
-          {flooded ? 'the low road is under water' : 'the low road is passable'}
+          {flooded
+            ? `low road drowned · clears in ${spanOf(ticksUntilTideTurn(state.tick))}`
+            : `low road open · floods in ${spanOf(ticksUntilTideTurn(state.tick))}`}
         </span>
       </div>
 
@@ -39,6 +51,27 @@ export function Hud({ state }: { state: GameState }) {
         <span className="hud-label">Coin</span>
         <span className="hud-coin">{state.coin}</span>
       </div>
+
+      {state.rentDueTick !== null && (
+        <div className="hud-block">
+          <span className="hud-label">Rent</span>
+          <span
+            className="hud-coin"
+            style={{
+              color:
+                state.coin < RENT_AMOUNT && state.rentDueTick - state.tick < 24 * TICKS_PER_HOUR
+                  ? ROOF
+                  : undefined,
+            }}
+          >
+            {RENT_AMOUNT}
+          </span>
+          <span className="hud-note">
+            due day {clockOf(state.rentDueTick).day}, dawn
+            {state.coin < RENT_AMOUNT ? ` · short ${RENT_AMOUNT - state.coin}` : ' · covered'}
+          </span>
+        </div>
+      )}
 
       {state.farm && (
         <>

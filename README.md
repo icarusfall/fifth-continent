@@ -15,8 +15,14 @@ The game opens on an empty marsh: choose ground for your farm (a sim action —
 placement is part of the replayable action log). Shear is a player verb.
 Orders are given through popover menus on the assets themselves; routes appear
 only once there is something to move. Rendering is layered Canvas 2D per spec
-§15.1 — painterly blob terrain (no visible grid), wobbly ink coastline, eased
-drag-pan / cursor-anchored zoom camera.
+§15.1 — painterly warped terrain (no visible grid), traced ink coastline,
+eased drag-pan / cursor-anchored zoom camera.
+
+**The squeeze (spec §6.8):** you are a tenant. Rent is 120 coin every six
+days, collected at dawn; perfect lawful play earns 144. Come up short and the
+agent distrains sheep at valuation — shrinking your income now and your alibi
+later. Lose the flock, lose the tenancy. The tide gauge forecasts when the low
+road floods and clears, so a run is a timed bet, not a coin flip.
 
 Not yet built (by design — see spec §12): the Dutchman, the Revenue, cover &
 heat, combat, the trees, the market model.

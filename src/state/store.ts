@@ -7,8 +7,8 @@ import { create } from 'zustand';
 import { initialState, tick } from '../sim/tick';
 import type { Action, ActionLog, GameState } from '../sim/types';
 
-// v2: GameState gained farm placement + fleeceReady; v1 saves are incompatible.
-const SAVE_KEY = 'fifth-continent-save-v2';
+// v3: GameState gained rent (rentDueTick/rentPaid/lost); older saves are incompatible.
+const SAVE_KEY = 'fifth-continent-save-v3';
 const AUTOSAVE_EVERY_TICKS = 30;
 
 interface SaveFile {
@@ -40,6 +40,7 @@ function loadSave(): SaveFile | null {
     const parsed = JSON.parse(raw) as SaveFile;
     if (parsed.version !== 1 || typeof parsed.state?.tick !== 'number') return null;
     if (!('farm' in parsed.state) || typeof parsed.state.fleeceReady !== 'number') return null;
+    if (!('rentDueTick' in parsed.state) || typeof parsed.state.lost !== 'boolean') return null;
     return parsed;
   } catch {
     return null;

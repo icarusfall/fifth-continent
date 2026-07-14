@@ -76,6 +76,12 @@ export interface GameState {
   coin: number;
   /** Where the player sited the farm; null during the placement phase. */
   farm: { x: number; y: number } | null;
+  /** Tick at which the next rent falls due; null before the tenancy begins. */
+  rentDueTick: number | null;
+  /** Cumulative coin paid in rent — the ledger will want it later. */
+  rentPaid: number;
+  /** The tenancy is forfeit: the sim freezes, the game is over. */
+  lost: boolean;
   flockSize: number;
   /** Wool on the sheep's backs, grown at dawn, collected by the shear action. */
   fleeceReady: number;

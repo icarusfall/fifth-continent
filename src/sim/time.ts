@@ -70,3 +70,15 @@ export function isFlooded(tick: number): boolean {
 export function tideIsRising(tick: number): boolean {
   return tick % TIDE_PERIOD_TICKS < TIDE_PERIOD_TICKS / 2;
 }
+
+/**
+ * Ticks until the low road next changes state (floods if open, clears if
+ * drowned). Any marsh carter knows this by heart; the player gets it too.
+ */
+export function ticksUntilTideTurn(tick: number): number {
+  const now = isFlooded(tick);
+  for (let t = 1; t <= TIDE_PERIOD_TICKS; t++) {
+    if (isFlooded(tick + t) !== now) return t;
+  }
+  return TIDE_PERIOD_TICKS; // unreachable: the tide always turns
+}

@@ -41,5 +41,10 @@ export const HIGH_ROAD_EXPOSURE = 1.0; // the Customs House watches it (unused u
 export const WOOL_PRICE_DOMESTIC = 2; // coin per fleece at Ryne
 export const LEIDEN_PRICE_MULT = 4; // M2: the Dutchman's offer
 
+// ---- Rent (spec §6.8: the first squeeze) ----
+export const RENT_AMOUNT = 120; // coin, per period
+export const RENT_PERIOD_DAYS = 6; // first due at dawn, this many days after placement
+export const SHEEP_VALUE = 10; // the agent's valuation under distraint
+
 // ---- Bookkeeping ----
 export const MAX_LOG_EVENTS = 50; // event log ring buffer, part of state

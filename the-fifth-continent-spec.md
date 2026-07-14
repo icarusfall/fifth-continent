@@ -162,6 +162,26 @@ shear             farmStore.fleece += fleeceReady; fleeceReady = 0 (a player
 "Tend flock" is an inspection verb (flock size, fleece ready) — no formula,
 no effect, until §19.2 gives the flock its real job in M3.
 
+### 6.8 M1½ — rent (the first squeeze)
+You are a tenant grazier. The landlord is in Applesham; his agent is punctual.
+Rent is the one running cost — §19.1 stays cut (no feed, no repair chores);
+this is a single number and a deadline, and it makes the domestic wool price
+legible as an insult rather than an adjective.
+```
+RENT_AMOUNT      = 120 coin
+RENT_PERIOD_DAYS = 6      // first due at dawn, RENT_PERIOD_DAYS days after placement
+at each due dawn:
+  paid      = min(coin, RENT_AMOUNT); coin -= paid
+  shortfall = RENT_AMOUNT - paid
+  seized    = min(flockSize, ceil(shortfall / SHEEP_VALUE))   // SHEEP_VALUE = 10
+  flockSize -= seized     // distraint: the agent takes sheep at valuation
+  if flockSize reaches 0 → the tenancy is forfeit (loss)
+```
+Perfect lawful play earns 144 coin per period against 120 rent. You can
+survive on wool; you cannot live on it. Distraint compounds: every seized
+sheep shrinks future income now and the smuggler's alibi later (§19.2).
+This arithmetic is the Dutchman's opening argument in M2.
+
 ---
 
 ## 7. THE REVENUE — A LEARNING ADVERSARY

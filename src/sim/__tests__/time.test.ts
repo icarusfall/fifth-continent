@@ -8,7 +8,14 @@ import {
   TIME_OF_DAY_MOD_DUSK,
   TIME_OF_DAY_MOD_NIGHT,
 } from '../balance';
-import { clockOf, dayPhaseOf, isFlooded, tideLevel, timeOfDayMod } from '../time';
+import {
+  clockOf,
+  dayPhaseOf,
+  isFlooded,
+  tideLevel,
+  ticksUntilTideTurn,
+  timeOfDayMod,
+} from '../time';
 
 describe('clock', () => {
   it('starts at day 1, 00:00', () => {
@@ -84,5 +91,15 @@ describe('tide', () => {
     ).length;
     expect(floodedTicks).toBeGreaterThan(0);
     expect(floodedTicks).toBeLessThan(TIDE_PERIOD_TICKS / 2);
+  });
+
+  it('forecasts the turn exactly', () => {
+    for (let t = 0; t < TIDE_PERIOD_TICKS * 2; t++) {
+      const dt = ticksUntilTideTurn(t);
+      expect(dt).toBeGreaterThan(0);
+      expect(isFlooded(t + dt)).not.toBe(isFlooded(t));
+      // ...and not a tick sooner.
+      expect(isFlooded(t + dt - 1)).toBe(isFlooded(t));
+    }
   });
 });

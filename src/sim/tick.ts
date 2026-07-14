@@ -7,8 +7,13 @@ import {
   CART_CAPACITY,
   FLEECE_PER_HEAD_PER_DAY,
   MAX_LOG_EVENTS,
+  RENT_AMOUNT,
+  RENT_PERIOD_DAYS,
   SHEARING_HOUR,
+  SHEEP_VALUE,
   STARTING_FLOCK,
+  TICKS_PER_DAY,
+  TICKS_PER_HOUR,
   WOOL_PRICE_DOMESTIC,
 } from './balance';
 import { edgeById, isPlaceable, nodeById, otherEnd } from './map';
@@ -23,6 +28,9 @@ export function initialState(seed: number): GameState {
     rngState: seedRng(seed),
     coin: 0,
     farm: null,
+    rentDueTick: null,
+    rentPaid: 0,
+    lost: false,
     flockSize: STARTING_FLOCK,
     fleeceReady: 0,
     stores: {},
@@ -80,7 +88,12 @@ function applyAction(state: GameState, action: Action): void {
         cargo: {},
         location: { kind: 'node', nodeId: 'farm' },
       });
+      // The tenancy begins: rent falls due at dawn, RENT_PERIOD_DAYS from now.
+      const placementDay = Math.floor(state.tick / TICKS_PER_DAY);
+      state.rentDueTick =
+        (placementDay + RENT_PERIOD_DAYS) * TICKS_PER_DAY + SHEARING_HOUR * TICKS_PER_HOUR;
       logEvent(state, 'Walland Farm. Twelve sheep, one cart, and a price in Ryne.');
+      logEvent(state, `The agent notes your name. Rent is ${RENT_AMOUNT} coin, six days hence.`);
       return;
     }
 
@@ -197,6 +210,33 @@ function growWoolAtDawn(state: GameState): void {
   }
 }
 
+/** Spec §6.8 — the agent calls at dawn. Pays what it can; distrains the rest. */
+function collectRent(state: GameState): void {
+  if (state.rentDueTick === null || state.tick !== state.rentDueTick) return;
+
+  const paid = Math.min(state.coin, RENT_AMOUNT);
+  state.coin -= paid;
+  state.rentPaid += paid;
+  const shortfall = RENT_AMOUNT - paid;
+
+  if (shortfall <= 0) {
+    logEvent(state, `Rent paid: ${RENT_AMOUNT} coin. The agent tips his hat exactly one inch.`);
+  } else {
+    const seized = Math.min(state.flockSize, Math.ceil(shortfall / SHEEP_VALUE));
+    state.flockSize -= seized;
+    logEvent(
+      state,
+      `Short by ${shortfall} coin. The agent's men drive off ${seized} sheep. Distraint, he calls it.`,
+    );
+    if (state.flockSize <= 0) {
+      state.lost = true;
+      logEvent(state, 'The tenancy is forfeit. The Gault keeps no one who cannot pay.');
+      return;
+    }
+  }
+  state.rentDueTick += RENT_PERIOD_DAYS * TICKS_PER_DAY;
+}
+
 function moveCarts(state: GameState): void {
   for (const cart of state.carts) {
     if (cart.location.kind !== 'edge') continue;
@@ -227,12 +267,16 @@ function moveCarts(state: GameState): void {
 // ---- The tick ----
 
 export function tick(state: GameState, actions: Action[]): GameState {
+  // The tenancy is forfeit: the world stops. Only a new game moves it.
+  if (state.lost) return clone(state);
+
   const next = clone(state);
 
   for (const action of actions) applyAction(next, action);
 
   next.tick += 1;
   growWoolAtDawn(next);
+  collectRent(next);
   moveCarts(next);
 
   return next;

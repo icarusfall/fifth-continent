@@ -5,9 +5,10 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { CART_CAPACITY, WOOL_PRICE_DOMESTIC } from '../sim/balance';
+import { CART_CAPACITY, LEIDEN_PRICE_MULT, WOOL_PRICE_DOMESTIC } from '../sim/balance';
 import { edgesFor, isPlaceable } from '../sim/map';
-import { clockOf, dayPhaseOf, isFlooded } from '../sim/time';
+import { clockOf, dayPhaseOf, isFlooded, ticksUntilTideTurn } from '../sim/time';
+import { spanOf } from './format';
 import type { GameState } from '../sim/types';
 import { useGameStore } from '../state/store';
 import { CameraController } from './camera';
@@ -291,6 +292,8 @@ export function GameMap({ state }: { state: GameState }) {
         </div>
       )}
 
+      {state.lost && <ForfeitOverlay />}
+
       {selected && (
         <div ref={popRef} className="popover-anchor">
           <Popover onClose={() => setSelected(null)}>
@@ -308,6 +311,22 @@ export function GameMap({ state }: { state: GameState }) {
           </Popover>
         </div>
       )}
+    </div>
+  );
+}
+
+function ForfeitOverlay() {
+  const reset = useGameStore((s) => s.reset);
+  return (
+    <div className="forfeit">
+      <div className="forfeit-card">
+        <h2>The tenancy is forfeit.</h2>
+        <p>
+          The agent's men drove off the last of the flock at dawn. The Gault keeps no one who
+          cannot pay.
+        </p>
+        <button onClick={reset}>Begin again</button>
+      </div>
     </div>
   );
 }
@@ -396,10 +415,17 @@ function FarmMenu({
           <div className="menu-buttons">
             <button
               disabled={flooded}
-              title={flooded ? 'Under the tide. It will fall.' : 'Short and flat. Floods at high water.'}
+              title={
+                flooded
+                  ? `Under the tide. Clears in ${spanOf(ticksUntilTideTurn(state.tick))}.`
+                  : `Short and flat. Floods in ${spanOf(ticksUntilTideTurn(state.tick))}.`
+              }
               onClick={() => enqueue({ type: 'dispatchCart', cartId: cart!.id, edgeId: 'low-road' })}
             >
-              Send by the low road {flooded ? '· drowned' : '· fast'}
+              Send by the low road{' '}
+              {flooded
+                ? `· clears in ${spanOf(ticksUntilTideTurn(state.tick))}`
+                : `· floods in ${spanOf(ticksUntilTideTurn(state.tick))}`}
             </button>
             <button
               title="Slow, dry, and past the Customs House."
@@ -426,6 +452,10 @@ function RyneMenu({ state, flooded }: { state: GameState; flooded: boolean }) {
       <p className="flavour">
         Wool fetches {WOOL_PRICE_DOMESTIC} coin the fleece here, and every buyer on the quay knows
         it cannot lawfully leave the country.
+      </p>
+      <p className="flavour">
+        Across the water they pay {WOOL_PRICE_DOMESTIC * LEIDEN_PRICE_MULT} the fleece. Not that
+        anyone would know about that.
       </p>
       {cartHere && held > 0 && (
         <div className="menu-buttons">

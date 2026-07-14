@@ -250,6 +250,38 @@ button.danger {
   color: var(--limewash);
 }
 
+/* Game over */
+.forfeit {
+  position: absolute;
+  inset: 0;
+  background: rgba(36, 28, 24, 0.82);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+}
+
+.forfeit-card {
+  max-width: 420px;
+  text-align: center;
+  padding: 28px 32px;
+  border: 1px solid var(--clay);
+  border-radius: 4px;
+  background: rgba(36, 28, 24, 0.95);
+}
+
+.forfeit-card h2 {
+  margin: 0 0 10px;
+  font-variant: small-caps;
+  letter-spacing: 0.05em;
+}
+
+.forfeit-card p {
+  font-style: italic;
+  opacity: 0.8;
+  line-height: 1.5;
+}
+
 /* Speed controls (header, compact) */
 .speed-controls {
   display: flex;
