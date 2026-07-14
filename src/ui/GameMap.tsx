@@ -192,7 +192,7 @@ export function GameMap({ state }: { state: GameState }) {
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       const r = shell.getBoundingClientRect();
-      cam.wheel(e.deltaY, e.clientX - r.left, e.clientY - r.top);
+      cam.wheel(e.deltaY, e.clientX - r.left, e.clientY - r.top, e.deltaMode);
     };
     shell.addEventListener('wheel', onWheel, { passive: false });
     return () => shell.removeEventListener('wheel', onWheel);

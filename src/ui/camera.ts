@@ -6,7 +6,7 @@ import { WORLD_H, WORLD_W } from './geometry';
 
 const ZOOM_MAX = 8;
 const ZOOM_SPEED = 0.0015; // spec §15.2
-const EASE_ZOOM = 0.18;
+const EASE_ZOOM = 0.14;
 const EASE_PAN = 0.35; // pans track the hand closely; zoom glides
 const DRAG_THRESHOLD_PX = 5;
 
@@ -51,11 +51,15 @@ export class CameraController {
   }
 
   /** Cursor-anchored zoom (spec §15.2), applied to the target camera. */
-  wheel(deltaY: number, sx: number, sy: number): void {
+  wheel(deltaY: number, sx: number, sy: number, deltaMode = 0): void {
+    // Normalise: line-mode wheels (some mice/browsers) report ~3 lines per
+    // notch; clamp so one violent notch cannot jump the target far.
+    let dy = deltaMode === 1 ? deltaY * 33 : deltaY;
+    dy = Math.max(-80, Math.min(80, dy));
     const worldBeforeX = this.tx + sx / this.tzoom;
     const worldBeforeY = this.ty + sy / this.tzoom;
     const minZoom = this.fitZoom * 0.85;
-    this.tzoom = Math.min(ZOOM_MAX, Math.max(minZoom, this.tzoom * (1 - deltaY * ZOOM_SPEED)));
+    this.tzoom = Math.min(ZOOM_MAX, Math.max(minZoom, this.tzoom * (1 - dy * ZOOM_SPEED)));
     const worldAfterX = this.tx + sx / this.tzoom;
     const worldAfterY = this.ty + sy / this.tzoom;
     this.tx += worldBeforeX - worldAfterX;
