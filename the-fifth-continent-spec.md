@@ -546,7 +546,7 @@ zoom        = clamp(zoom * (1 - deltaY * 0.0015), MIN_ZOOM, MAX_ZOOM)
 worldAfter  = screenToWorld(mouse, cam, zoom)
 cam        += worldBefore - worldAfter
 ```
-Also: drag-to-pan (middle mouse or space+drag), edge-scroll, and trackpad pinch (`ctrlKey` on the wheel event).
+Also: drag-to-pan (middle mouse or space+drag), edge-scroll, and trackpad pinch (`ctrlKey` on the wheel event). On touch, one finger pans and a two-finger pinch drives the same midpoint-anchored zoom — the game must stay playable on a phone, with the header and event log yielding the screen to the map below 640px.
 
 **The camera is eased.** Pan and zoom set a *target*; the camera lerps toward it
 (~20%/frame) and never snaps. Terrain is painted to the static layer as soft
