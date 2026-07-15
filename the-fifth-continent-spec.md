@@ -913,6 +913,11 @@ See §18. Small caps, high Heat, no buffering.
 
 **No modal management screens.** Everything is map + side panels + popovers. A management screen would betray the thesis, which is that *the map is the truth and the map is also what the Revenue is assembling.*
 
+**Click the place, not the pixel.** Anything standing at a node answers from
+the node's popover: a cart in the farmyard is part of the farm's menu (its
+cargo, its carter, its dyke), never a separate sprite to hunt for. Only a
+cart on the road — where there is no place to click — answers for itself.
+
 ### 20.1 The one exception: THE LEDGER
 The single screen you switch into — and it is **diegetic**, because bookkeeping *is* the cover mechanic.
 

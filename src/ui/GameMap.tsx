@@ -27,7 +27,7 @@ import {
   nodeById,
   officerEdgesFor,
 } from '../sim/map';
-import { clockOf, dayPhaseOf, isFlooded, ticksUntilTideTurn } from '../sim/time';
+import { dayPhaseOf, isFlooded, ticksUntilTideTurn } from '../sim/time';
 import { GOOD_LABEL, spanOf, storeSummary } from './format';
 import type { Cart, CutDepth, EdgeId, GameState, Good, NodeId } from '../sim/types';
 import { useGameStore } from '../state/store';
@@ -406,8 +406,17 @@ export function GameMap({ state }: { state: GameState }) {
       const d = Math.hypot(w.x - t.x, w.y - t.y);
       if (d <= t.r && (!best || d < best.d)) best = { sel: t.sel, d };
     }
-    if (best?.sel === 'farm') farmVisitedRef.current = true;
-    setSelected(best?.sel ?? null);
+    let sel = best?.sel ?? null;
+    // Click the place, not the pixel (spec §20): a cart standing at a node
+    // answers from the node's menu; only a cart on the road answers for itself.
+    if (sel?.startsWith('cart:')) {
+      const cart = s.carts.find((c) => c.id === sel!.slice(5));
+      if (cart?.location.kind === 'node' && cart.location.nodeId !== 'customs') {
+        sel = cart.location.nodeId as Selection;
+      }
+    }
+    if (sel === 'farm') farmVisitedRef.current = true;
+    setSelected(sel);
   }
 
   return (
@@ -723,8 +732,8 @@ function FarmMenu({
         <>
           {held > 0 && (
             <p className="flavour">
-              The cart stands laden ({held}/{CART_CAPACITY}): {storeSummary(cart!.cargo)}. Ryne
-              pays {WOOL_PRICE_DOMESTIC} coin a fleece.
+              {cart!.name} stands laden ({held}/{CART_CAPACITY}). Ryne pays{' '}
+              {WOOL_PRICE_DOMESTIC} coin a fleece.
             </p>
           )}
           <div className="menu-buttons">
@@ -778,6 +787,8 @@ function FarmMenu({
           </div>
         </>
       )}
+
+      <CartsAtNode state={state} nodeId="farm" />
     </>
   );
 }
@@ -853,6 +864,8 @@ function RyneMenu({ state, flooded }: { state: GameState; flooded: boolean }) {
           )}
         </div>
       )}
+
+      <CartsAtNode state={state} nodeId="ryne" />
     </>
   );
 }
@@ -944,6 +957,8 @@ function ShingleMenu({ state, onPlace }: { state: GameState; onPlace: () => void
           )}
         </div>
       )}
+
+      <CartsAtNode state={state} nodeId="shingle" />
     </>
   );
 }
@@ -1030,6 +1045,96 @@ function CuttingHouseMenu({ state }: { state: GameState }) {
           </button>
         </div>
       )}
+
+      <CartsAtNode state={state} nodeId="cutting-house" />
+    </>
+  );
+}
+
+/**
+ * Spec §20: click the place, not the pixel. Every cart standing at a node
+ * shows its business here — cargo, carter, the hire flow, and the dyke.
+ */
+function CartsAtNode({ state, nodeId }: { state: GameState; nodeId: NodeId }) {
+  const enqueue = useEnqueue();
+  const [hiring, setHiring] = useState<{ cartId: string; good: Good } | null>(null);
+  const carts = state.carts.filter(
+    (c) => c.location.kind === 'node' && c.location.nodeId === nodeId,
+  );
+  if (carts.length === 0) return null;
+
+  // A standing order runs from where the cart stands (spec §6.11).
+  const haulables = Array.from(
+    new Set([
+      ...(Object.entries(state.stores[nodeId] ?? {}) as Array<[Good, number]>)
+        .filter(([, n]) => n > 0)
+        .map(([g]) => g),
+      ...(nodeId === 'farm' ? (['fleece'] as Good[]) : []),
+    ]),
+  );
+  const destinations = (['farm', 'ryne', 'shingle', 'cutting-house'] as NodeId[]).filter(
+    (n) => n !== nodeId && (n !== 'cutting-house' || state.cuttingHouse),
+  );
+
+  return (
+    <>
+      {carts.map((cart) => {
+        const laden = cargoCount(cart.cargo) > 0;
+        return (
+          <div key={cart.id}>
+            <p className="flavour">
+              {cart.name}: {storeSummary(cart.cargo, 'empty')}
+              {cart.carter
+                ? ` · a carter on the reins — ${GOOD_LABEL[cart.carter.good]} to ${
+                    nodeById(cart.carter.to, state.farm, state.cuttingHouse).name
+                  }, ${CARTER_WAGE} coin a day. He minds the tide and nothing else.`
+                : ''}
+            </p>
+            <div className="menu-buttons">
+              {cart.carter ? (
+                <button onClick={() => enqueue({ type: 'dismissCarter', cartId: cart.id })}>
+                  Dismiss the carter
+                </button>
+              ) : hiring?.cartId === cart.id ? (
+                <>
+                  {destinations.map((to) => (
+                    <button
+                      key={to}
+                      onClick={() => {
+                        enqueue({
+                          type: 'hireCarter',
+                          cartId: cart.id,
+                          order: { from: nodeId, to, good: hiring.good },
+                        });
+                        setHiring(null);
+                      }}
+                    >
+                      {GOOD_LABEL[hiring.good]} to{' '}
+                      {nodeById(to, state.farm, state.cuttingHouse).name}, and back, until told
+                      otherwise
+                    </button>
+                  ))}
+                  <button onClick={() => setHiring(null)}>Think better of it</button>
+                </>
+              ) : (
+                haulables.map((good) => (
+                  <button
+                    key={good}
+                    onClick={() => setHiring({ cartId: cart.id, good })}
+                  >
+                    Hire a carter to haul {GOOD_LABEL[good]} · {CARTER_WAGE} coin a day
+                  </button>
+                ))
+              )}
+              {laden && !cart.carter && (
+                <button onClick={() => enqueue({ type: 'ditchCargo', cartId: cart.id })}>
+                  Tip {cart.name.toLowerCase()}&rsquo;s load into a dyke · nothing comes back
+                </button>
+              )}
+            </div>
+          </div>
+        );
+      })}
     </>
   );
 }
@@ -1044,119 +1149,60 @@ function CartMenu({
   cartId: string;
 }) {
   const enqueue = useEnqueue();
-  const [haulGood, setHaulGood] = useState<Good | null>(null);
   const cart = state.carts.find((c) => c.id === cartId);
   if (!cart) return null;
   const cargo = storeSummary(cart.cargo, 'Empty');
   const laden = cargoCount(cart.cargo) > 0;
 
-  // The one order an idle cart takes anywhere: the dyke (spec §6.9).
-  const ditchButton = laden && !cart.carter && (
-    <div className="menu-buttons">
-      <button onClick={() => enqueue({ type: 'ditchCargo', cartId: cart.id })}>
-        Tip the lot into a dyke · nothing comes back
-      </button>
-    </div>
-  );
-
-  const carterBlock = cart.carter && (
-    <>
-      <p className="flavour">
-        A carter holds the reins: {GOOD_LABEL[cart.carter.good]},{' '}
-        {nodeById(cart.carter.from, state.farm, state.cuttingHouse).name} to{' '}
-        {nodeById(cart.carter.to, state.farm, state.cuttingHouse).name}, {CARTER_WAGE} coin a day.
-        He minds the tide and nothing else — not even the blue coat.
-      </p>
-      <div className="menu-buttons">
-        <button onClick={() => enqueue({ type: 'dismissCarter', cartId: cart.id })}>
-          Dismiss the carter
-        </button>
-      </div>
-    </>
-  );
-
-  if (cart.location.kind === 'edge') {
-    const edge = edgesFor(state.farm, state.cuttingHouse).find(
-      (e) => e.id === (cart.location as { edgeId: string }).edgeId,
-    );
-    const pct = edge ? Math.round((cart.location.progress / edge.latency) * 100) : 0;
-    const halted = edge?.condition === 'tideLocked' && flooded;
+  // A cart popover only opens on the road (spec §20) — but the road ends,
+  // and a stale selection lands here: point at the place and step aside.
+  if (cart.location.kind === 'node') {
+    const here = nodeById(cart.location.nodeId, state.farm, state.cuttingHouse);
     return (
       <>
         <h4>{cart.name}</h4>
         <p className="flavour">
-          {cargo} aboard. {edge?.name}, {pct}% along.
-          {halted ? ' The tide has the road — waiting on high ground.' : ''}
+          Standing at {here.name}. {cargo} aboard. Its business is the place&rsquo;s business —
+          click {here.name}.
         </p>
-        {carterBlock}
-        {ditchButton}
       </>
     );
   }
 
-  const hereId = cart.location.nodeId;
-  const here = nodeById(hereId, state.farm, state.cuttingHouse);
-
-  // Hiring (spec §6.11): a standing order runs from where the cart stands.
-  const haulables = Array.from(
-    new Set([
-      ...(Object.entries(state.stores[hereId] ?? {}) as Array<[Good, number]>)
-        .filter(([, n]) => n > 0)
-        .map(([g]) => g),
-      ...(hereId === 'farm' ? (['fleece'] as Good[]) : []),
-    ]),
+  const edge = edgesFor(state.farm, state.cuttingHouse).find(
+    (e) => e.id === (cart.location as { edgeId: string }).edgeId,
   );
-  const destinations = (['farm', 'ryne', 'shingle', 'cutting-house'] as NodeId[]).filter(
-    (n) => n !== hereId && (n !== 'cutting-house' || state.cuttingHouse),
-  );
-
+  const pct = edge ? Math.round((cart.location.progress / edge.latency) * 100) : 0;
+  const halted = edge?.condition === 'tideLocked' && flooded;
   return (
     <>
       <h4>{cart.name}</h4>
       <p className="flavour">
-        Standing at {here.name}. {cargo} aboard.{' '}
-        {clockOf(state.tick).hour >= 20 ? 'The pony would rather not.' : ''}
+        {cargo} aboard. {edge?.name}, {pct}% along.
+        {halted ? ' The tide has the road — waiting on high ground.' : ''}
       </p>
-      {carterBlock}
-      {!cart.carter && (
+      {cart.carter && (
         <>
-          <p className="flavour">Orders are given where the cart stands.</p>
-          {haulables.length > 0 && (
-            <div className="menu-buttons">
-              {haulGood === null ? (
-                <>
-                  {haulables.map((good) => (
-                    <button key={good} onClick={() => setHaulGood(good)}>
-                      Hire a carter to haul {GOOD_LABEL[good]} · {CARTER_WAGE} coin a day
-                    </button>
-                  ))}
-                </>
-              ) : (
-                <>
-                  {destinations.map((to) => (
-                    <button
-                      key={to}
-                      onClick={() => {
-                        enqueue({
-                          type: 'hireCarter',
-                          cartId: cart.id,
-                          order: { from: hereId, to, good: haulGood },
-                        });
-                        setHaulGood(null);
-                      }}
-                    >
-                      {GOOD_LABEL[haulGood]} to {nodeById(to, state.farm, state.cuttingHouse).name},
-                      and back, until told otherwise
-                    </button>
-                  ))}
-                  <button onClick={() => setHaulGood(null)}>Think better of it</button>
-                </>
-              )}
-            </div>
-          )}
+          <p className="flavour">
+            A carter holds the reins: {GOOD_LABEL[cart.carter.good]},{' '}
+            {nodeById(cart.carter.from, state.farm, state.cuttingHouse).name} to{' '}
+            {nodeById(cart.carter.to, state.farm, state.cuttingHouse).name}, {CARTER_WAGE} coin a
+            day. He minds the tide and nothing else — not even the blue coat.
+          </p>
+          <div className="menu-buttons">
+            <button onClick={() => enqueue({ type: 'dismissCarter', cartId: cart.id })}>
+              Dismiss the carter
+            </button>
+          </div>
         </>
       )}
-      {ditchButton}
+      {laden && !cart.carter && (
+        <div className="menu-buttons">
+          <button onClick={() => enqueue({ type: 'ditchCargo', cartId: cart.id })}>
+            Tip the lot into a dyke · nothing comes back
+          </button>
+        </div>
+      )}
     </>
   );
 }
