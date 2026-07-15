@@ -10,13 +10,14 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  CARTER_WAGE,
   FLEECE_PER_HEAD_PER_DAY,
   RENT_AMOUNT,
   STARTING_FLOCK,
   TICKS_PER_DAY,
   WOOL_PRICE_DOMESTIC,
 } from '../balance';
-import { runPolicyGame, smugglerPolicy } from '../policy';
+import { delegatorPolicy, runPolicyGame, smugglerPolicy } from '../policy';
 
 const GAMES = 200;
 const DAYS = 14; // two rent dues fall inside this window
@@ -58,6 +59,12 @@ describe(`${GAMES} seeded games, ${DAYS} days each`, () => {
         expect(loc.progress).toBeGreaterThanOrEqual(0);
       }
 
+      // The lawful life is exactly that (spec §6.10): no heat, no officer,
+      // ever — the quiet verdict on honest wool.
+      expect(s.heat.regional).toBe(0);
+      expect(s.heat.national).toBe(0);
+      expect(s.revenue.officer.arrived).toBe(false);
+
       coins.push(s.coin);
     }
 
@@ -88,6 +95,12 @@ describe(`${GAMES} seeded games, 20 days each — the smuggler (spec §6.9)`, ()
       expect(s.dutchman.unlocked).toBe(true);
       expect(s.cuttingHouse).not.toBeNull(); // the bot went into trade
 
+      // Twenty days of trade summon the officer and start the doom clock
+      // (spec §6.10) — and the trade survives him anyway.
+      expect(s.revenue.officer.arrived).toBe(true);
+      expect(s.heat.regional).toBeGreaterThan(0);
+      expect(s.heat.national).toBeGreaterThan(0);
+
       expect(Number.isFinite(s.coin)).toBe(true);
       // A purely lawful life over the same span tops out at
       // totalFleece × domestic price − rent (spec §6.8 arithmetic):
@@ -101,5 +114,37 @@ describe(`${GAMES} seeded games, 20 days each — the smuggler (spec §6.9)`, ()
 
     // Deterministic policy, no randomness in the economy: still a point.
     expect(new Set(coins).size).toBe(1);
+  });
+});
+
+describe(`${GAMES} seeded games, ${DAYS} days each — the delegator (spec §6.11)`, () => {
+  it('a hired carter sustains the lawful life with no hand on the reins', { timeout: 60_000 }, () => {
+    const coins: number[] = [];
+
+    for (let seed = 1; seed <= GAMES; seed++) {
+      const s = runPolicyGame(seed, TICKS_PER_DAY * DAYS, delegatorPolicy);
+
+      expect(s.lost).toBe(false);
+      expect(s.flockSize).toBe(STARTING_FLOCK);
+      expect(s.rentPaid).toBe(2 * RENT_AMOUNT);
+      expect(s.carts[0].carter).not.toBeNull(); // the man is still on the wage
+      expect(s.ledger.soldLawfully).toBeGreaterThan(0); // and the wool moved
+
+      // Automation of honest wool is exactly as invisible as honest wool.
+      expect(s.heat.regional).toBe(0);
+      expect(s.revenue.officer.arrived).toBe(false);
+
+      // Solvent after wages — the carter roughly pays for himself (§6.11),
+      // and cannot out-earn the same wool sold by hand.
+      expect(s.coin).toBeGreaterThan(0);
+      const totalFleece = STARTING_FLOCK * FLEECE_PER_HEAD_PER_DAY * DAYS;
+      expect(s.coin).toBeLessThanOrEqual(
+        totalFleece * WOOL_PRICE_DOMESTIC - s.rentPaid - CARTER_WAGE,
+      );
+
+      coins.push(s.coin);
+    }
+
+    expect(new Set(coins).size).toBe(1); // deterministic, like everything here
   });
 });

@@ -69,12 +69,21 @@ export type CartLocation =
       progress: number;
     };
 
+/** A hired carter's standing order (spec §6.11): shuttle `good` from → to. */
+export interface CarterOrder {
+  from: NodeId;
+  to: NodeId;
+  good: Good;
+}
+
 export interface Cart {
   id: CartId;
   name: string;
   capacity: number;
   cargo: Store;
   location: CartLocation;
+  /** Non-null = a hired man drives this cart on a standing order (§6.11). */
+  carter: CarterOrder | null;
 }
 
 export interface GameEvent {
@@ -113,6 +122,34 @@ export interface GameState {
   };
   /** Ryne's remaining appetite today, per good — reset at dawn (spec §6.9). */
   demandRemaining: Store;
+  /** Spec §6.10: the parish noticing, and London noticing. */
+  heat: { regional: number; national: number };
+  /** Spec §6.10 / §7: the Revenue's mind, and the officer who acts on it. */
+  revenue: {
+    officer: {
+      /** Permanent from the first dawn regional heat crosses the threshold. */
+      arrived: boolean;
+      location: CartLocation;
+      /** Today's destination: an inspection target, or home to the Customs House. */
+      targetNodeId: NodeId | null;
+      inspectedToday: boolean;
+    };
+    /** Where they think goods move — grows from stains, decays at dawn. */
+    suspicion: Record<NodeId, number>;
+    /** The player's fogged copy: suspicion as of last dawn. The parish talks. */
+    gossip: Record<NodeId, number>;
+  };
+  /** Spec §6.10 / §19.2 — the books, one page per inspection. */
+  ledger: {
+    /** Fleece per day the books admit the flock gives. Set at will. */
+    declaredYield: number;
+    declaredToDate: number;
+    grownToDate: number;
+    /** Fleece sold at Ryne since the page opened. */
+    soldLawfully: number;
+    /** Fleece on hand when the page opened — carried stock is not new wool. */
+    openingStock: number;
+  };
   /** Goods sitting at nodes (farm store, quay, …). */
   stores: Record<NodeId, Store>;
   carts: Cart[];
@@ -132,7 +169,11 @@ export type Action =
   | { type: 'sellToDutchman'; cartId: CartId }
   | { type: 'buyFromDutchman'; cartId: CartId; good: Good; qty: number }
   | { type: 'placeCuttingHouse'; x: number; y: number }
-  | { type: 'cut'; depth: CutDepth; tubs: number };
+  | { type: 'cut'; depth: CutDepth; tubs: number }
+  | { type: 'buyCart' }
+  | { type: 'hireCarter'; cartId: CartId; order: CarterOrder }
+  | { type: 'dismissCarter'; cartId: CartId }
+  | { type: 'setDeclaredYield'; fleecePerDay: number };
 
 /** Actions to apply at a given tick, for replay: actionLog[tick] = Action[]. */
 export type ActionLog = Record<number, Action[]>;

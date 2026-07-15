@@ -14,6 +14,8 @@ import {
   CART_CAPACITY,
   HIGH_ROAD_EXPOSURE,
   HIGH_ROAD_TICKS_PER_TILE,
+  HORSE_TICKS_PER_TILE_MARSH,
+  HORSE_TICKS_PER_TILE_ROAD,
   LOW_ROAD_EXPOSURE,
   LOW_ROAD_TICKS_PER_TILE,
   MARSH_TICKS_PER_TILE,
@@ -255,4 +257,79 @@ export function otherEnd(edge: MapEdge, from: NodeId): NodeId {
   if (edge.a === from) return edge.b;
   if (edge.b === from) return edge.a;
   throw new Error(`Node ${from} is not an endpoint of ${edge.id}`);
+}
+
+// ---- The officer's map (spec §6.10) ----
+// The Customs House sits beside the high road but off the cart graph: the
+// officer alone rides the short lane between his lodgings and Ryne. He does
+// not use the low road — the blue coat belongs on the high road, and he
+// knows the tide as well as anyone born here.
+
+const CUSTOMS_LANE_PATH = [
+  { x: CUSTOMS.x, y: CUSTOMS.y },
+  { x: 27, y: 20 },
+  { x: RYNE.x, y: RYNE.y },
+];
+
+export const CUSTOMS_LANE: MapEdge = {
+  id: 'customs-lane',
+  name: 'The Customs Lane',
+  a: 'customs',
+  b: 'ryne',
+  capacity: 0, // no hauler carries goods here; the lane is his alone
+  latency: 1, // cart latency is meaningless; horse latency rules below
+  exposure: 0,
+  condition: 'open',
+  path: CUSTOMS_LANE_PATH,
+};
+
+/** Roads take a horse at road pace; everything else is marsh under hoof. */
+export function horseLatency(edge: MapEdge): number {
+  const rate =
+    edge.id === 'high-road' || edge.id === 'low-road' || edge.id === 'customs-lane'
+      ? HORSE_TICKS_PER_TILE_ROAD
+      : HORSE_TICKS_PER_TILE_MARSH;
+  return Math.max(1, Math.round(pathTileLength(edge.path) * rate));
+}
+
+/** The edges the officer will ride: everything but the low road, plus his lane. */
+export function officerEdgesFor(farm: FarmSite, cuttingHouse?: BuildingSite): MapEdge[] {
+  return [...edgesFor(farm, cuttingHouse).filter((e) => e.id !== 'low-road'), CUSTOMS_LANE];
+}
+
+/**
+ * Dijkstra over a small edge set: the first edge to take from `from` on the
+ * cheapest path to `to`, or null if unreachable. `cost` prices an edge;
+ * return Infinity to bar it (a flooded low road, say).
+ */
+export function firstHop(
+  from: NodeId,
+  to: NodeId,
+  edges: MapEdge[],
+  cost: (edge: MapEdge) => number,
+): MapEdge | null {
+  if (from === to) return null;
+  const dist: Record<NodeId, number> = { [from]: 0 };
+  const first: Record<NodeId, MapEdge> = {};
+  const done: Record<NodeId, boolean> = {};
+  for (;;) {
+    let u: NodeId | null = null;
+    for (const k of Object.keys(dist)) {
+      if (!done[k] && (u === null || dist[k] < dist[u])) u = k;
+    }
+    if (u === null) return null;
+    if (u === to) return first[to] ?? null;
+    done[u] = true;
+    for (const e of edges) {
+      if (e.a !== u && e.b !== u) continue;
+      const c = cost(e);
+      if (!Number.isFinite(c)) continue;
+      const v = otherEnd(e, u);
+      const d = dist[u] + c;
+      if (dist[v] === undefined || d < dist[v]) {
+        dist[v] = d;
+        first[v] = u === from ? e : first[u];
+      }
+    }
+  }
 }

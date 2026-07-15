@@ -8,7 +8,7 @@ import {
   ticksUntilTideTurn,
 } from '../sim/time';
 import type { GameState } from '../sim/types';
-import { DYKE, LIMEWASH, ROOF, SEA } from './palette';
+import { DYKE, HEAT_RED, LIMEWASH, REVENUE_BLUE, ROOF, SEA } from './palette';
 
 import { spanOf } from './format';
 
@@ -79,6 +79,25 @@ export function Hud({ state }: { state: GameState }) {
         <span className="hud-label">Wool on flock</span>
         <span className="hud-coin">{state.fleeceReady}</span>
       </div>
+
+      {(state.heat.regional >= 0.5 || state.revenue.officer.arrived) && (
+        <div className="hud-block">
+          <span className="hud-label" style={{ color: REVENUE_BLUE }}>
+            Heat
+          </span>
+          <span
+            className="hud-coin"
+            style={{ color: state.heat.regional >= 50 ? HEAT_RED : undefined }}
+            title="The parish noticing. It cools a little each dawn."
+          >
+            {Math.round(state.heat.regional)}
+          </span>
+          <span className="hud-note" title="London noticing. London does not forget.">
+            London {state.heat.national < 1 ? state.heat.national.toFixed(1) : Math.round(state.heat.national)}
+            {state.revenue.officer.arrived ? ' · an officer rides the Gault' : ''}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

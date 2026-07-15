@@ -11,11 +11,14 @@ export const DYKE = '#5E7A7D';
 export const LIMEWASH = '#E8E1D2'; // sheep, shingle, plaster
 export const ROOF = '#A85D4A';
 
-// Reserved. Do not use yet.
+// Unlocked in M3: the Revenue entered the game wearing the coat (spec §6.10),
+// and Heat is now a number the player reads.
 export const REVENUE_BLUE = '#2E4A6B';
+export const HEAT_RED = '#C4453A';
+
+// Reserved. Do not use yet.
 export const ICHOR_GREEN = '#6FBF8F';
 export const PHLOGISTON_ORANGE = '#E09B3D';
-export const HEAT_RED = '#C4453A';
 
 export const TERRAIN_FILL: Record<string, string> = {
   c: CLAY,

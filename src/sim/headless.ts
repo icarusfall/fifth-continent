@@ -20,5 +20,14 @@ if (state.cuttingHouse) {
   console.log(`cutting house at (${state.cuttingHouse.x}, ${state.cuttingHouse.y}): ${JSON.stringify(state.stores['cutting-house'])}`);
 }
 console.log(`cart: ${JSON.stringify(state.carts[0].location)} cargo: ${JSON.stringify(state.carts[0].cargo)}`);
+console.log(
+  `heat: regional ${state.heat.regional.toFixed(1)} · national ${state.heat.national.toFixed(1)} · officer ${
+    state.revenue.officer.arrived ? `arrived, at ${JSON.stringify(state.revenue.officer.location)}` : 'not yet'
+  }`,
+);
+console.log(`suspicion: ${JSON.stringify(state.revenue.suspicion)}`);
+console.log(
+  `books: declared ${state.ledger.declaredYield}/day · page d${state.ledger.declaredToDate} g${state.ledger.grownToDate} s${state.ledger.soldLawfully}`,
+);
 console.log(`--- last events ---`);
 for (const e of state.log.slice(-10)) console.log(`  [${e.tick}] ${e.text}`);

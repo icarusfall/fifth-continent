@@ -14,6 +14,7 @@ import {
   CUTTING_HOUSE_COST,
   DUTCHMAN_PRICE,
   LEIDEN_PRICE_MULT,
+  PLAUSIBLE_YIELD_MIN,
   RENT_AMOUNT,
   WOOL_PRICE_DOMESTIC,
 } from './balance';
@@ -99,6 +100,12 @@ export function smugglerPolicy(state: GameState): Action[] {
 
   if (at === 'farm') {
     if (state.fleeceReady > 0) actions.push({ type: 'shear' });
+    // Short the books to the plausible floor: the surplus clip stops existing
+    // on paper the day the lugger starts buying it (§6.10).
+    const floor = Math.floor(state.flockSize * PLAUSIBLE_YIELD_MIN);
+    if (state.ledger.declaredYield > floor) {
+      actions.push({ type: 'setDeclaredYield', fleecePerDay: floor });
+    }
     // Raise the cutting house once there is coin beyond the rent reserve.
     if (!state.cuttingHouse && state.coin >= CUTTING_HOUSE_COST + RENT_AMOUNT) {
       actions.push({ type: 'placeCuttingHouse', ...BOT_CUTTING_HOUSE_SITE });
@@ -115,6 +122,16 @@ export function smugglerPolicy(state: GameState): Action[] {
     }
     // Unsold town goods ride back in when the town is hungry again.
     if (SELLABLE.some((g) => cargoOf(cart, g) > 0 && (state.demandRemaining[g] ?? 0) > 0)) {
+      actions.push(roadHome(state));
+      return actions;
+    }
+    // Keep the lawful trade visible: declared wool must go somewhere the
+    // officer can see it, and the barn must not silt up (§6.9, §6.10).
+    if (
+      (state.stores.farm?.fleece ?? 0) >= CART_CAPACITY &&
+      (state.demandRemaining.fleece ?? 0) > 0
+    ) {
+      actions.push({ type: 'loadCart', cartId: cart.id, good: 'fleece', qty: CART_CAPACITY });
       actions.push(roadHome(state));
     }
     return actions;
@@ -178,6 +195,27 @@ export function smugglerPolicy(state: GameState): Action[] {
     return actions;
   }
 
+  return actions;
+}
+
+/**
+ * delegatorPolicy: §6.11 lived in miniature. The owner shears and keeps no
+ * secrets; a hired carter runs the wool to Ryne on a standing order. If the
+ * man walks off over wages, another is hired — the bot tests the machinery,
+ * not the labour market.
+ */
+export function delegatorPolicy(state: GameState): Action[] {
+  const actions: Action[] = [];
+  const cart = state.carts[0];
+  if (!cart) return actions;
+  if (!cart.carter) {
+    actions.push({
+      type: 'hireCarter',
+      cartId: cart.id,
+      order: { from: 'farm', to: 'ryne', good: 'fleece' },
+    });
+  }
+  if (state.fleeceReady > 0) actions.push({ type: 'shear' });
   return actions;
 }
 

@@ -4,7 +4,7 @@
 // so outlines scale with the camera as the spec asks.
 
 import { hash2, jitter, TILE, tileCenter } from './geometry';
-import { CLAY, DYKE, INK, LIMEWASH, MARSH_DARK, ROOF, SEA } from './palette';
+import { CLAY, DYKE, HEAT_RED, INK, LIMEWASH, MARSH_DARK, REVENUE_BLUE, ROOF, SEA } from './palette';
 import { mix } from './paint';
 
 const OUT = 1.6; // outline width at world scale
@@ -166,6 +166,70 @@ export function drawCart(
     ctx.stroke();
   }
   ctx.restore();
+}
+
+/** The Riding Officer (spec §6.10): one man, one horse, Revenue blue at last. */
+export function drawOfficer(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  angle: number,
+): void {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+
+  // the horse — bigger than a pony and it knows it
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = OUT;
+  ctx.fillStyle = mix(INK, CLAY, 0.35);
+  ctx.beginPath();
+  ctx.ellipse(0, 1.5, 5.2, 3, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  // head
+  ctx.beginPath();
+  ctx.ellipse(5.6, -0.6, 2.2, 1.4, -0.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  // legs, reduced to intent
+  ctx.beginPath();
+  ctx.moveTo(-3, 4);
+  ctx.lineTo(-3, 6.5);
+  ctx.moveTo(3, 4);
+  ctx.lineTo(3, 6.5);
+  ctx.stroke();
+
+  // the rider — the coat is the entire point
+  ctx.fillStyle = REVENUE_BLUE;
+  ctx.beginPath();
+  ctx.roundRect(-2.6, -6.2, 5.2, 6, 1.6);
+  ctx.fill();
+  ctx.stroke();
+  // hat
+  ctx.fillStyle = INK;
+  ctx.beginPath();
+  ctx.ellipse(0, -7, 2.4, 1, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+/** A gossip stain (spec §6.10): where the parish thinks the Revenue is looking. */
+export function drawGossipStain(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  strength: number,
+): void {
+  const r = 10 + Math.sqrt(strength) * 6;
+  const g = ctx.createRadialGradient(x, y, 2, x, y, r);
+  g.addColorStop(0, `${HEAT_RED}66`);
+  g.addColorStop(1, `${HEAT_RED}00`);
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 export function drawSheep(

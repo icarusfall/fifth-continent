@@ -6,40 +6,46 @@ A single-player, browser-based god/builder game about smuggling, logistics, and
 the two kinds of magic you can use to hide a crime. Design spec and build brief:
 [the-fifth-continent-spec.md](./the-fifth-continent-spec.md).
 
-## Status: Milestone 2 — The Crime ✅ (awaiting review)
+## Status: Milestone 3 — The Revenue ✅ (awaiting review)
 
-Twelve sheep, one cart, two roads — and now a third way, across the open
-marsh to the shingle, where nobody counts what crosses.
+In M2 the crime works; in M3 it costs. Everything recorded since M1 — edge
+exposure, time-of-day, tubs sitting still, the ditch — is finally consumed.
 
-**The crime (spec §6.9):** once the first rent has been felt, a lugger stands
-off the shingle on night ∩ falling tide — a walking window the tide gauge
-already forecasts, so every run is a timed bet. The Dutchman pays four times
-the insulting Ryne price for fleece and sells jenever, tea, and lace from a
-finite hold. No credit. The same cart carries both legs; bidirectionality is
-discovered as margin, not presented as a feature. The cutting house is the
-first player-sited building — placing it generates marsh tracks to the farm,
-the shingle, and Ryne, so siting the triangle is the decision — and the depth
-of the cut (gentle / standard / deep) trades volume against quality tier.
-Ryne buys at fixed prices behind a daily appetite per good: dumping hits a
-wall, the first crude taste of §17's second ceiling. Overproof jenever has no
-legal buyer at all.
+**The Revenue (spec §6.10):** Heat in two pools — the parish's, which cools a
+little each dawn, and London's, which barely does (the doom clock). Moving
+contraband, storing it past a building's cover, selling it in town, even
+ditching it all heat the parish, and every act stains its nearest node with
+suspicion. Past a threshold a Riding Officer arrives for good: one man, one
+horse, entirely deterministic. Each dawn he rides to the sorest stain,
+searches, seizes what the cover cannot hide, stops carts that share his road
+— and at the farm he counts sheep against the books. The player keeps one
+standing number, `declaredYield`: undeclared wool never existed and may
+vanish over any gunwale; declared wool must show, and he prices every fleece
+adrift. The parish talks over breakfast — a one-key gossip overlay paints
+yesterday's Revenue mind on the map. The lawful carter generates exactly no
+Heat, ever, and the officer never comes: the quiet verdict on honest wool.
 
-**The squeeze (spec §6.8):** rent is 120 coin every six days, collected at
-dawn; perfect lawful play earns 144. Come up short and the agent distrains
-sheep at valuation. Lose the flock, lose the tenancy. One good night on the
-shingle out-earns a lawful week — the headless smuggler bot ends day 20 with
-~6× the lawful ceiling, and the game never says the word "crime" out loud.
+**The wheels (spec §6.11):** carts can be bought (the yard holds three) and a
+hired carter takes a standing order — load here, sell or unload there, back
+again, 3 coin a day at dawn. He minds the tide and nothing else: not night,
+not the blue coat. Automate the alibi; run the tubs yourself.
 
-Not yet built (by design — see spec §12): the Revenue, cover & heat (route
-exposure and storage are recorded, not yet consumed), combat, the trees, the
-moving-price market model (§17).
+**The crime (spec §6.9)** and **the squeeze (§6.8)** stand as built in M1–M2:
+the Dutchman on night ∩ falling tide, the cutting house triangle, Ryne's
+daily appetite, rent and distraint. The 200-game smuggler bot now meets the
+officer around day 10, loses the odd load to him, and still ends day 20 far
+above the lawful ceiling — crime pays, and now it costs.
+
+Not yet built (by design — see spec §12): bribes, informers, decoys and the
+escalation ladder past one man (M4+), fortifications and §6.1's throughput
+leak (M4), the trees (M5), the moving-price market model (§17).
 
 ## Run it
 
 ```bash
 npm install
 npm run dev        # play at http://localhost:5173
-npm test           # 88 tests incl. replay determinism + 2×200 headless games
+npm test           # 123 tests incl. replay determinism + 3×200 headless games
 npm run headless   # play 3 scripted days in Node, no browser
 npm run headless 1740 20 smuggler   # twenty days of the Dutchman's argument
 ```

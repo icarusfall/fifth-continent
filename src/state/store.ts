@@ -7,9 +7,9 @@ import { create } from 'zustand';
 import { initialState, tick } from '../sim/tick';
 import type { Action, ActionLog, GameState } from '../sim/types';
 
-// v5: M2 adds the Dutchman, the cutting house, and demand caps to GameState;
+// v6: M3 adds Heat, the Revenue, the ledger, and carters to GameState;
 // older saves are incompatible and are silently abandoned.
-const SAVE_KEY = 'fifth-continent-save-v5';
+const SAVE_KEY = 'fifth-continent-save-v6';
 const AUTOSAVE_EVERY_TICKS = 30;
 
 interface SaveFile {
@@ -45,6 +45,12 @@ function loadSave(): SaveFile | null {
     if (typeof parsed.state.rentDueTick !== 'number' || typeof parsed.state.lost !== 'boolean')
       return null;
     if (typeof parsed.state.dutchman?.present !== 'boolean' || !parsed.state.demandRemaining)
+      return null;
+    if (
+      typeof parsed.state.heat?.regional !== 'number' ||
+      typeof parsed.state.revenue?.officer?.arrived !== 'boolean' ||
+      typeof parsed.state.ledger?.declaredYield !== 'number'
+    )
       return null;
     return parsed;
   } catch {

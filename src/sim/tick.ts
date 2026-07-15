@@ -5,6 +5,8 @@
 
 import {
   CART_CAPACITY,
+  CART_COST,
+  CARTER_WAGE,
   CUTS,
   FARM_STORE_CAPACITY,
   CUTTING_HOUSE_COST,
@@ -15,6 +17,7 @@ import {
   DUTCHMAN_PRICE,
   FLEECE_PER_HEAD_PER_DAY,
   LEIDEN_PRICE_MULT,
+  MAX_CARTS,
   MAX_LOG_EVENTS,
   RENT_AMOUNT,
   RENT_PERIOD_DAYS,
@@ -26,10 +29,18 @@ import {
   TICKS_PER_HOUR,
   WOOL_PRICE_DOMESTIC,
 } from './balance';
-import { FARM_SITE, edgeById, isPlaceable, nodeById, otherEnd } from './map';
+import { FARM_SITE, edgeById, edgesFor, firstHop, isPlaceable, nodeById, otherEnd } from './map';
+import {
+  accrueDitchHeat,
+  accrueMarketTattle,
+  accrueRouteHeat,
+  accrueStorageHeat,
+  dawnRevenue,
+  officerTick,
+} from './revenue';
 import { seedRng } from './rng';
 import { clockOf, dayPhaseOf, isFlooded, tideIsRising } from './time';
-import type { Action, Cart, GameState, Store } from './types';
+import type { Action, Cart, GameState, Good, NodeId, Store } from './types';
 
 export function initialState(seed: number): GameState {
   return {
@@ -47,6 +58,25 @@ export function initialState(seed: number): GameState {
     cuttingHouse: null,
     dutchman: { unlocked: false, present: false, hold: {}, fleeceAppetite: 0 },
     demandRemaining: { ...DAILY_DEMAND },
+    heat: { regional: 0, national: 0 },
+    revenue: {
+      officer: {
+        arrived: false,
+        location: { kind: 'node', nodeId: 'customs' },
+        targetNodeId: null,
+        inspectedToday: false,
+      },
+      suspicion: {},
+      gossip: {},
+    },
+    // The books open honest: the flock gives what the flock gives (§6.10).
+    ledger: {
+      declaredYield: STARTING_FLOCK * FLEECE_PER_HEAD_PER_DAY,
+      declaredToDate: 0,
+      grownToDate: 0,
+      soldLawfully: 0,
+      openingStock: 0,
+    },
     stores: {
       farm: { fleece: 0 },
       ryne: {},
@@ -59,6 +89,7 @@ export function initialState(seed: number): GameState {
         capacity: CART_CAPACITY,
         cargo: {},
         location: { kind: 'node', nodeId: 'farm' },
+        carter: null,
       },
     ],
     log: [
@@ -90,6 +121,40 @@ function logEvent(state: GameState, text: string): void {
 
 function findCart(state: GameState, cartId: string): Cart | undefined {
   return state.carts.find((c) => c.id === cartId);
+}
+
+/** A crewed cart answers to its carter, not the player (spec §6.11). */
+function underOrders(state: GameState, cart: Cart): boolean {
+  if (!cart.carter) return false;
+  logEvent(state, `${cart.name} has a carter on the reins. Dismiss him to drive it yourself.`);
+  return true;
+}
+
+function isDawn(tick: number): boolean {
+  const { hour, minute } = clockOf(tick);
+  return hour === SHEARING_HOUR && minute === 0;
+}
+
+/**
+ * The core of a Ryne sale, shared by the player's verb and the hired
+ * carter (§6.11): demand cap, coin, the books, and the town's tattle.
+ * Returns units sold; the caller does its own talking.
+ */
+function marketSale(state: GameState, cart: Cart, good: Good): number {
+  if (good === 'jenever') return 0; // no legal buyer at any price
+  const held = cart.cargo[good] ?? 0;
+  const appetite = state.demandRemaining[good] ?? 0;
+  const qty = Math.min(held, appetite);
+  if (qty <= 0) return 0;
+  cart.cargo[good] = held - qty;
+  state.demandRemaining[good] = appetite - qty;
+  state.coin += qty * RYNE_PRICE[good];
+  if (good === 'fleece') {
+    state.ledger.soldLawfully += qty; // lawful wool enters the books (§6.10)
+  } else {
+    accrueMarketTattle(state, good, qty);
+  }
+  return qty;
 }
 
 // ---- Action application ----
@@ -125,7 +190,7 @@ function applyAction(state: GameState, action: Action): void {
 
     case 'loadCart': {
       const cart = findCart(state, action.cartId);
-      if (!cart) return;
+      if (!cart || underOrders(state, cart)) return;
       if (cart.location.kind !== 'node') {
         logEvent(state, `${cart.name} cannot be loaded on the road.`);
         return;
@@ -143,7 +208,7 @@ function applyAction(state: GameState, action: Action): void {
 
     case 'unloadCart': {
       const cart = findCart(state, action.cartId);
-      if (!cart) return;
+      if (!cart || underOrders(state, cart)) return;
       if (cart.location.kind !== 'node') {
         logEvent(state, `${cart.name} cannot be unloaded on the road.`);
         return;
@@ -174,10 +239,11 @@ function applyAction(state: GameState, action: Action): void {
 
     case 'ditchCargo': {
       const cart = findCart(state, action.cartId);
-      if (!cart) return;
+      if (!cart || underOrders(state, cart)) return;
       const dumped = cargoCount(cart.cargo);
       if (dumped <= 0) return;
       cart.cargo = {};
+      accrueDitchHeat(state, dumped);
       logEvent(
         state,
         `${cart.name} tips ${dumped} goods into a dyke. The marsh keeps its own ledger.`,
@@ -187,7 +253,7 @@ function applyAction(state: GameState, action: Action): void {
 
     case 'dispatchCart': {
       const cart = findCart(state, action.cartId);
-      if (!cart) return;
+      if (!cart || underOrders(state, cart)) return;
       if (cart.location.kind !== 'node') {
         logEvent(state, `${cart.name} is already on the road.`);
         return;
@@ -215,7 +281,7 @@ function applyAction(state: GameState, action: Action): void {
 
     case 'sell': {
       const cart = findCart(state, action.cartId);
-      if (!cart) return;
+      if (!cart || underOrders(state, cart)) return;
       if (cart.location.kind !== 'node') return;
       const node = nodeById(cart.location.nodeId, state.farm, state.cuttingHouse);
       if (node.kind !== 'market') {
@@ -228,16 +294,12 @@ function applyAction(state: GameState, action: Action): void {
       }
       const held = cart.cargo[action.good] ?? 0;
       if (held <= 0) return;
-      const appetite = state.demandRemaining[action.good] ?? 0;
-      if (appetite <= 0) {
+      if ((state.demandRemaining[action.good] ?? 0) <= 0) {
         logEvent(state, `Ryne has had its fill of ${action.good} today. Dawn brings appetite.`);
         return;
       }
-      const qty = Math.min(held, appetite);
+      const qty = marketSale(state, cart, action.good);
       const price = RYNE_PRICE[action.good];
-      cart.cargo[action.good] = held - qty;
-      state.demandRemaining[action.good] = appetite - qty;
-      state.coin += qty * price;
       logEvent(
         state,
         action.good === 'fleece'
@@ -250,7 +312,7 @@ function applyAction(state: GameState, action: Action): void {
 
     case 'sellToDutchman': {
       const cart = findCart(state, action.cartId);
-      if (!cart) return;
+      if (!cart || underOrders(state, cart)) return;
       if (cart.location.kind !== 'node' || cart.location.nodeId !== 'shingle') return;
       if (!state.dutchman.present) {
         logEvent(state, 'Shingle and sea-wrack. Nobody is buying wool from the water tonight.');
@@ -272,7 +334,7 @@ function applyAction(state: GameState, action: Action): void {
 
     case 'buyFromDutchman': {
       const cart = findCart(state, action.cartId);
-      if (!cart) return;
+      if (!cart || underOrders(state, cart)) return;
       if (cart.location.kind !== 'node' || cart.location.nodeId !== 'shingle') return;
       if (!state.dutchman.present) return;
       const price = DUTCHMAN_PRICE[action.good];
@@ -342,19 +404,169 @@ function applyAction(state: GameState, action: Action): void {
       );
       return;
     }
+
+    case 'buyCart': {
+      if (state.carts.length >= MAX_CARTS) {
+        logEvent(state, 'The yard holds three carts and no more.');
+        return;
+      }
+      if (state.coin < CART_COST) {
+        logEvent(state, `A cart and pony run ${CART_COST} coin, and the till is short.`);
+        return;
+      }
+      state.coin -= CART_COST;
+      const ordinal = ['The Cart', 'The Second Cart', 'The Third Cart'][state.carts.length];
+      state.carts.push({
+        id: `cart-${state.carts.length + 1}`,
+        name: ordinal,
+        capacity: CART_CAPACITY,
+        cargo: {},
+        location: { kind: 'node', nodeId: 'farm' },
+        carter: null,
+      });
+      logEvent(state, `${ordinal} stands in the yard, pony and all. ${CART_COST} coin.`);
+      return;
+    }
+
+    case 'hireCarter': {
+      const cart = findCart(state, action.cartId);
+      if (!cart) return;
+      if (cart.carter) {
+        logEvent(state, `${cart.name} already has a man on the reins.`);
+        return;
+      }
+      const { from, to } = action.order;
+      const nodesKnown = ['farm', 'ryne', 'shingle', ...(state.cuttingHouse ? ['cutting-house'] : [])];
+      if (from === to || !nodesKnown.includes(from) || !nodesKnown.includes(to)) return;
+      cart.carter = { ...action.order };
+      logEvent(
+        state,
+        `A carter takes ${cart.name}: ${nodeById(from, state.farm, state.cuttingHouse).name} to ${
+          nodeById(to, state.farm, state.cuttingHouse).name
+        }, ${CARTER_WAGE} coin a day. He does not ask what is in the load.`,
+      );
+      return;
+    }
+
+    case 'dismissCarter': {
+      const cart = findCart(state, action.cartId);
+      if (!cart || !cart.carter) return;
+      cart.carter = null;
+      logEvent(state, `The carter is paid off ${cart.name}. He knew the roads, and he knows things now.`);
+      return;
+    }
+
+    case 'setDeclaredYield': {
+      const declared = Math.max(0, Math.min(state.flockSize, Math.round(action.fleecePerDay)));
+      state.ledger.declaredYield = declared;
+      logEvent(
+        state,
+        declared < state.flockSize * FLEECE_PER_HEAD_PER_DAY
+          ? `The book now swears the flock gives ${declared} fleece a day. Scrapie, if anyone asks.`
+          : `The book admits the flock's full clip: ${declared} fleece a day.`,
+      );
+      return;
+    }
   }
 }
 
 // ---- Per-tick processes ----
 
 function growWoolAtDawn(state: GameState): void {
-  const { hour, minute } = clockOf(state.tick);
-  if (hour === SHEARING_HOUR && minute === 0) {
-    const grown = state.flockSize * FLEECE_PER_HEAD_PER_DAY;
-    state.fleeceReady += grown;
-    logEvent(state, `Dawn. The flock carries ${state.fleeceReady} fleece of wool.`);
-    // Ryne wakes hungry (spec §6.9): yesterday's saturation is forgiven.
-    state.demandRemaining = { ...DAILY_DEMAND };
+  if (!isDawn(state.tick)) return;
+  const grown = state.flockSize * FLEECE_PER_HEAD_PER_DAY;
+  state.fleeceReady += grown;
+  logEvent(state, `Dawn. The flock carries ${state.fleeceReady} fleece of wool.`);
+  // Ryne wakes hungry (spec §6.9): yesterday's saturation is forgiven.
+  state.demandRemaining = { ...DAILY_DEMAND };
+  // The books accrue (§6.10): what grew, and what the page admits grew.
+  state.ledger.grownToDate += grown;
+  state.ledger.declaredToDate += Math.min(state.ledger.declaredYield, grown);
+}
+
+/** Spec §6.11 — wages at dawn, with the wool. Unpaid men walk the same morning. */
+function payCartersAtDawn(state: GameState): void {
+  if (!isDawn(state.tick)) return;
+  for (const cart of state.carts) {
+    if (!cart.carter) continue;
+    if (state.coin >= CARTER_WAGE) {
+      state.coin -= CARTER_WAGE;
+    } else {
+      cart.carter = null;
+      logEvent(
+        state,
+        `No wage, no carter: the man walks off ${cart.name} and leaves it standing.`,
+      );
+    }
+  }
+}
+
+// ---- The hired carter (spec §6.11) ----
+// Tide-smart and coat-blind: he takes the faster road that is open at
+// departure, and he will drive contraband straight past the Customs House
+// if that is the order he was given.
+
+function carterDispatch(state: GameState, cart: Cart, target: NodeId): void {
+  if (cart.location.kind !== 'node' || cart.location.nodeId === target) return;
+  const from = cart.location.nodeId;
+  const hop = firstHop(from, target, edgesFor(state.farm, state.cuttingHouse), (e) =>
+    e.condition === 'tideLocked' && isFlooded(state.tick) ? Infinity : e.latency,
+  );
+  if (!hop) return; // no open road: he waits for the tide like anyone
+  cart.location = { kind: 'edge', edgeId: hop.id, from, to: otherEnd(hop, from), progress: 0 };
+}
+
+function runCarters(state: GameState): void {
+  for (const cart of state.carts) {
+    const order = cart.carter;
+    if (!order || cart.location.kind !== 'node') continue;
+    const at = cart.location.nodeId;
+
+    if (at === order.from) {
+      const store = state.stores[at];
+      const available = store?.[order.good] ?? 0;
+      const room = cart.capacity - cargoCount(cart.cargo);
+      const qty = Math.min(available, room);
+      if (qty > 0) {
+        store![order.good] = available - qty;
+        addToStore(cart.cargo, order.good, qty);
+      }
+      // A carter shuttles loads, not air: nothing aboard, he waits.
+      if ((cart.cargo[order.good] ?? 0) > 0) carterDispatch(state, cart, order.to);
+      continue;
+    }
+
+    if (at === order.to && (cart.cargo[order.good] ?? 0) > 0) {
+      const node = nodeById(at, state.farm, state.cuttingHouse);
+      if (node.kind === 'market') {
+        const sold = marketSale(state, cart, order.good);
+        if (sold > 0) {
+          logEvent(
+            state,
+            `The carter sells ${sold} ${order.good} at ${node.name} for ${sold * RYNE_PRICE[order.good]} coin.`,
+          );
+        }
+      } else {
+        // Unload into the store, respecting the barn's walls (§6.9).
+        const held = cart.cargo[order.good] ?? 0;
+        const roomHere =
+          at === 'farm'
+            ? FARM_STORE_CAPACITY - cargoCount(state.stores[at] ?? {})
+            : Number.MAX_SAFE_INTEGER;
+        const qty = Math.min(held, Math.max(0, roomHere));
+        if (qty > 0) {
+          cart.cargo[order.good] = held - qty;
+          state.stores[at] = state.stores[at] ?? {};
+          addToStore(state.stores[at], order.good, qty);
+        }
+      }
+      // What cannot be sold or unloaded rides home with him.
+      carterDispatch(state, cart, order.from);
+      continue;
+    }
+
+    // Anywhere else: head for the work — deliveries first.
+    carterDispatch(state, cart, (cart.cargo[order.good] ?? 0) > 0 ? order.to : order.from);
   }
 }
 
@@ -428,6 +640,7 @@ function moveCarts(state: GameState): void {
     }
 
     cart.location.progress += 1;
+    accrueRouteHeat(state, cart, edge); // §6.2, consumed at last
     if (cart.location.progress >= edge.latency) {
       const arrived = cart.location.to;
       cart.location = { kind: 'node', nodeId: arrived };
@@ -451,9 +664,14 @@ export function tick(state: GameState, actions: Action[]): GameState {
 
   next.tick += 1;
   growWoolAtDawn(next);
+  payCartersAtDawn(next);
   collectRent(next);
+  if (isDawn(next.tick)) dawnRevenue(next);
   dutchmanTide(next);
+  runCarters(next);
   moveCarts(next);
+  accrueStorageHeat(next);
+  officerTick(next);
 
   return next;
 }

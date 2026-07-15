@@ -124,6 +124,37 @@ header h1 {
   cursor: crosshair;
 }
 
+/* Spec §6.10 — one toggle for the gossip overlay: yesterday's Revenue mind. */
+.gossip-toggle {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 9;
+  background: rgba(36, 28, 24, 0.88);
+  border: 1px solid var(--clay);
+  border-radius: 4px;
+  color: #cbbfa8;
+  font: inherit;
+  font-size: 12px;
+  padding: 5px 12px;
+  cursor: pointer;
+}
+
+.gossip-toggle.on {
+  border-color: #c4453a;
+  color: #e0a49b;
+}
+
+/* The ledger's two-button stepper sits inline, not stacked. */
+.ledger-row {
+  flex-direction: row;
+}
+
+.ledger-row button {
+  width: 44px;
+  flex: none;
+}
+
 .map-canvas {
   width: 100%;
   height: 100%;

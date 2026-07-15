@@ -7,19 +7,29 @@ import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
   CART_CAPACITY,
+  CART_COST,
+  CARTER_WAGE,
   CUTS,
   CUTTING_HOUSE_COST,
   CUT_SUGAR_COST,
   DUTCHMAN_PRICE,
   FARM_STORE_CAPACITY,
   LEIDEN_PRICE_MULT,
+  MAX_CARTS,
   RYNE_PRICE,
   WOOL_PRICE_DOMESTIC,
 } from '../sim/balance';
-import { SHINGLE, edgesFor, isPlaceable, nodeById } from '../sim/map';
+import {
+  SHINGLE,
+  edgesFor,
+  horseLatency,
+  isPlaceable,
+  nodeById,
+  officerEdgesFor,
+} from '../sim/map';
 import { clockOf, dayPhaseOf, isFlooded, ticksUntilTideTurn } from '../sim/time';
 import { GOOD_LABEL, spanOf, storeSummary } from './format';
-import type { CutDepth, GameState, Good } from '../sim/types';
+import type { Cart, CutDepth, EdgeId, GameState, Good, NodeId } from '../sim/types';
 import { useGameStore } from '../state/store';
 import { CameraController } from './camera';
 import { pathPoints, pointAlong, TILE, tileCenter } from './geometry';
@@ -30,8 +40,10 @@ import {
   drawCuttingHouse,
   drawFarm,
   drawFarmGlow,
+  drawGossipStain,
   drawLabel,
   drawLugger,
+  drawOfficer,
   drawRoad,
   drawRyne,
   drawSheep,
@@ -39,20 +51,30 @@ import {
   drawTileHighlight,
 } from './sprites';
 
-type Selection = 'farm' | 'ryne' | 'customs' | 'cart' | 'shingle' | 'cutting-house' | null;
+type Selection =
+  | 'farm'
+  | 'ryne'
+  | 'customs'
+  | 'shingle'
+  | 'cutting-house'
+  | 'officer'
+  | `cart:${string}`
+  | null;
 
 function cargoCount(cargo: Partial<Record<Good, number>>): number {
   return Object.values(cargo).reduce((a, b) => a + (b ?? 0), 0);
 }
 
-/** Cart position in world coords. */
-function cartWorldPos(state: GameState): { x: number; y: number; angle: number } | null {
-  const cart = state.carts[0];
-  if (!cart) return null;
+/** One cart's position in world coords; carts at a node fan out in the yard. */
+function cartWorldPosOf(
+  state: GameState,
+  cart: Cart,
+): { x: number; y: number; angle: number } | null {
   if (cart.location.kind === 'node') {
     const node = nodeById(cart.location.nodeId, state.farm, state.cuttingHouse);
     const anchor = tileCenter(node);
-    return { x: anchor.x + 14, y: anchor.y + 8, angle: 0 };
+    const slot = state.carts.filter((c) => c.location.kind === 'node').indexOf(cart);
+    return { x: anchor.x + 14 + slot * 9, y: anchor.y + 8 + slot * 5, angle: 0 };
   }
   const edge = edgesFor(state.farm, state.cuttingHouse).find(
     (e) => e.id === (cart.location as { edgeId: string }).edgeId,
@@ -60,6 +82,49 @@ function cartWorldPos(state: GameState): { x: number; y: number; angle: number }
   if (!edge) return null;
   const pts = pathPoints(edge, cart.location.from !== edge.a);
   return pointAlong(pts, cart.location.progress / edge.latency);
+}
+
+/** The officer's position: at a node, or riding one of his edges. */
+function officerWorldPos(state: GameState): { x: number; y: number; angle: number } | null {
+  const officer = state.revenue.officer;
+  if (!officer.arrived) return null;
+  if (officer.location.kind === 'node') {
+    const node = nodeById(officer.location.nodeId, state.farm, state.cuttingHouse);
+    const anchor = tileCenter(node);
+    return { x: anchor.x - 12, y: anchor.y + 10, angle: 0 };
+  }
+  const edge = officerEdgesFor(state.farm, state.cuttingHouse).find(
+    (e) => e.id === (officer.location as { edgeId: string }).edgeId,
+  );
+  if (!edge) return null;
+  const pts = pathPoints(edge, officer.location.from !== edge.a);
+  return pointAlong(pts, Math.min(1, officer.location.progress / horseLatency(edge)));
+}
+
+/** The first cart at this node still answering to the player's hand. */
+function idleCartAt(state: GameState, nodeId: NodeId): Cart | undefined {
+  return state.carts.find(
+    (c) => !c.carter && c.location.kind === 'node' && c.location.nodeId === nodeId,
+  );
+}
+
+/**
+ * Spec §6.10: dispatch buttons carry the warning a marshman's eyes would.
+ * True when the officer rides this edge or stands at its far end.
+ */
+function coatOn(state: GameState, edgeId: EdgeId, from: NodeId): boolean {
+  const officer = state.revenue.officer;
+  if (!officer.arrived) return false;
+  if (officer.location.kind === 'edge') return officer.location.edgeId === edgeId;
+  const edge = edgesFor(state.farm, state.cuttingHouse).find((e) => e.id === edgeId);
+  if (!edge) return false;
+  const far = edge.a === from ? edge.b : edge.a;
+  return officer.location.nodeId === far;
+}
+
+/** '· the blue coat…' suffix for a dispatch button, or empty. */
+function coatNote(state: GameState, edgeId: EdgeId, from: NodeId): string {
+  return coatOn(state, edgeId, from) ? ' · the blue coat rides it' : '';
 }
 
 function routesVisible(state: GameState): boolean {
@@ -82,6 +147,10 @@ function isFreshGame(state: GameState): boolean {
 }
 
 function anchorWorld(sel: Selection, state: GameState): { x: number; y: number } | null {
+  if (sel?.startsWith('cart:')) {
+    const cart = state.carts.find((c) => c.id === sel.slice(5));
+    return cart ? cartWorldPosOf(state, cart) : null;
+  }
   switch (sel) {
     case 'farm':
       return tileCenter(state.farm);
@@ -93,8 +162,8 @@ function anchorWorld(sel: Selection, state: GameState): { x: number; y: number }
       return tileCenter(SHINGLE);
     case 'cutting-house':
       return state.cuttingHouse ? tileCenter(state.cuttingHouse) : null;
-    case 'cart':
-      return cartWorldPos(state);
+    case 'officer':
+      return officerWorldPos(state);
     default:
       return null;
   }
@@ -119,6 +188,10 @@ export function GameMap({ state }: { state: GameState }) {
   const [placing, setPlacing] = useState(false);
   const placingRef = useRef(false);
   placingRef.current = placing;
+  // The gossip overlay (spec §6.10): yesterday's Revenue mind, one toggle.
+  const [showGossip, setShowGossip] = useState(false);
+  const showGossipRef = useRef(false);
+  showGossipRef.current = showGossip;
   const hoverTileRef = useRef<{ x: number; y: number } | null>(null);
   // Live touch points, for two-finger pinch. One pointer pans; two pinch.
   const pointersRef = useRef(new Map<number, { x: number; y: number }>());
@@ -211,10 +284,36 @@ export function GameMap({ state }: { state: GameState }) {
         drawLabel(ctx, 'Cutting House', cc.x, cc.y - 12);
       }
 
-      const cart = s.carts[0];
-      const cp = cartWorldPos(s);
-      if (cart && cp) {
-        drawCart(ctx, cp.x, cp.y, cart.location.kind === 'edge' ? cp.angle : 0, cargoCount(cart.cargo) > 0);
+      // Gossip stains (spec §6.10): where the parish thinks the Revenue looks.
+      if (showGossipRef.current) {
+        for (const [nodeId, strength] of Object.entries(s.revenue.gossip)) {
+          if (strength < 0.5) continue;
+          if (nodeId === 'cutting-house' && !s.cuttingHouse) continue;
+          try {
+            const c = tileCenter(nodeById(nodeId, s.farm, s.cuttingHouse));
+            drawGossipStain(ctx, c.x, c.y, strength);
+          } catch {
+            /* a stain on a node that no longer exists dries out */
+          }
+        }
+      }
+
+      for (const cart of s.carts) {
+        const cp = cartWorldPosOf(s, cart);
+        if (cp) {
+          drawCart(
+            ctx,
+            cp.x,
+            cp.y,
+            cart.location.kind === 'edge' ? cp.angle : 0,
+            cargoCount(cart.cargo) > 0,
+          );
+        }
+      }
+
+      const op = officerWorldPos(s);
+      if (op) {
+        drawOfficer(ctx, op.x, op.y, s.revenue.officer.location.kind === 'edge' ? op.angle : 0);
       }
 
       // Placement mode: the hovered tile answers before the coin is spent.
@@ -281,8 +380,12 @@ export function GameMap({ state }: { state: GameState }) {
 
     // Hit-test the assets, nearest first.
     const targets: Array<{ sel: Selection; x: number; y: number; r: number }> = [];
-    const cp = cartWorldPos(s);
-    if (cp) targets.push({ sel: 'cart', x: cp.x, y: cp.y, r: 14 });
+    for (const cart of s.carts) {
+      const cp = cartWorldPosOf(s, cart);
+      if (cp) targets.push({ sel: `cart:${cart.id}`, x: cp.x, y: cp.y, r: 14 });
+    }
+    const op = officerWorldPos(s);
+    if (op) targets.push({ sel: 'officer', x: op.x, y: op.y, r: 14 });
     const fc = tileCenter(s.farm);
     targets.push({ sel: 'farm', x: fc.x, y: fc.y, r: 26 });
     const rc = tileCenter({ x: 28, y: 21.8 });
@@ -394,6 +497,19 @@ export function GameMap({ state }: { state: GameState }) {
 
       {state.lost && <ForfeitOverlay />}
 
+      {(state.heat.regional >= 0.5 || state.revenue.officer.arrived) && (
+        <button
+          className={showGossip ? 'gossip-toggle on' : 'gossip-toggle'}
+          title="What the parish says the Revenue thinks. Yesterday's news, like all gossip."
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowGossip((v) => !v);
+          }}
+        >
+          {showGossip ? 'gossip · on' : 'gossip'}
+        </button>
+      )}
+
       {selected && !placing && (
         <div ref={popRef} className="popover-anchor">
           <Popover onClose={() => setSelected(null)}>
@@ -404,18 +520,47 @@ export function GameMap({ state }: { state: GameState }) {
             {selected === 'customs' && (
               <>
                 <h4>The Customs House</h4>
-                <p className="flavour">Quiet today. It counts things. It is counting now.</p>
+                <p className="flavour">
+                  {state.revenue.officer.arrived
+                    ? 'A Riding Officer lodges upstairs now. He keeps early hours and long lists.'
+                    : 'Quiet today. It counts things. It is counting now.'}
+                </p>
               </>
             )}
             {selected === 'shingle' && (
               <ShingleMenu state={state} onPlace={() => setPlacing(true)} />
             )}
             {selected === 'cutting-house' && <CuttingHouseMenu state={state} />}
-            {selected === 'cart' && <CartMenu state={state} flooded={flooded} />}
+            {selected === 'officer' && <OfficerMenu state={state} />}
+            {selected?.startsWith('cart:') && (
+              <CartMenu state={state} flooded={flooded} cartId={selected.slice(5)} />
+            )}
           </Popover>
         </div>
       )}
     </div>
+  );
+}
+
+function OfficerMenu({ state }: { state: GameState }) {
+  const officer = state.revenue.officer;
+  const riding = officer.location.kind === 'edge';
+  const bound =
+    officer.targetNodeId && officer.targetNodeId !== 'customs'
+      ? nodeById(officer.targetNodeId, state.farm, state.cuttingHouse).name
+      : null;
+  return (
+    <>
+      <h4>The Riding Officer</h4>
+      <p className="flavour">
+        {riding
+          ? `On the road, sitting his horse like a writ.${bound ? ` Bound, by the look of it, for ${bound}.` : ''}`
+          : officer.location.kind === 'node' && officer.location.nodeId === 'customs'
+            ? 'At his lodgings above the Customs House, writing. Always writing.'
+            : 'Dismounted, and looking at things the way he looks at everything: twice.'}
+      </p>
+      <p className="flavour">He is paid to notice. The parish notices him back — that much is free.</p>
+    </>
   );
 }
 
@@ -466,12 +611,13 @@ function FarmMenu({
   onPlace: () => void;
 }) {
   const enqueue = useEnqueue();
-  const cart = state.carts[0];
-  const cartHere = cart?.location.kind === 'node' && cart.location.nodeId === 'farm';
+  const cart = idleCartAt(state, 'farm');
+  const cartHere = !!cart;
   const barn = state.stores.farm ?? {};
   const stored = cargoCount(barn);
   const barnRoom = FARM_STORE_CAPACITY - stored;
   const held = cart ? cargoCount(cart.cargo) : 0;
+  const ledger = state.ledger;
 
   return (
     <>
@@ -534,7 +680,44 @@ function FarmMenu({
             Raise a cutting house · {CUTTING_HOUSE_COST} coin
           </button>
         )}
+        {state.carts.length < MAX_CARTS && (state.coin >= CART_COST || state.carts.length > 1) && (
+          <button
+            disabled={state.coin < CART_COST}
+            title="Cart, pony, and no questions from the wheelwright."
+            onClick={() => enqueue({ type: 'buyCart' })}
+          >
+            Buy a cart · {CART_COST} coin
+          </button>
+        )}
       </div>
+
+      {state.dutchman.unlocked && (
+        <>
+          <p className="flavour">
+            The book swears the flock gives <strong>{ledger.declaredYield}</strong> fleece a day
+            (it gives {state.flockSize}). This page: {ledger.declaredToDate} declared ·{' '}
+            {ledger.soldLawfully} sold at Ryne. Declared wool must show; the rest never existed.
+          </p>
+          <div className="menu-buttons ledger-row">
+            <button
+              disabled={ledger.declaredYield <= 0}
+              onClick={() =>
+                enqueue({ type: 'setDeclaredYield', fleecePerDay: ledger.declaredYield - 1 })
+              }
+            >
+              −
+            </button>
+            <button
+              disabled={ledger.declaredYield >= state.flockSize}
+              onClick={() =>
+                enqueue({ type: 'setDeclaredYield', fleecePerDay: ledger.declaredYield + 1 })
+              }
+            >
+              +
+            </button>
+          </div>
+        </>
+      )}
 
       {cartHere && (
         <>
@@ -569,7 +752,7 @@ function FarmMenu({
                     enqueue({ type: 'dispatchCart', cartId: cart!.id, edgeId: 'high-road' })
                   }
                 >
-                  Send by the high road · slow
+                  Send by the high road · slow{coatNote(state, 'high-road', 'farm')}
                 </button>
               </>
             )}
@@ -580,7 +763,7 @@ function FarmMenu({
                   enqueue({ type: 'dispatchCart', cartId: cart!.id, edgeId: 'marsh-track' })
                 }
               >
-                Send over the marsh to the shingle
+                Send over the marsh to the shingle{coatNote(state, 'marsh-track', 'farm')}
               </button>
             )}
             {state.cuttingHouse && (
@@ -589,7 +772,7 @@ function FarmMenu({
                   enqueue({ type: 'dispatchCart', cartId: cart!.id, edgeId: 'cut-farm-track' })
                 }
               >
-                Send to the cutting house
+                Send to the cutting house{coatNote(state, 'cut-farm-track', 'farm')}
               </button>
             )}
           </div>
@@ -601,8 +784,8 @@ function FarmMenu({
 
 function RyneMenu({ state, flooded }: { state: GameState; flooded: boolean }) {
   const enqueue = useEnqueue();
-  const cart = state.carts[0];
-  const cartHere = cart?.location.kind === 'node' && cart.location.nodeId === 'ryne';
+  const cart = idleCartAt(state, 'ryne');
+  const cartHere = !!cart;
   const sellables = (Object.entries(cart?.cargo ?? {}) as Array<[Good, number]>).filter(
     ([g, n]) => n > 0 && g !== 'jenever',
   );
@@ -657,7 +840,7 @@ function RyneMenu({ state, flooded }: { state: GameState; flooded: boolean }) {
             Home by the low road {flooded ? '· drowned' : '· fast'}
           </button>
           <button onClick={() => enqueue({ type: 'dispatchCart', cartId: cart!.id, edgeId: 'high-road' })}>
-            Home by the high road · slow
+            Home by the high road · slow{coatNote(state, 'high-road', 'ryne')}
           </button>
           {state.cuttingHouse && (
             <button
@@ -665,7 +848,7 @@ function RyneMenu({ state, flooded }: { state: GameState; flooded: boolean }) {
                 enqueue({ type: 'dispatchCart', cartId: cart!.id, edgeId: 'cut-ryne-track' })
               }
             >
-              Out to the cutting house
+              Out to the cutting house{coatNote(state, 'cut-ryne-track', 'ryne')}
             </button>
           )}
         </div>
@@ -676,8 +859,8 @@ function RyneMenu({ state, flooded }: { state: GameState; flooded: boolean }) {
 
 function ShingleMenu({ state, onPlace }: { state: GameState; onPlace: () => void }) {
   const enqueue = useEnqueue();
-  const cart = state.carts[0];
-  const cartHere = cart?.location.kind === 'node' && cart.location.nodeId === 'shingle';
+  const cart = idleCartAt(state, 'shingle');
+  const cartHere = !!cart;
   const d = state.dutchman;
   const fleeceHeld = cart?.cargo.fleece ?? 0;
   const fleeceSale = Math.min(fleeceHeld, d.fleeceAppetite);
@@ -748,7 +931,7 @@ function ShingleMenu({ state, onPlace }: { state: GameState; onPlace: () => void
           <button
             onClick={() => enqueue({ type: 'dispatchCart', cartId: cart!.id, edgeId: 'marsh-track' })}
           >
-            Home over the marsh
+            Home over the marsh{coatNote(state, 'marsh-track', 'shingle')}
           </button>
           {state.cuttingHouse && (
             <button
@@ -756,7 +939,7 @@ function ShingleMenu({ state, onPlace }: { state: GameState; onPlace: () => void
                 enqueue({ type: 'dispatchCart', cartId: cart!.id, edgeId: 'cut-shingle-track' })
               }
             >
-              To the cutting house
+              To the cutting house{coatNote(state, 'cut-shingle-track', 'shingle')}
             </button>
           )}
         </div>
@@ -767,8 +950,8 @@ function ShingleMenu({ state, onPlace }: { state: GameState; onPlace: () => void
 
 function CuttingHouseMenu({ state }: { state: GameState }) {
   const enqueue = useEnqueue();
-  const cart = state.carts[0];
-  const cartHere = cart?.location.kind === 'node' && cart.location.nodeId === 'cutting-house';
+  const cart = idleCartAt(state, 'cutting-house');
+  const cartHere = !!cart;
   const store = state.stores['cutting-house'] ?? {};
   const tubs = store.jenever ?? 0;
   const cuttable = Math.min(tubs, Math.floor(state.coin / CUT_SUGAR_COST));
@@ -829,21 +1012,21 @@ function CuttingHouseMenu({ state }: { state: GameState }) {
               enqueue({ type: 'dispatchCart', cartId: cart!.id, edgeId: 'cut-ryne-track' })
             }
           >
-            Send to Ryne
+            Send to Ryne{coatNote(state, 'cut-ryne-track', 'cutting-house')}
           </button>
           <button
             onClick={() =>
               enqueue({ type: 'dispatchCart', cartId: cart!.id, edgeId: 'cut-farm-track' })
             }
           >
-            Send home to the farm
+            Send home to the farm{coatNote(state, 'cut-farm-track', 'cutting-house')}
           </button>
           <button
             onClick={() =>
               enqueue({ type: 'dispatchCart', cartId: cart!.id, edgeId: 'cut-shingle-track' })
             }
           >
-            Send to the shingle
+            Send to the shingle{coatNote(state, 'cut-shingle-track', 'cutting-house')}
           </button>
         </div>
       )}
@@ -851,20 +1034,45 @@ function CuttingHouseMenu({ state }: { state: GameState }) {
   );
 }
 
-function CartMenu({ state, flooded }: { state: GameState; flooded: boolean }) {
+function CartMenu({
+  state,
+  flooded,
+  cartId,
+}: {
+  state: GameState;
+  flooded: boolean;
+  cartId: string;
+}) {
   const enqueue = useEnqueue();
-  const cart = state.carts[0];
+  const [haulGood, setHaulGood] = useState<Good | null>(null);
+  const cart = state.carts.find((c) => c.id === cartId);
   if (!cart) return null;
   const cargo = storeSummary(cart.cargo, 'Empty');
   const laden = cargoCount(cart.cargo) > 0;
 
-  // The one order the cart takes anywhere: tip the lot into a dyke (spec §6.9).
-  const ditchButton = laden && (
+  // The one order an idle cart takes anywhere: the dyke (spec §6.9).
+  const ditchButton = laden && !cart.carter && (
     <div className="menu-buttons">
       <button onClick={() => enqueue({ type: 'ditchCargo', cartId: cart.id })}>
         Tip the lot into a dyke · nothing comes back
       </button>
     </div>
+  );
+
+  const carterBlock = cart.carter && (
+    <>
+      <p className="flavour">
+        A carter holds the reins: {GOOD_LABEL[cart.carter.good]},{' '}
+        {nodeById(cart.carter.from, state.farm, state.cuttingHouse).name} to{' '}
+        {nodeById(cart.carter.to, state.farm, state.cuttingHouse).name}, {CARTER_WAGE} coin a day.
+        He minds the tide and nothing else — not even the blue coat.
+      </p>
+      <div className="menu-buttons">
+        <button onClick={() => enqueue({ type: 'dismissCarter', cartId: cart.id })}>
+          Dismiss the carter
+        </button>
+      </div>
+    </>
   );
 
   if (cart.location.kind === 'edge') {
@@ -875,25 +1083,79 @@ function CartMenu({ state, flooded }: { state: GameState; flooded: boolean }) {
     const halted = edge?.condition === 'tideLocked' && flooded;
     return (
       <>
-        <h4>The Cart</h4>
+        <h4>{cart.name}</h4>
         <p className="flavour">
           {cargo} aboard. {edge?.name}, {pct}% along.
           {halted ? ' The tide has the road — waiting on high ground.' : ''}
         </p>
+        {carterBlock}
         {ditchButton}
       </>
     );
   }
 
-  const here = nodeById(cart.location.nodeId, state.farm, state.cuttingHouse);
+  const hereId = cart.location.nodeId;
+  const here = nodeById(hereId, state.farm, state.cuttingHouse);
+
+  // Hiring (spec §6.11): a standing order runs from where the cart stands.
+  const haulables = Array.from(
+    new Set([
+      ...(Object.entries(state.stores[hereId] ?? {}) as Array<[Good, number]>)
+        .filter(([, n]) => n > 0)
+        .map(([g]) => g),
+      ...(hereId === 'farm' ? (['fleece'] as Good[]) : []),
+    ]),
+  );
+  const destinations = (['farm', 'ryne', 'shingle', 'cutting-house'] as NodeId[]).filter(
+    (n) => n !== hereId && (n !== 'cutting-house' || state.cuttingHouse),
+  );
+
   return (
     <>
-      <h4>The Cart</h4>
+      <h4>{cart.name}</h4>
       <p className="flavour">
         Standing at {here.name}. {cargo} aboard.{' '}
         {clockOf(state.tick).hour >= 20 ? 'The pony would rather not.' : ''}
       </p>
-      <p className="flavour">Orders are given where the cart stands.</p>
+      {carterBlock}
+      {!cart.carter && (
+        <>
+          <p className="flavour">Orders are given where the cart stands.</p>
+          {haulables.length > 0 && (
+            <div className="menu-buttons">
+              {haulGood === null ? (
+                <>
+                  {haulables.map((good) => (
+                    <button key={good} onClick={() => setHaulGood(good)}>
+                      Hire a carter to haul {GOOD_LABEL[good]} · {CARTER_WAGE} coin a day
+                    </button>
+                  ))}
+                </>
+              ) : (
+                <>
+                  {destinations.map((to) => (
+                    <button
+                      key={to}
+                      onClick={() => {
+                        enqueue({
+                          type: 'hireCarter',
+                          cartId: cart.id,
+                          order: { from: hereId, to, good: haulGood },
+                        });
+                        setHaulGood(null);
+                      }}
+                    >
+                      {GOOD_LABEL[haulGood]} to {nodeById(to, state.farm, state.cuttingHouse).name},
+                      and back, until told otherwise
+                    </button>
+                  ))}
+                  <button onClick={() => setHaulGood(null)}>Think better of it</button>
+                </>
+              )}
+            </div>
+          )}
+        </>
+      )}
       {ditchButton}
     </>
   );

@@ -99,6 +99,39 @@ export const DAILY_DEMAND: Record<Good, number> = {
   'brandy-gent': 2,
 };
 
+// ---- M3: Heat, two pools (spec §6.10) ----
+export const REGIONAL_HEAT_DECAY = 0.97; // × at dawn — the parish forgets, slowly
+export const NATIONAL_HEAT_DECAY = 0.995; // × at dawn — London barely forgets
+export const PROMOTION_THRESHOLD = 100; // regional above this spills upward at dawn
+export const PROMOTION_RATE = 0.1; // share of the excess that promotes
+export const SUSPICION_SHARE = 0.5; // every heat event stains its nearest node by this
+export const SUSPICION_DECAY = 0.99; // × at dawn — he keeps notes
+export const STORAGE_HEAT_COEFF = 0.01; // per illicit unit over cover, per tick (§18)
+export const MARKET_TATTLE = 0.5; // heat per contraband unit sold at Ryne
+export const DITCH_HEAT = 0.2; // heat per unit tipped into a dyke — tubs carry no name
+/** What a site can hide in plain sight (stock, not throughput — §6.1 leak is M4). */
+export const COVER_CAPACITY: Partial<Record<string, number>> = {
+  farm: 4, // wool-trade clutter
+  'cutting-house': 6,
+};
+
+// ---- M3: the Riding Officer (spec §6.10) ----
+export const OFFICER_ARRIVAL_HEAT = 30; // first dawn regional at or above this, he comes
+export const PATROL_THRESHOLD = 4; // max suspicion below this, he rides his beat
+export const SEIZURE_HEAT = 1.5; // regional heat per unit seized
+export const SEARCH_RELIEF = 0.5; // × suspicion at a node searched clean
+export const HORSE_TICKS_PER_TILE_ROAD = 0.18; // faster than any cart
+export const HORSE_TICKS_PER_TILE_MARSH = 0.45; // the marsh fights horses
+
+// ---- M3: the books (spec §6.10 / §19.2) ----
+export const PLAUSIBLE_YIELD_MIN = 0.5; // he knows what a Romney ewe gives
+export const WOOL_GAP_COEFF = 1.0; // regional heat per fleece adrift at inspection
+
+// ---- M3: wheels (spec §6.11) ----
+export const CART_COST = 50; // coin, cart and pony, bought at the farm
+export const MAX_CARTS = 3; // the yard holds three
+export const CARTER_WAGE = 3; // coin per carter, due at dawn with the wool
+
 // ---- Rent (spec §6.8: the first squeeze) ----
 export const RENT_AMOUNT = 120; // coin, per period
 export const RENT_PERIOD_DAYS = 6; // first due at dawn, this many days after placement
