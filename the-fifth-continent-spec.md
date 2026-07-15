@@ -291,6 +291,168 @@ batch is four days of selling, or a spread of cuts across tiers. Rent holds at
 20 a day. One good night on the shingle out-earns a lawful week; that is the
 whole argument, and the player does the moral bookkeeping themselves.
 
+### 6.10 M3 — the Revenue (Heat, suspicion, the Riding Officer, the books)
+
+In M2 the crime works; in M3 it costs. Everything recorded since M1 — edge
+exposure, time-of-day, tubs sitting still, the ditch — is finally consumed.
+No new goods, no new buildings, no dice: M3 adds one man, two numbers, and a
+page of arithmetic he checks against your life. Revenue blue (`#2E4A6B`)
+enters the palette at last: he wears the coat.
+
+**Contraband.** Jenever, tea, lace and every brandy tier are contraband
+wherever they stand. Fleece is lawful in itself — wool's crime is the export
+(§2), the gunwale is the crime scene, and the Revenue catches it not on the
+marsh but in the books (below).
+
+**Heat — two pools (§6.3, consumed at last).**
+```
+heat.regional   the parish noticing; decays ×0.97 at dawn
+heat.national   London noticing; decays ×0.995 at dawn — the doom clock
+promotion       at dawn, spill = max(0, regional - PROMOTION_THRESHOLD) × PROMOTION_RATE
+                regional -= spill; national += spill
+                PROMOTION_THRESHOLD = 100, PROMOTION_RATE = 0.10
+```
+Loss stays out of reach in M3 — national Heat buys escalation in M4+, not
+dragoons tomorrow. It accrues so that the doom clock is already ticking when
+the player first learns to read it.
+
+**Heat sources.** Each source adds to `heat.regional`; each also stains the
+nearest node: `suspicion[node] += amount × SUSPICION_SHARE (0.5)` (§6.6 with
+`officerCompetence = 1`, bribes not yet in the world).
+```
+route     per tick a cart moves with contraband aboard (§6.2):
+          (illicitAboard × edge.exposure / edge.latency) × timeOfDayMod(t)
+          — weatherMod and concealmentTech wait for their systems (= 1, 0)
+storage   per tick contraband sits in a store or on a standing cart (§18):
+          max(0, illicitStored - coverCapacity[site]) × STORAGE_HEAT_COEFF (0.01)
+          coverCapacity: farm 4 (wool-trade clutter), cutting house 6,
+          everywhere else 0, carts 0 (the false bottom is a tree tier)
+market    selling contraband at Ryne: units × MARKET_TATTLE (0.5)
+          — the town drinks happily and talks constantly
+ditch     tipped cargo: units × DITCH_HEAT (0.2), regional only, no node
+          stain — the Revenue drags dykes, but tubs carry no name
+```
+Night discipline, low-exposure tracks, a clean barn and a quick market are
+the M3 countermeasures. They are behaviour, not purchases: the tree tiers
+that buy Heat down arrive in M5.
+
+**The Riding Officer.** One man, on a government horse, permanent from the
+first dawn where `heat.regional ≥ OFFICER_ARRIVAL_HEAT (30)`. He lodges at
+the Customs House and he is entirely deterministic — outplaying him is
+timetabling, not luck (§7: countermeasures against an inference, never a
+dice roll).
+```
+at dawn    target = argmax suspicion[node], if the max ≥ PATROL_THRESHOLD (4);
+           otherwise his beat: Customs House → Ryne → back
+riding     HORSE_TICKS_PER_TILE: road 0.18, marsh 0.45 — the marsh fights
+           horses; the shingle is a long, sour ride
+stop       if he and a cart share an edge on the same tick, the cart is
+           stopped and searched: contraband aboard is seized (cover 0)
+search     at his target node: found = max(0, illicitStored - coverCapacity);
+           seized, plus heat.regional += found × SEIZURE_HEAT (1.5);
+           a clean search instead cools the trail:
+           suspicion[node] ×= SEARCH_RELIEF (0.5)
+           one inspection a day, then home to the Customs House
+decay      suspicion[node] ×= 0.99 at dawn — he keeps notes
+```
+Seizure takes the goods and nothing else: no arrest, no fine, no combat.
+There is deliberately no verb for violence against him — that verb arrives
+with M4 and §7 prices it as catastrophe. The ditch (§6.9) becomes the panic
+button it was built to be: see the blue coat on your road, tip the lot.
+
+**The books (§19.2, §20.1 — the flock gets its job).** The farm popover
+grows a ledger page. The player keeps one standing number:
+```
+declaredYield   fleece per day the books admit the flock gives, 0..flockSize,
+                changed at will; accrues declaredToDate at each dawn
+grownToDate     what the flock actually grew (accrued at dawn)
+soldLawfully    fleece sold at Ryne, accrued at sale
+```
+Undeclared wool does not exist and may vanish over any gunwale it likes.
+Declared wool must be accounted for. When the officer inspects the farm he
+counts sheep and reads the page:
+```
+accounted = soldLawfully + fleece on hand (barn + carts + sheep's backs)
+gap       = |declaredToDate - accounted|
+          + max(0, grownToDate × PLAUSIBLE_YIELD_MIN - declaredToDate)
+            PLAUSIBLE_YIELD_MIN = 0.5 — he knows what a Romney ewe gives;
+            swear to less than half and he prices the lie himself
+heat.regional += gap × WOOL_GAP_COEFF (1.0); the page is then initialled —
+each gap is paid for once, and the ledger reconciles to reality
+```
+The squeeze: honest books mean every fleece must show — the Dutchman becomes
+expensive. Short books free the surplus wool but cap lawful Ryne sales at the
+declared figure, and the floor keeps half the clip on the record. Cooking
+the books is one number, and it is a real decision every rent period.
+
+**What the player sees (§20.2, first cut).** `gossip` = suspicion snapshotted
+at each dawn — the parish talks over breakfast, so the player reads
+yesterday's Revenue mind, not today's. One toggle paints the gossip stains on
+the map; the full A/B/C overlay set waits until there are flows worth
+superimposing. The officer himself is always visible — one horse in open
+country; it is his mind that is fogged, not his body. The HUD gains the two
+Heat gauges. Dispatch buttons carry the warning a marshman's eyes would:
+when the officer is on an edge or standing at its far node, the button says
+so — *"the blue coat is on the high road."* Hired carters (§6.11) do not
+read buttons and do not heed the coat; the warning is for the hand on the
+tiller, and that difference is the point.
+
+**What M3 does not do** (each deferred with the system that gives it
+meaning): no bribes — the Bought Officer is a tree tier (M5); no `watched`
+set, informers or decoy runs (M4/M5); no escalation past one man — the Water
+Guard and worse are bought by national Heat in M4+; no §6.1 throughput leak
+or fortificationVisibility — those enter with fortifications in M4 (M3 cover
+is capacity against *stock*, §18); no weather; no arrest, fine or combat.
+
+Arithmetic, against §6.9: a full night run is 8 × 0.7 × 0.4 ≈ 2.2 route
+Heat; a day's brandy trade at Ryne tattles ~5–6 more; a barn holding 8 tubs
+overnight leaks ~2.5. A working smuggler runs ~8–10 Heat a day against 3%
+decay, meets the officer around day 9–11, and lives thereafter by keeping
+the stains moving. The lawful carter generates exactly none of it — the
+officer never comes, which is its own quiet verdict on the lawful life.
+Numbers are opening bids for the distribution tests to beat into shape.
+
+### 6.11 M3 — more wheels: bought carts and the hired carter
+
+§5 promised haulers *assigned* to edges; here the promise is kept. The wool
+round — shear, load, road, sell, home — is by now a felt chore, and per §10
+the mechanic arrives only once the player has the problem it solves. The
+deeper move: automation frees the player's hands for crime. You automate the
+alibi and run the tubs yourself — and the moment carts move without you is
+the moment the officer starts stopping carts (§6.10).
+```
+buyCart      CART_COST = 50 coin, at the farm; the new cart is named and
+             starts in the yard. MAX_CARTS = 3 — the yard holds three.
+hireCarter   a carter takes a cart and a standing order:
+             order = { from: node, to: node, good }
+             CARTER_WAGE = 3 coin per day, due at dawn with the wool
+at `from`    load `good` to capacity from the store; if the store is empty
+             he waits (a carter shuttles loads, not air)
+roads        between nodes joined by two edges he takes the faster one that
+             is open at departure — he knows the tide like everyone born here
+at `to`      market → sell into remaining demand; otherwise unload into the
+             store (respecting its walls, §6.9); what cannot be sold or
+             unloaded rides home with him
+wages        unpaid at dawn → he walks off the same morning; the cart stands
+             where he left it, order cleared
+dismiss      at will, no severance; the order clears
+```
+The carter is deliberately dumb about everything but the tide: he does not
+watch for the blue coat, he does not wait for night, and he will drive a
+cartload of contraband straight past the Customs House if that is the order
+he was given. Standing orders full of brandy are legal-to-write and stupid-
+to-keep — the player discovers this the way §10 demands: by losing a load.
+Night-only orders, pack-ponies and the rest of §21's stable are deferred to
+their milestones; the hired mouth that can be *turned* joins the informer
+system in M4/M5 — the payroll is where informers will start.
+
+Arithmetic: a carter on farm→Ryne moves the whole clip (12/day ≤ his two
+runs × 8) for 3 coin against ~24 coin of wool — automation of the lawful
+trade roughly pays for itself and buys the player's attention back. A second
+cart (50) plus wages eats most of a rent period's lawful margin: expansion
+is bought with crime's proceeds, which is the game's whole loop in
+miniature.
+
 ---
 
 ## 7. THE REVENUE — A LEARNING ADVERSARY
@@ -423,7 +585,7 @@ rent and distraint (§6.8), popover menus on the assets themselves, drag-to-pan
 disclosure: routes appear only once there is something to move.
 
 **M2 — The Crime.** Dutchman, the beach, inbound goods, cutting house, quality tiers, bidirectional routing (§6.9). Fixed prices and daily demand caps — §17's market model comes later.
-**M3 — The Revenue.** `RevenueModel`, suspicion inference, the fogged player-facing intel map, cover & leak, first Riding Officer.
+**M3 — The Revenue.** `RevenueModel`, suspicion inference, the fogged player-facing intel map, cover & leak, first Riding Officer (§6.10). Bought carts and the hired carter on standing orders (§6.11) — automation arrives with the man who stops carts.
 **M4 — Force.** Hawksmere, raid resolution, fortification tiers, the visibility trade-off.
 **M5 — The Trees.** Ichor and Phlogiston, Debt, Publication, the two unlock events.
 **M6 — Alliances & Endings.**
