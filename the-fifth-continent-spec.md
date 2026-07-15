@@ -146,12 +146,15 @@ Coin spent on non-productive assets (a fine house, a carriage, a pew) raises **r
 suspicion[node] += observedActivity × officerCompetence × (1 - bribed[officer])
 ```
 
-### 6.7 M1½ — placement, shearing, road latency
-The game opens with an empty marsh and one decision: where the farm goes.
+### 6.7 M1½ — the farm, shearing, road latency
+The farm is given, not chosen: the game begins at Walland Farm, on a fixed
+marsh site (`FARM_SITE`). *(An earlier draft let the player site the farm
+first; reversed — an empty map with one consequence-free decision taught less
+than a farm that glows until first clicked. Placement machinery stays in the
+map code: M2+ buildings will need it, with real trade-offs attached.)*
 ```
-placeFarm(x, y)   valid iff terrain[y][x] is marsh; creates the farm node,
-                  the flock, and the cart, and generates both road edges
-                  from the farm to Ryne's fixed waypoint chains
+FARM_SITE         fixed, on the open marsh; farm, flock, cart and both road
+                  edges exist from tick 0, and the rent clock starts at once
 roadLatency       = max(1, round(pathTileLength × ticksPerTile[road]))
                   ticksPerTile: low road 0.26 (flat, direct), high 0.53 (climbs)
 fleeceReady      += flockSize × FLEECE_PER_HEAD_PER_DAY at dawn (wool on the
@@ -160,7 +163,9 @@ shear             farmStore.fleece += fleeceReady; fleeceReady = 0 (a player
                   verb at the farm, not an automatic process)
 ```
 "Tend flock" is an inspection verb (flock size, fleece ready) — no formula,
-no effect, until §19.2 gives the flock its real job in M3.
+no effect, until §19.2 gives the flock its real job in M3. On a fresh game
+the farm pulses gently until the player first opens its menu — the one
+non-diegetic affordance the opening allows itself.
 
 ### 6.8 M1½ — rent (the first squeeze)
 You are a tenant grazier. The landlord is in Applesham; his agent is punctual.
@@ -307,11 +312,11 @@ Three endings, one per tree. All three are, in their way, a kind of loss.
 - Minimal SVG render + a clock. Ugly is fine. **Correct and deterministic is not optional.**
 - Replay test: `(seed, actionLog)` → identical final state.
 
-**M1½ — The Yard.** *(Interface pass, no new adversaries.)* Farm placement on
-an open marsh (§6.7), shear as a player verb, popover menus on the assets
-themselves, drag-to-pan / cursor-anchored zoom (§15.2), textured tiles with the
-wobble trick (§15.3), progressive disclosure: routes appear only once there is
-something to move.
+**M1½ — The Yard.** *(Interface pass, no new adversaries.)* The fixed farm at
+Walland with a glow affordance on first play (§6.7), shear as a player verb,
+rent and distraint (§6.8), popover menus on the assets themselves, drag-to-pan
+/ cursor-anchored zoom (§15.2), painterly warped terrain (§15.3), progressive
+disclosure: routes appear only once there is something to move.
 
 **M2 — The Crime.** Dutchman, the beach, inbound goods, cutting house, quality tiers, bidirectional routing.
 **M3 — The Revenue.** `RevenueModel`, suspicion inference, the fogged player-facing intel map, cover & leak, first Riding Officer.

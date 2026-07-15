@@ -6,7 +6,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { CART_CAPACITY, LEIDEN_PRICE_MULT, WOOL_PRICE_DOMESTIC } from '../sim/balance';
-import { edgesFor, isPlaceable } from '../sim/map';
+import { edgesFor } from '../sim/map';
 import { clockOf, dayPhaseOf, isFlooded, ticksUntilTideTurn } from '../sim/time';
 import { spanOf } from './format';
 import type { GameState } from '../sim/types';
@@ -18,24 +18,22 @@ import {
   drawCart,
   drawCustoms,
   drawFarm,
+  drawFarmGlow,
   drawLabel,
   drawRoad,
   drawRyne,
   drawSheep,
-  drawTileHighlight,
 } from './sprites';
 
 type Selection = 'farm' | 'ryne' | 'customs' | 'cart' | null;
 
-/** Cart position in world coords, or null before the farm exists. */
+/** Cart position in world coords. */
 function cartWorldPos(state: GameState): { x: number; y: number; angle: number } | null {
   const cart = state.carts[0];
   if (!cart) return null;
   if (cart.location.kind === 'node') {
     const anchor =
-      cart.location.nodeId === 'farm' && state.farm
-        ? tileCenter(state.farm)
-        : tileCenter({ x: 28, y: 22 });
+      cart.location.nodeId === 'farm' ? tileCenter(state.farm) : tileCenter({ x: 28, y: 22 });
     return { x: anchor.x + 14, y: anchor.y + 8, angle: 0 };
   }
   const edge = edgesFor(state.farm).find(
@@ -49,16 +47,26 @@ function cartWorldPos(state: GameState): { x: number; y: number; angle: number }
 function routesVisible(state: GameState): boolean {
   const cart = state.carts[0];
   return (
-    !!state.farm &&
-    !!cart &&
-    ((cart.cargo.fleece ?? 0) > 0 || cart.location.kind === 'edge' || state.coin > 0)
+    !!cart && ((cart.cargo.fleece ?? 0) > 0 || cart.location.kind === 'edge' || state.coin > 0)
+  );
+}
+
+/** A brand-new tenancy: nothing earned, nothing moved — the farm glows. */
+function isFreshGame(state: GameState): boolean {
+  const cart = state.carts[0];
+  return (
+    state.coin === 0 &&
+    state.rentPaid === 0 &&
+    (state.stores.farm?.fleece ?? 0) === 0 &&
+    (cart?.cargo.fleece ?? 0) === 0 &&
+    cart?.location.kind === 'node'
   );
 }
 
 function anchorWorld(sel: Selection, state: GameState): { x: number; y: number } | null {
   switch (sel) {
     case 'farm':
-      return state.farm ? tileCenter(state.farm) : null;
+      return tileCenter(state.farm);
     case 'ryne':
       return tileCenter({ x: 28, y: 21 });
     case 'customs':
@@ -84,15 +92,12 @@ export function GameMap({ state }: { state: GameState }) {
   const selectedRef = useRef<Selection>(null);
   selectedRef.current = selected;
   const [tending, setTending] = useState(false);
-  const hoverRef = useRef<{ x: number; y: number } | null>(null);
+  // The startup glow dies the first time the farm menu opens.
+  const farmVisitedRef = useRef(false);
 
-  const enqueue = useGameStore((s) => s.enqueue);
-
-  const placing = state.farm === null;
   const flooded = isFlooded(state.tick);
   const phase = dayPhaseOf(state.tick);
   const nightOpacity = phase === 'night' ? 0.34 : phase === 'dusk' ? 0.16 : 0;
-  const placePending = useGameStore((s) => s.pending.some((a) => a.type === 'placeFarm'));
 
   // ---- The render loop (layers 0–1) ----
   useEffect(() => {
@@ -145,11 +150,12 @@ export function GameMap({ state }: { state: GameState }) {
           drawRoad(ctx, pathPoints(edge, false), edge.condition === 'tideLocked' && floodedNow);
         }
       }
-      if (s.farm) {
-        drawSheep(ctx, s.farm, s.flockSize);
-        drawFarm(ctx, s.farm);
-        const fc = tileCenter(s.farm);
-        drawLabel(ctx, 'Walland Farm', fc.x, fc.y - 16);
+      drawSheep(ctx, s.farm, s.flockSize);
+      drawFarm(ctx, s.farm);
+      const fc = tileCenter(s.farm);
+      drawLabel(ctx, 'Walland Farm', fc.x, fc.y - 16);
+      if (isFreshGame(s) && !farmVisitedRef.current) {
+        drawFarmGlow(ctx, s.farm, (performance.now() / 1800) % 1);
       }
       drawRyne(ctx);
       drawLabel(ctx, 'Ryne', 28.5 * TILE, 19.6 * TILE);
@@ -160,12 +166,6 @@ export function GameMap({ state }: { state: GameState }) {
       const cp = cartWorldPos(s);
       if (cart && cp) {
         drawCart(ctx, cp.x, cp.y, cart.location.kind === 'edge' ? cp.angle : 0, (cart.cargo.fleece ?? 0) > 0);
-      }
-
-      // Placement hover.
-      if (s.farm === null && hoverRef.current) {
-        const t = hoverRef.current;
-        drawTileHighlight(ctx, t.x, t.y, isPlaceable(t.x, t.y));
       }
 
       // Layer 3 helper: keep the popover pinned to its anchor.
@@ -204,15 +204,6 @@ export function GameMap({ state }: { state: GameState }) {
     return { x: e.clientX - r.left, y: e.clientY - r.top };
   }
 
-  function tileAt(e: React.PointerEvent | React.MouseEvent): { x: number; y: number } | null {
-    const p = localPos(e);
-    const w = camRef.current!.screenToWorld(p.x, p.y);
-    const tx = Math.floor(w.x / TILE);
-    const ty = Math.floor(w.y / TILE);
-    if (tx < 0 || ty < 0 || tx >= 40 || ty >= 30) return null;
-    return { x: tx, y: ty };
-  }
-
   function onClick(e: React.MouseEvent) {
     const cam = camRef.current!;
     if (cam.wasDrag()) return;
@@ -220,22 +211,12 @@ export function GameMap({ state }: { state: GameState }) {
     const p = localPos(e);
     const w = cam.screenToWorld(p.x, p.y);
 
-    if (s.farm === null) {
-      const t = tileAt(e);
-      if (t && isPlaceable(t.x, t.y) && !placePending) {
-        enqueue({ type: 'placeFarm', x: t.x, y: t.y });
-      }
-      return;
-    }
-
     // Hit-test the assets, nearest first.
     const targets: Array<{ sel: Selection; x: number; y: number; r: number }> = [];
     const cp = cartWorldPos(s);
     if (cp) targets.push({ sel: 'cart', x: cp.x, y: cp.y, r: 14 });
-    if (s.farm) {
-      const fc = tileCenter(s.farm);
-      targets.push({ sel: 'farm', x: fc.x, y: fc.y, r: 26 });
-    }
+    const fc = tileCenter(s.farm);
+    targets.push({ sel: 'farm', x: fc.x, y: fc.y, r: 26 });
     const rc = tileCenter({ x: 28, y: 21.8 });
     targets.push({ sel: 'ryne', x: rc.x, y: rc.y, r: 42 });
     const cc = tileCenter({ x: 26, y: 19 });
@@ -246,6 +227,7 @@ export function GameMap({ state }: { state: GameState }) {
       const d = Math.hypot(w.x - t.x, w.y - t.y);
       if (d <= t.r && (!best || d < best.d)) best = { sel: t.sel, d };
     }
+    if (best?.sel === 'farm') farmVisitedRef.current = true;
     setSelected(best?.sel ?? null);
     setTending(false);
   }
@@ -253,7 +235,7 @@ export function GameMap({ state }: { state: GameState }) {
   return (
     <div
       ref={shellRef}
-      className={`map-shell ${placing ? 'placing' : ''}`}
+      className="map-shell"
       onPointerDown={(e) => {
         if (e.button === 0 || e.button === 1) {
           const p = localPos(e);
@@ -268,7 +250,6 @@ export function GameMap({ state }: { state: GameState }) {
       onPointerMove={(e) => {
         const p = localPos(e);
         camRef.current!.pointerMove(p.x, p.y);
-        if (stateRef.current.farm === null) hoverRef.current = tileAt(e);
       }}
       onPointerUp={(e) => {
         camRef.current!.pointerUp();
@@ -283,14 +264,6 @@ export function GameMap({ state }: { state: GameState }) {
       <canvas ref={canvasRef} className="map-canvas" />
 
       {nightOpacity > 0 && <div className="night-veil" style={{ opacity: nightOpacity }} />}
-
-      {placing && (
-        <div className="banner">
-          {placePending
-            ? 'The stakes are cut. The ground is chosen.'
-            : 'Choose ground for your farm — any dry marsh will take it.'}
-        </div>
-      )}
 
       {state.lost && <ForfeitOverlay />}
 

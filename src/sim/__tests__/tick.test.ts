@@ -6,14 +6,13 @@ import {
   TICKS_PER_HOUR,
   WOOL_PRICE_DOMESTIC,
 } from '../balance';
-import { edgesFor } from '../map';
+import { FARM_SITE, edgesFor } from '../map';
 import { isFlooded } from '../time';
 import { initialState, tick } from '../tick';
 import type { Action, GameState } from '../types';
 
-const SITE = { x: 8, y: 11 };
-const HIGH_ROAD_LATENCY = edgesFor(SITE).find((e) => e.id === 'high-road')!.latency;
-const LOW_ROAD_LATENCY = edgesFor(SITE).find((e) => e.id === 'low-road')!.latency;
+const HIGH_ROAD_LATENCY = edgesFor(FARM_SITE).find((e) => e.id === 'high-road')!.latency;
+const LOW_ROAD_LATENCY = edgesFor(FARM_SITE).find((e) => e.id === 'low-road')!.latency;
 
 function runTicks(state: GameState, n: number, actionsAt: Record<number, Action[]> = {}): GameState {
   let s = state;
@@ -23,16 +22,11 @@ function runTicks(state: GameState, n: number, actionsAt: Record<number, Action[
   return s;
 }
 
-/** A fresh game with the farm already sited at the bot's spot. */
-function placedState(): GameState {
-  return tick(initialState(1), [{ type: 'placeFarm', ...SITE }]);
-}
-
 describe('tick purity', () => {
   it('never mutates its input', () => {
     const s0 = initialState(1);
     const frozen = JSON.stringify(s0);
-    tick(s0, [{ type: 'placeFarm', ...SITE }]);
+    tick(s0, [{ type: 'shear' }]);
     tick(s0, []);
     expect(JSON.stringify(s0)).toBe(frozen);
   });
@@ -43,43 +37,25 @@ describe('tick purity', () => {
   });
 });
 
-describe('placing the farm (spec §6.7)', () => {
-  it('starts with no farm, no cart, no roads', () => {
+describe('the opening state (spec §6.7: the farm is given)', () => {
+  it('begins with the farm at Walland, the flock, the cart, and the store', () => {
     const s0 = initialState(1);
-    expect(s0.farm).toBeNull();
-    expect(s0.carts).toHaveLength(0);
+    expect(s0.farm).toEqual(FARM_SITE);
+    expect(s0.carts).toHaveLength(1);
+    expect(s0.carts[0].location).toEqual({ kind: 'node', nodeId: 'farm' });
+    expect(s0.stores.farm).toEqual({ fleece: 0 });
+    expect(s0.flockSize).toBeGreaterThan(0);
   });
 
-  it('siting the farm creates the flock, the cart, and the store', () => {
-    const s = placedState();
-    expect(s.farm).toEqual(SITE);
-    expect(s.carts).toHaveLength(1);
-    expect(s.carts[0].location).toEqual({ kind: 'node', nodeId: 'farm' });
-    expect(s.stores.farm).toEqual({ fleece: 0 });
-  });
-
-  it('rejects bad ground and stays in the placement phase', () => {
-    const s = tick(initialState(1), [{ type: 'placeFarm', x: 38, y: 10 }]); // the sea
-    expect(s.farm).toBeNull();
-    expect(s.carts).toHaveLength(0);
-    expect(s.log.some((e) => e.text.includes('will not take a farm'))).toBe(true);
-  });
-
-  it('cannot be placed twice', () => {
-    const s = tick(placedState(), [{ type: 'placeFarm', x: 9, y: 12 }]);
-    expect(s.farm).toEqual(SITE);
-  });
-
-  it('no wool grows before the farm exists', () => {
-    const s = runTicks(initialState(1), SHEARING_HOUR * TICKS_PER_HOUR + 2);
-    expect(s.fleeceReady).toBe(0);
+  it('the rent clock starts at once', () => {
+    expect(initialState(1).rentDueTick).toBeGreaterThan(0);
   });
 });
 
 describe('the flock and the shears', () => {
-  /** Farm placed at tick 0, run to just past dawn: wool is on the sheep. */
+  /** Run to just past dawn: wool is on the sheep. */
   function dawnState(): GameState {
-    return runTicks(placedState(), SHEARING_HOUR * TICKS_PER_HOUR);
+    return runTicks(initialState(1), SHEARING_HOUR * TICKS_PER_HOUR + 1);
   }
 
   it('wool grows onto the sheep at dawn, one fleece per head', () => {
@@ -89,7 +65,7 @@ describe('the flock and the shears', () => {
   });
 
   it('grows every day and accumulates if unshorn', () => {
-    const s = runTicks(placedState(), 24 * TICKS_PER_HOUR * 2);
+    const s = runTicks(initialState(1), 24 * TICKS_PER_HOUR * 2);
     expect(s.fleeceReady).toBe(STARTING_FLOCK * 2);
   });
 
@@ -108,9 +84,9 @@ describe('the flock and the shears', () => {
 });
 
 describe('the cart', () => {
-  /** Farm placed, dawn passed, flock sheared: fleece in the store. */
+  /** Dawn passed, flock sheared: fleece in the store. */
   function stateWithFleece(): GameState {
-    const s = runTicks(placedState(), SHEARING_HOUR * TICKS_PER_HOUR);
+    const s = runTicks(initialState(1), SHEARING_HOUR * TICKS_PER_HOUR);
     return tick(s, [{ type: 'shear' }]);
   }
 
@@ -176,7 +152,7 @@ describe('the tide and the low road', () => {
 
   it('refuses dispatch onto the low road at high water', () => {
     const floodedTick = findTide(1, true);
-    let s = runTicks(placedState(), floodedTick - 1);
+    let s = runTicks(initialState(1), floodedTick);
     expect(isFlooded(s.tick)).toBe(true);
     s = tick(s, [{ type: 'dispatchCart', cartId: 'cart-1', edgeId: 'low-road' }]);
     expect(s.carts[0].location).toEqual({ kind: 'node', nodeId: 'farm' });
@@ -184,7 +160,7 @@ describe('the tide and the low road', () => {
   });
 
   it('allows the low road at low water', () => {
-    let s = runTicks(placedState(), 2); // tick 3: still low water
+    let s = runTicks(initialState(1), 3); // tick 3: still low water
     expect(isFlooded(s.tick)).toBe(false);
     s = tick(s, [{ type: 'dispatchCart', cartId: 'cart-1', edgeId: 'low-road' }]);
     expect(s.carts[0].location.kind).toBe('edge');
@@ -194,7 +170,7 @@ describe('the tide and the low road', () => {
     // Dispatch a few ticks before the flood so the cart is caught out.
     const floodStart = findTide(1, true);
     const departure = floodStart - 3;
-    let s = runTicks(placedState(), departure - 1);
+    let s = runTicks(initialState(1), departure);
     s = tick(s, [{ type: 'dispatchCart', cartId: 'cart-1', edgeId: 'low-road' }]);
 
     // Run deep into the flood window: the cart must still be on the edge,

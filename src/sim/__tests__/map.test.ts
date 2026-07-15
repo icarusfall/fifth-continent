@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { HIGH_ROAD_TICKS_PER_TILE, LOW_ROAD_TICKS_PER_TILE } from '../balance';
 import {
+  FARM_SITE,
   MAP_HEIGHT,
   MAP_WIDTH,
   TERRAIN,
@@ -30,8 +31,8 @@ describe('the Gault (hand-authored map)', () => {
     }
   });
 
-  it('places every fixed node on dry land inside the map', () => {
-    for (const node of nodesFor(null)) {
+  it('places every node on dry land inside the map', () => {
+    for (const node of nodesFor(FARM_SITE)) {
       expect(node.x).toBeGreaterThanOrEqual(0);
       expect(node.x).toBeLessThan(MAP_WIDTH);
       expect(node.y).toBeGreaterThanOrEqual(0);
@@ -42,8 +43,13 @@ describe('the Gault (hand-authored map)', () => {
   });
 });
 
-describe('farm placement (spec §6.7)', () => {
-  it('accepts marsh and nothing else', () => {
+describe('the farm site and buildable ground', () => {
+  it('Walland Farm sits on open marsh', () => {
+    expect(FARM_SITE).toEqual(SITE);
+    expect(isPlaceable(FARM_SITE.x, FARM_SITE.y)).toBe(true);
+  });
+
+  it('buildable ground is marsh and nothing else (M2+ buildings site through this)', () => {
     expect(isPlaceable(8, 11)).toBe(true); // open marsh
     expect(isPlaceable(2, 1)).toBe(false); // clay upland
     expect(isPlaceable(38, 10)).toBe(false); // the sea
@@ -53,12 +59,7 @@ describe('farm placement (spec §6.7)', () => {
     expect(isPlaceable(5, 400)).toBe(false); // off the map
   });
 
-  it('there are no nodes or roads before the farm is sited', () => {
-    expect(nodesFor(null).map((n) => n.id)).toEqual(['ryne', 'customs']);
-    expect(edgesFor(null)).toEqual([]);
-  });
-
-  it('siting the farm creates the farm node and both roads', () => {
+  it('the farm node and both roads exist at the site', () => {
     expect(nodeById('farm', SITE)).toMatchObject({ kind: 'farm', ...SITE });
     expect(edgesFor(SITE).map((e) => e.id).sort()).toEqual(['high-road', 'low-road']);
   });

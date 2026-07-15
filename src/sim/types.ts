@@ -74,10 +74,10 @@ export interface GameState {
   tick: number;
   rngState: RngState;
   coin: number;
-  /** Where the player sited the farm; null during the placement phase. */
-  farm: { x: number; y: number } | null;
-  /** Tick at which the next rent falls due; null before the tenancy begins. */
-  rentDueTick: number | null;
+  /** The farm's fixed site (spec §6.7: the tenancy at Walland). */
+  farm: { x: number; y: number };
+  /** Tick at which the next rent falls due. */
+  rentDueTick: number;
   /** Cumulative coin paid in rent — the ledger will want it later. */
   rentPaid: number;
   /** The tenancy is forfeit: the sim freezes, the game is over. */
@@ -95,7 +95,6 @@ export interface GameState {
 // ---- Actions ----
 
 export type Action =
-  | { type: 'placeFarm'; x: number; y: number }
   | { type: 'shear' }
   | { type: 'loadCart'; cartId: CartId; good: Good; qty: number }
   | { type: 'unloadCart'; cartId: CartId; good: Good; qty: number }

@@ -59,7 +59,7 @@ export function terrainAt(x: number, y: number): string {
   return TERRAIN[y][x];
 }
 
-/** Spec §6.7: a farm may be sited on any marsh tile. */
+/** Buildable ground is open marsh. (M2+ buildings will site through this.) */
 export function isPlaceable(x: number, y: number): boolean {
   return terrainAt(x, y) === '.';
 }
@@ -68,6 +68,9 @@ export interface FarmSite {
   x: number;
   y: number;
 }
+
+/** Spec §6.7: the tenancy at Walland is where the game begins. */
+export const FARM_SITE: FarmSite = { x: 8, y: 11 };
 
 // ---- Fixed nodes ----
 
@@ -80,10 +83,8 @@ export const CUSTOMS: MapNode = {
   y: 19,
 };
 
-export function nodesFor(farm: FarmSite | null): MapNode[] {
-  const fixed = [RYNE, CUSTOMS];
-  if (!farm) return fixed;
-  return [{ id: 'farm', kind: 'farm', name: 'Walland Farm', x: farm.x, y: farm.y }, ...fixed];
+export function nodesFor(farm: FarmSite): MapNode[] {
+  return [{ id: 'farm', kind: 'farm', name: 'Walland Farm', x: farm.x, y: farm.y }, RYNE, CUSTOMS];
 }
 
 // ---- Roads ----
@@ -122,8 +123,7 @@ export function roadLatency(path: Array<{ x: number; y: number }>, ticksPerTile:
   return Math.max(1, Math.round(pathTileLength(path) * ticksPerTile));
 }
 
-export function edgesFor(farm: FarmSite | null): MapEdge[] {
-  if (!farm) return [];
+export function edgesFor(farm: FarmSite): MapEdge[] {
   const lowPath = [{ x: farm.x, y: farm.y }, ...LOW_ROAD_WAYPOINTS];
   const highPath = [{ x: farm.x, y: farm.y }, ...HIGH_ROAD_WAYPOINTS];
   return [
@@ -152,13 +152,13 @@ export function edgesFor(farm: FarmSite | null): MapEdge[] {
   ];
 }
 
-export function nodeById(id: NodeId, farm: FarmSite | null): MapNode {
+export function nodeById(id: NodeId, farm: FarmSite): MapNode {
   const n = nodesFor(farm).find((n) => n.id === id);
   if (!n) throw new Error(`Unknown node: ${id}`);
   return n;
 }
 
-export function edgeById(id: EdgeId, farm: FarmSite | null): MapEdge {
+export function edgeById(id: EdgeId, farm: FarmSite): MapEdge {
   const e = edgesFor(farm).find((e) => e.id === id);
   if (!e) throw new Error(`Unknown edge: ${id}`);
   return e;

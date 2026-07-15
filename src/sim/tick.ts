@@ -16,7 +16,7 @@ import {
   TICKS_PER_HOUR,
   WOOL_PRICE_DOMESTIC,
 } from './balance';
-import { edgeById, isPlaceable, nodeById, otherEnd } from './map';
+import { FARM_SITE, edgeById, nodeById, otherEnd } from './map';
 import { seedRng } from './rng';
 import { clockOf, isFlooded } from './time';
 import type { Action, Cart, GameState, Store } from './types';
@@ -27,15 +27,30 @@ export function initialState(seed: number): GameState {
     tick: 0,
     rngState: seedRng(seed),
     coin: 0,
-    farm: null,
-    rentDueTick: null,
+    farm: { ...FARM_SITE },
+    // The tenancy runs from the first morning (spec §6.8).
+    rentDueTick: RENT_PERIOD_DAYS * TICKS_PER_DAY + SHEARING_HOUR * TICKS_PER_HOUR,
     rentPaid: 0,
     lost: false,
     flockSize: STARTING_FLOCK,
     fleeceReady: 0,
-    stores: {},
-    carts: [],
-    log: [{ tick: 0, text: 'The Gault. Choose ground for your farm.' }],
+    stores: {
+      farm: { fleece: 0 },
+      ryne: {},
+    },
+    carts: [
+      {
+        id: 'cart-1',
+        name: 'The Cart',
+        capacity: CART_CAPACITY,
+        cargo: {},
+        location: { kind: 'node', nodeId: 'farm' },
+      },
+    ],
+    log: [
+      { tick: 0, text: 'Walland Farm. Twelve sheep, one cart, and a price in Ryne.' },
+      { tick: 0, text: `The agent notes your name. Rent is ${RENT_AMOUNT} coin, six days hence.` },
+    ],
   };
 }
 
@@ -70,35 +85,7 @@ function findCart(state: GameState, cartId: string): Cart | undefined {
 
 function applyAction(state: GameState, action: Action): void {
   switch (action.type) {
-    case 'placeFarm': {
-      if (state.farm !== null) {
-        logEvent(state, 'The farm is already built.');
-        return;
-      }
-      if (!isPlaceable(action.x, action.y)) {
-        logEvent(state, 'That ground will not take a farm.');
-        return;
-      }
-      state.farm = { x: action.x, y: action.y };
-      state.stores.farm = { fleece: 0 };
-      state.carts.push({
-        id: 'cart-1',
-        name: 'The Cart',
-        capacity: CART_CAPACITY,
-        cargo: {},
-        location: { kind: 'node', nodeId: 'farm' },
-      });
-      // The tenancy begins: rent falls due at dawn, RENT_PERIOD_DAYS from now.
-      const placementDay = Math.floor(state.tick / TICKS_PER_DAY);
-      state.rentDueTick =
-        (placementDay + RENT_PERIOD_DAYS) * TICKS_PER_DAY + SHEARING_HOUR * TICKS_PER_HOUR;
-      logEvent(state, 'Walland Farm. Twelve sheep, one cart, and a price in Ryne.');
-      logEvent(state, `The agent notes your name. Rent is ${RENT_AMOUNT} coin, six days hence.`);
-      return;
-    }
-
     case 'shear': {
-      if (state.farm === null) return;
       if (state.fleeceReady <= 0) {
         logEvent(state, 'The sheep are shorn bare. Wool grows by dawn.');
         return;
@@ -201,7 +188,6 @@ function applyAction(state: GameState, action: Action): void {
 // ---- Per-tick processes ----
 
 function growWoolAtDawn(state: GameState): void {
-  if (state.farm === null) return;
   const { hour, minute } = clockOf(state.tick);
   if (hour === SHEARING_HOUR && minute === 0) {
     const grown = state.flockSize * FLEECE_PER_HEAD_PER_DAY;
@@ -212,7 +198,7 @@ function growWoolAtDawn(state: GameState): void {
 
 /** Spec §6.8 — the agent calls at dawn. Pays what it can; distrains the rest. */
 function collectRent(state: GameState): void {
-  if (state.rentDueTick === null || state.tick !== state.rentDueTick) return;
+  if (state.tick !== state.rentDueTick) return;
 
   const paid = Math.min(state.coin, RENT_AMOUNT);
   state.coin -= paid;

@@ -11,7 +11,6 @@ import {
 import { initialState, tick } from '../tick';
 import type { GameState } from '../types';
 
-const SITE = { x: 8, y: 11 };
 const FIRST_DUE = RENT_PERIOD_DAYS * TICKS_PER_DAY + SHEARING_HOUR * TICKS_PER_HOUR;
 
 function runTicks(state: GameState, n: number): GameState {
@@ -20,23 +19,14 @@ function runTicks(state: GameState, n: number): GameState {
   return s;
 }
 
-/** Farm placed at tick 0, coin set by fiat for the scenario. */
+/** A fresh game with coin set by fiat for the scenario. */
 function placedWithCoin(coin: number): GameState {
-  const s = tick(initialState(1), [{ type: 'placeFarm', ...SITE }]);
-  return { ...s, coin };
+  return { ...initialState(1), coin };
 }
 
 describe('rent (spec §6.8)', () => {
-  it('no rent falls due before the tenancy begins', () => {
-    const s = runTicks(initialState(1), FIRST_DUE + 10);
-    expect(s.rentDueTick).toBeNull();
-    expect(s.coin).toBe(0);
-    expect(s.lost).toBe(false);
-  });
-
-  it('placement schedules the first due dawn, six days out', () => {
-    const s = tick(initialState(1), [{ type: 'placeFarm', ...SITE }]);
-    expect(s.rentDueTick).toBe(FIRST_DUE);
+  it('the tenancy schedules the first due dawn, six days out', () => {
+    expect(initialState(1).rentDueTick).toBe(FIRST_DUE);
   });
 
   it('collects in full when the coin is there', () => {

@@ -4,12 +4,10 @@ import { deserialise, runGame, serialise } from '../run';
 import { tick } from '../tick';
 import type { ActionLog } from '../types';
 
-// A hand-scripted first day: site the farm, wait for dawn, shear, load,
-// take the high road (the tide has the low road at the scripted hour),
-// sell, come home.
+// A hand-scripted first day: wait for dawn, shear, load, take the high road
+// (the tide has the low road at the scripted hour), sell, come home.
 const dawn = SHEARING_HOUR * TICKS_PER_HOUR; // tick 30
 const script: ActionLog = {
-  0: [{ type: 'placeFarm', x: 8, y: 11 }],
   [dawn + 1]: [{ type: 'shear' }],
   [dawn + 2]: [{ type: 'loadCart', cartId: 'cart-1', good: 'fleece', qty: 8 }],
   [dawn + 3]: [{ type: 'dispatchCart', cartId: 'cart-1', edgeId: 'high-road' }],

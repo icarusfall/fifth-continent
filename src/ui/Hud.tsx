@@ -52,39 +52,33 @@ export function Hud({ state }: { state: GameState }) {
         <span className="hud-coin">{state.coin}</span>
       </div>
 
-      {state.rentDueTick !== null && (
-        <div className="hud-block">
-          <span className="hud-label">Rent</span>
-          <span
-            className="hud-coin"
-            style={{
-              color:
-                state.coin < RENT_AMOUNT && state.rentDueTick - state.tick < 24 * TICKS_PER_HOUR
-                  ? ROOF
-                  : undefined,
-            }}
-          >
-            {RENT_AMOUNT}
-          </span>
-          <span className="hud-note">
-            due day {clockOf(state.rentDueTick).day}, dawn
-            {state.coin < RENT_AMOUNT ? ` · short ${RENT_AMOUNT - state.coin}` : ' · covered'}
-          </span>
-        </div>
-      )}
+      <div className="hud-block">
+        <span className="hud-label">Rent</span>
+        <span
+          className="hud-coin"
+          style={{
+            color:
+              state.coin < RENT_AMOUNT && state.rentDueTick - state.tick < 24 * TICKS_PER_HOUR
+                ? ROOF
+                : undefined,
+          }}
+        >
+          {RENT_AMOUNT}
+        </span>
+        <span className="hud-note">
+          due day {clockOf(state.rentDueTick).day}, dawn
+          {state.coin < RENT_AMOUNT ? ` · short ${RENT_AMOUNT - state.coin}` : ' · covered'}
+        </span>
+      </div>
 
-      {state.farm && (
-        <>
-          <div className="hud-block">
-            <span className="hud-label">Fleece in store</span>
-            <span className="hud-coin">{state.stores.farm?.fleece ?? 0}</span>
-          </div>
-          <div className="hud-block">
-            <span className="hud-label">Wool on flock</span>
-            <span className="hud-coin">{state.fleeceReady}</span>
-          </div>
-        </>
-      )}
+      <div className="hud-block">
+        <span className="hud-label">Fleece in store</span>
+        <span className="hud-coin">{state.stores.farm?.fleece ?? 0}</span>
+      </div>
+      <div className="hud-block">
+        <span className="hud-label">Wool on flock</span>
+        <span className="hud-coin">{state.fleeceReady}</span>
+      </div>
     </div>
   );
 }

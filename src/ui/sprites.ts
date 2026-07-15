@@ -232,6 +232,30 @@ export function drawLabel(ctx: CanvasRenderingContext2D, text: string, x: number
   ctx.fillText(text.toUpperCase(), x, y);
 }
 
+/**
+ * The one non-diegetic affordance of the opening (spec §6.7): the farm
+ * pulses gently until first clicked. `phase` is 0..1.
+ */
+export function drawFarmGlow(
+  ctx: CanvasRenderingContext2D,
+  site: { x: number; y: number },
+  phase: number,
+): void {
+  const c = tileCenter(site);
+  const pulse = 0.5 + 0.5 * Math.sin(phase * Math.PI * 2);
+  ctx.strokeStyle = LIMEWASH;
+  ctx.lineWidth = 1.6 + pulse * 1.2;
+  ctx.globalAlpha = 0.5 - pulse * 0.25;
+  ctx.beginPath();
+  ctx.ellipse(c.x, c.y + 2, 26 + pulse * 8, 17 + pulse * 5.5, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.globalAlpha = 0.25 - pulse * 0.12;
+  ctx.beginPath();
+  ctx.ellipse(c.x, c.y + 2, 33 + pulse * 10, 21.5 + pulse * 7, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+}
+
 export function drawTileHighlight(
   ctx: CanvasRenderingContext2D,
   tx: number,

@@ -11,12 +11,12 @@ the two kinds of magic you can use to hide a crime. Design spec and build brief:
 Twelve sheep, one cart, two roads. The low road floods at high tide; the high
 road is slow and passes the Customs House. Fleece → Ryne → an insulting price.
 
-The game opens on an empty marsh: choose ground for your farm (a sim action —
-placement is part of the replayable action log). Shear is a player verb.
-Orders are given through popover menus on the assets themselves; routes appear
-only once there is something to move. Rendering is layered Canvas 2D per spec
-§15.1 — painterly warped terrain (no visible grid), traced ink coastline,
-eased drag-pan / cursor-anchored zoom camera.
+The game opens at Walland Farm — fixed site, glowing gently until first
+clicked. Shear is a player verb. Orders are given through popover menus on
+the assets themselves; routes appear only once there is something to move.
+Rendering is layered Canvas 2D per spec §15.1 — painterly warped terrain (no
+visible grid), traced ink coastline, eased drag-pan / cursor-anchored zoom
+camera.
 
 **The squeeze (spec §6.8):** you are a tenant. Rent is 120 coin every six
 days, collected at dawn; perfect lawful play earns 144. Come up short and the

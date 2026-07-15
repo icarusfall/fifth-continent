@@ -1,24 +1,16 @@
-// A trivial scripted player for headless runs: site the farm, shear at dawn,
-// load the cart, take the low road when the tide allows (else the high road),
-// sell at Ryne, come home. Used by the 200-game distribution test (spec §13)
-// and the `npm run headless` demo. This is a bot, not an AI — it exists so
-// that balance can be smoke-tested without a browser.
+// A trivial scripted player for headless runs: shear at dawn, load the cart,
+// take the low road when the tide allows (else the high road), sell at Ryne,
+// come home. Used by the 200-game distribution test (spec §13) and the
+// `npm run headless` demo. This is a bot, not an AI — it exists so that
+// balance can be smoke-tested without a browser.
 
 import { CART_CAPACITY } from './balance';
 import { isFlooded } from './time';
 import { initialState, tick } from './tick';
 import type { Action, GameState } from './types';
 
-/** The bot's favourite ground — the old default site on the open marsh. */
-export const POLICY_FARM_SITE = { x: 8, y: 11 };
-
 export function greedyCarterPolicy(state: GameState): Action[] {
   const actions: Action[] = [];
-
-  if (state.farm === null) {
-    actions.push({ type: 'placeFarm', ...POLICY_FARM_SITE });
-    return actions;
-  }
 
   const cart = state.carts[0];
   if (!cart || cart.location.kind !== 'node') return actions;
