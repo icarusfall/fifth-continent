@@ -260,6 +260,24 @@ When the appetite is spent, the town is done buying until dawn. This is the
 first, crude taste of §17's second ceiling — saturation as a wall — without a
 single moving price.
 
+**The barn, and the ditch.** §18's storage inversion arrives early, blunt and
+heatless: the farm store is finite, a cart is not a warehouse, and the last
+resort is to feed the marsh.
+```
+FARM_STORE_CAPACITY = 24   units, all goods together — exactly one
+                           lugger-load of wool, two dawns of the flock
+shear      moves min(fleeceReady, roomInBarn) into the store; wool the barn
+           cannot take stays on the sheep and loses nothing
+unload     legal at any node with a store; at the farm, capped by roomInBarn
+ditch      a cart may tip its whole cargo into a dyke wherever it stands —
+           goods destroyed, no coin back. (M3: the Revenue drags dykes;
+           recorded, not consumed, like all M2 exposure.)
+```
+The cap is the argument, pre-Heat: tubs in the barn crowd the wool out, so
+contraband must keep moving even before sitting still costs anything. The
+ditch exists so a full cart is never a soft-lock — only a loss the player
+chose over a worse one.
+
 **What M2 does not do** (each deferred with the system that gives it meaning):
 no Heat consumed (M3); no Standing, so quality only prices goods (buyer damage
 comes with buyers who remember); no smouching — tea sells as-is, bulking

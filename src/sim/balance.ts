@@ -32,6 +32,9 @@ export const SHEARING_HOUR = DAWN_HOUR; // fleece lands in the farm store at daw
 // ---- The cart ----
 export const CART_CAPACITY = 8; // fleece per run; 12 sheep/day forces a second run
 
+// ---- The barn (spec §6.9 / §18: storage is scarce — the cap arrives before the Heat) ----
+export const FARM_STORE_CAPACITY = 24; // units, all goods together — one lugger-load of wool
+
 // ---- Roads (spec §6.7: latency = max(1, round(pathTileLength × ticksPerTile))) ----
 export const LOW_ROAD_TICKS_PER_TILE = 0.26; // flat and direct, when the sea allows
 export const HIGH_ROAD_TICKS_PER_TILE = 0.53; // climbs the upland, minds its manners

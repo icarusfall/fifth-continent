@@ -6,6 +6,7 @@
 import {
   CART_CAPACITY,
   CUTS,
+  FARM_STORE_CAPACITY,
   CUTTING_HOUSE_COST,
   CUT_SUGAR_COST,
   DAILY_DEMAND,
@@ -103,11 +104,22 @@ function applyAction(state: GameState, action: Action): void {
         logEvent(state, 'The sheep are shorn bare. Wool grows by dawn.');
         return;
       }
-      const qty = state.fleeceReady;
-      state.fleeceReady = 0;
       state.stores.farm = state.stores.farm ?? {};
+      // The barn is finite (spec §6.9): wool it cannot take stays on the sheep.
+      const room = FARM_STORE_CAPACITY - cargoCount(state.stores.farm);
+      const qty = Math.min(state.fleeceReady, room);
+      if (qty <= 0) {
+        logEvent(state, 'The barn is full to the rafters. The wool stays on the sheep.');
+        return;
+      }
+      state.fleeceReady -= qty;
       addToStore(state.stores.farm, 'fleece', qty);
-      logEvent(state, `Sheared ${qty} fleece into the farm store.`);
+      logEvent(
+        state,
+        state.fleeceReady > 0
+          ? `Sheared ${qty} fleece; the barn takes no more. The rest stays on the sheep.`
+          : `Sheared ${qty} fleece into the farm store.`,
+      );
       return;
     }
 
@@ -137,15 +149,38 @@ function applyAction(state: GameState, action: Action): void {
         return;
       }
       const held = cart.cargo[action.good] ?? 0;
-      const qty = Math.min(action.qty, held);
-      if (qty <= 0) return;
-      cart.cargo[action.good] = held - qty;
       const nodeId = cart.location.nodeId;
+      // Only the barn has walls (spec §6.9); other stores stay open ground for now.
+      const room =
+        nodeId === 'farm'
+          ? FARM_STORE_CAPACITY - cargoCount(state.stores[nodeId] ?? {})
+          : Number.MAX_SAFE_INTEGER;
+      const qty = Math.min(action.qty, held, room);
+      if (qty <= 0) {
+        if (held > 0 && room <= 0) {
+          logEvent(state, 'The barn is full to the rafters. Nothing more fits.');
+        }
+        return;
+      }
+      cart.cargo[action.good] = held - qty;
       state.stores[nodeId] = state.stores[nodeId] ?? {};
       addToStore(state.stores[nodeId], action.good, qty);
       logEvent(
         state,
         `Unloaded ${qty} ${action.good} at ${nodeById(nodeId, state.farm, state.cuttingHouse).name}.`,
+      );
+      return;
+    }
+
+    case 'ditchCargo': {
+      const cart = findCart(state, action.cartId);
+      if (!cart) return;
+      const dumped = cargoCount(cart.cargo);
+      if (dumped <= 0) return;
+      cart.cargo = {};
+      logEvent(
+        state,
+        `${cart.name} tips ${dumped} goods into a dyke. The marsh keeps its own ledger.`,
       );
       return;
     }

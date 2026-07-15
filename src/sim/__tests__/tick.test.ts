@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   CART_CAPACITY,
+  FARM_STORE_CAPACITY,
   SHEARING_HOUR,
   STARTING_FLOCK,
+  TICKS_PER_DAY,
   TICKS_PER_HOUR,
   WOOL_PRICE_DOMESTIC,
 } from '../balance';
@@ -142,6 +144,77 @@ describe('the cart', () => {
     }
   });
 });
+
+describe('the barn and the ditch (spec §6.9)', () => {
+  /** Three dawns unshorn: more wool on the sheep than the barn can hold. */
+  function threeDawnsState(): GameState {
+    return runTicks(initialState(1), 2 * TICKS_PER_DAY + SHEARING_HOUR * TICKS_PER_HOUR + 1);
+  }
+
+  it('shearing stops at the barn wall; the rest stays on the sheep', () => {
+    const s0 = threeDawnsState();
+    expect(s0.fleeceReady).toBe(3 * STARTING_FLOCK); // 36 > 24
+    const s = tick(s0, [{ type: 'shear' }]);
+    expect(s.stores.farm?.fleece).toBe(FARM_STORE_CAPACITY);
+    expect(s.fleeceReady).toBe(3 * STARTING_FLOCK - FARM_STORE_CAPACITY);
+    expect(s.log.some((e) => e.text.includes('barn takes no more'))).toBe(true);
+  });
+
+  it('shearing into a full barn moves nothing and says why', () => {
+    const full = tick(threeDawnsState(), [{ type: 'shear' }]);
+    const s = tick(full, [{ type: 'shear' }]);
+    expect(s.stores.farm?.fleece).toBe(FARM_STORE_CAPACITY);
+    expect(s.fleeceReady).toBe(3 * STARTING_FLOCK - FARM_STORE_CAPACITY);
+    expect(s.log.some((e) => e.text.includes('full to the rafters'))).toBe(true);
+  });
+
+  it('unloading respects the barn wall at the farm', () => {
+    // Fill the barn (24), put 8 on the cart, shear the barn full again:
+    // the cart now has 8 fleece and nowhere at the farm to put them.
+    let s = tick(threeDawnsState(), [{ type: 'shear' }]);
+    s = tick(s, [{ type: 'loadCart', cartId: 'cart-1', good: 'fleece', qty: CART_CAPACITY }]);
+    s = tick(s, [{ type: 'shear' }]);
+    expect(cargoCountOf(s.stores.farm!)).toBe(FARM_STORE_CAPACITY);
+
+    s = tick(s, [{ type: 'unloadCart', cartId: 'cart-1', good: 'fleece', qty: 999 }]);
+    expect(s.carts[0].cargo.fleece).toBe(CART_CAPACITY); // nothing moved
+    expect(cargoCountOf(s.stores.farm!)).toBe(FARM_STORE_CAPACITY);
+    expect(s.log.some((e) => e.text.includes('Nothing more fits'))).toBe(true);
+  });
+
+  it('other stores have no walls yet — Ryne takes an unload freely', () => {
+    let s = tick(threeDawnsState(), [{ type: 'shear' }]);
+    s = tick(s, [{ type: 'loadCart', cartId: 'cart-1', good: 'fleece', qty: CART_CAPACITY }]);
+    s = tick(s, [{ type: 'dispatchCart', cartId: 'cart-1', edgeId: 'high-road' }]);
+    s = runTicks(s, HIGH_ROAD_LATENCY);
+    expect(s.carts[0].location).toEqual({ kind: 'node', nodeId: 'ryne' });
+    s = tick(s, [{ type: 'unloadCart', cartId: 'cart-1', good: 'fleece', qty: 999 }]);
+    expect(s.carts[0].cargo.fleece).toBe(0);
+    expect(s.stores.ryne?.fleece).toBe(CART_CAPACITY);
+  });
+
+  it('ditching tips the whole cargo into the marsh, anywhere, for nothing', () => {
+    let s = tick(threeDawnsState(), [{ type: 'shear' }]);
+    s = tick(s, [{ type: 'loadCart', cartId: 'cart-1', good: 'fleece', qty: CART_CAPACITY }]);
+    s = tick(s, [{ type: 'dispatchCart', cartId: 'cart-1', edgeId: 'high-road' }]);
+    expect(s.carts[0].location.kind).toBe('edge'); // mid-road is fine
+    const coinBefore = s.coin;
+    s = tick(s, [{ type: 'ditchCargo', cartId: 'cart-1' }]);
+    expect(s.carts[0].cargo).toEqual({});
+    expect(s.coin).toBe(coinBefore); // no refund
+    expect(s.log.some((e) => e.text.includes('into a dyke'))).toBe(true);
+  });
+
+  it('ditching an empty cart is a no-op', () => {
+    const s0 = initialState(1);
+    const s = tick(s0, [{ type: 'ditchCargo', cartId: 'cart-1' }]);
+    expect(s.log.some((e) => e.text.includes('dyke'))).toBe(false);
+  });
+});
+
+function cargoCountOf(store: Partial<Record<string, number>>): number {
+  return Object.values(store).reduce((a: number, b) => a + (b ?? 0), 0);
+}
 
 describe('the tide and the low road', () => {
   /** First tick t >= from where flooded(t) === want. */

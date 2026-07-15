@@ -126,6 +126,7 @@ export type Action =
   | { type: 'shear' }
   | { type: 'loadCart'; cartId: CartId; good: Good; qty: number }
   | { type: 'unloadCart'; cartId: CartId; good: Good; qty: number }
+  | { type: 'ditchCargo'; cartId: CartId }
   | { type: 'dispatchCart'; cartId: CartId; edgeId: EdgeId }
   | { type: 'sell'; cartId: CartId; good: Good }
   | { type: 'sellToDutchman'; cartId: CartId }

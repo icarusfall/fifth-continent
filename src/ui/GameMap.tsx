@@ -11,6 +11,7 @@ import {
   CUTTING_HOUSE_COST,
   CUT_SUGAR_COST,
   DUTCHMAN_PRICE,
+  FARM_STORE_CAPACITY,
   LEIDEN_PRICE_MULT,
   RYNE_PRICE,
   WOOL_PRICE_DOMESTIC,
@@ -467,14 +468,17 @@ function FarmMenu({
   const enqueue = useEnqueue();
   const cart = state.carts[0];
   const cartHere = cart?.location.kind === 'node' && cart.location.nodeId === 'farm';
-  const store = state.stores.farm?.fleece ?? 0;
+  const barn = state.stores.farm ?? {};
+  const stored = cargoCount(barn);
+  const barnRoom = FARM_STORE_CAPACITY - stored;
   const held = cart ? cargoCount(cart.cargo) : 0;
 
   return (
     <>
       <h4>Walland Farm</h4>
       <p className="flavour">
-        {state.flockSize} sheep · {state.fleeceReady} wool on their backs · {store} fleece in store
+        {state.flockSize} sheep · {state.fleeceReady} wool on their backs · barn {stored}/
+        {FARM_STORE_CAPACITY}: {storeSummary(barn, 'empty')}
       </p>
 
       <div className="menu-buttons">
@@ -485,15 +489,38 @@ function FarmMenu({
         >
           Shear
         </button>
-        {store > 0 && cartHere && held < CART_CAPACITY && (
-          <button
-            onClick={() =>
-              enqueue({ type: 'loadCart', cartId: cart!.id, good: 'fleece', qty: CART_CAPACITY })
-            }
-          >
-            Load cart with fleece
-          </button>
-        )}
+        {cartHere &&
+          held < CART_CAPACITY &&
+          (Object.entries(barn) as Array<[Good, number]>)
+            .filter(([, n]) => n > 0)
+            .map(([good]) => (
+              <button
+                key={good}
+                onClick={() =>
+                  enqueue({ type: 'loadCart', cartId: cart!.id, good, qty: CART_CAPACITY })
+                }
+              >
+                Load cart with {GOOD_LABEL[good]}
+              </button>
+            ))}
+        {cartHere &&
+          (Object.entries(cart!.cargo) as Array<[Good, number]>)
+            .filter(([, n]) => n > 0)
+            .map(([good, n]) => {
+              const can = Math.min(n, barnRoom);
+              return (
+                <button
+                  key={`unload-${good}`}
+                  disabled={can <= 0}
+                  title={can <= 0 ? 'The barn is full to the rafters.' : undefined}
+                  onClick={() => enqueue({ type: 'unloadCart', cartId: cart!.id, good, qty: 99 })}
+                >
+                  {can > 0
+                    ? `Unload ${can} ${GOOD_LABEL[good]} into the barn`
+                    : `${GOOD_LABEL[good]} · the barn is full`}
+                </button>
+              );
+            })}
         {state.dutchman.unlocked && !state.cuttingHouse && (
           <button
             disabled={state.coin < CUTTING_HOUSE_COST}
@@ -825,9 +852,20 @@ function CuttingHouseMenu({ state }: { state: GameState }) {
 }
 
 function CartMenu({ state, flooded }: { state: GameState; flooded: boolean }) {
+  const enqueue = useEnqueue();
   const cart = state.carts[0];
   if (!cart) return null;
   const cargo = storeSummary(cart.cargo, 'Empty');
+  const laden = cargoCount(cart.cargo) > 0;
+
+  // The one order the cart takes anywhere: tip the lot into a dyke (spec §6.9).
+  const ditchButton = laden && (
+    <div className="menu-buttons">
+      <button onClick={() => enqueue({ type: 'ditchCargo', cartId: cart.id })}>
+        Tip the lot into a dyke · nothing comes back
+      </button>
+    </div>
+  );
 
   if (cart.location.kind === 'edge') {
     const edge = edgesFor(state.farm, state.cuttingHouse).find(
@@ -842,6 +880,7 @@ function CartMenu({ state, flooded }: { state: GameState; flooded: boolean }) {
           {cargo} aboard. {edge?.name}, {pct}% along.
           {halted ? ' The tide has the road — waiting on high ground.' : ''}
         </p>
+        {ditchButton}
       </>
     );
   }
@@ -855,6 +894,7 @@ function CartMenu({ state, flooded }: { state: GameState; flooded: boolean }) {
         {clockOf(state.tick).hour >= 20 ? 'The pony would rather not.' : ''}
       </p>
       <p className="flavour">Orders are given where the cart stands.</p>
+      {ditchButton}
     </>
   );
 }
