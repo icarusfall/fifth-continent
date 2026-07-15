@@ -5,10 +5,19 @@
 
 import {
   CART_CAPACITY,
+  CUTS,
+  CUTTING_HOUSE_COST,
+  CUT_SUGAR_COST,
+  DAILY_DEMAND,
+  DUTCHMAN_FLEECE_DEMAND,
+  DUTCHMAN_HOLD,
+  DUTCHMAN_PRICE,
   FLEECE_PER_HEAD_PER_DAY,
+  LEIDEN_PRICE_MULT,
   MAX_LOG_EVENTS,
   RENT_AMOUNT,
   RENT_PERIOD_DAYS,
+  RYNE_PRICE,
   SHEARING_HOUR,
   SHEEP_VALUE,
   STARTING_FLOCK,
@@ -16,9 +25,9 @@ import {
   TICKS_PER_HOUR,
   WOOL_PRICE_DOMESTIC,
 } from './balance';
-import { FARM_SITE, edgeById, nodeById, otherEnd } from './map';
+import { FARM_SITE, edgeById, isPlaceable, nodeById, otherEnd } from './map';
 import { seedRng } from './rng';
-import { clockOf, isFlooded } from './time';
+import { clockOf, dayPhaseOf, isFlooded, tideIsRising } from './time';
 import type { Action, Cart, GameState, Store } from './types';
 
 export function initialState(seed: number): GameState {
@@ -34,9 +43,13 @@ export function initialState(seed: number): GameState {
     lost: false,
     flockSize: STARTING_FLOCK,
     fleeceReady: 0,
+    cuttingHouse: null,
+    dutchman: { unlocked: false, present: false, hold: {}, fleeceAppetite: 0 },
+    demandRemaining: { ...DAILY_DEMAND },
     stores: {
       farm: { fleece: 0 },
       ryne: {},
+      shingle: {},
     },
     carts: [
       {
@@ -130,7 +143,10 @@ function applyAction(state: GameState, action: Action): void {
       const nodeId = cart.location.nodeId;
       state.stores[nodeId] = state.stores[nodeId] ?? {};
       addToStore(state.stores[nodeId], action.good, qty);
-      logEvent(state, `Unloaded ${qty} ${action.good} at ${nodeById(nodeId, state.farm).name}.`);
+      logEvent(
+        state,
+        `Unloaded ${qty} ${action.good} at ${nodeById(nodeId, state.farm, state.cuttingHouse).name}.`,
+      );
       return;
     }
 
@@ -141,7 +157,7 @@ function applyAction(state: GameState, action: Action): void {
         logEvent(state, `${cart.name} is already on the road.`);
         return;
       }
-      const edge = edgeById(action.edgeId, state.farm);
+      const edge = edgeById(action.edgeId, state.farm, state.cuttingHouse);
       const from = cart.location.nodeId;
       if (edge.a !== from && edge.b !== from) {
         logEvent(state, `${edge.name} does not start here.`);
@@ -166,19 +182,128 @@ function applyAction(state: GameState, action: Action): void {
       const cart = findCart(state, action.cartId);
       if (!cart) return;
       if (cart.location.kind !== 'node') return;
-      const node = nodeById(cart.location.nodeId, state.farm);
+      const node = nodeById(cart.location.nodeId, state.farm, state.cuttingHouse);
       if (node.kind !== 'market') {
         logEvent(state, `No buyer at ${node.name}.`);
         return;
       }
-      const qty = cart.cargo[action.good] ?? 0;
-      if (qty <= 0) return;
-      const price = WOOL_PRICE_DOMESTIC;
-      cart.cargo[action.good] = 0;
+      if (action.good === 'jenever') {
+        logEvent(state, 'No buyer in Ryne will touch overproof jenever. It wants cutting.');
+        return;
+      }
+      const held = cart.cargo[action.good] ?? 0;
+      if (held <= 0) return;
+      const appetite = state.demandRemaining[action.good] ?? 0;
+      if (appetite <= 0) {
+        logEvent(state, `Ryne has had its fill of ${action.good} today. Dawn brings appetite.`);
+        return;
+      }
+      const qty = Math.min(held, appetite);
+      const price = RYNE_PRICE[action.good];
+      cart.cargo[action.good] = held - qty;
+      state.demandRemaining[action.good] = appetite - qty;
       state.coin += qty * price;
       logEvent(
         state,
-        `Sold ${qty} ${action.good} at ${node.name} for ${qty * price} coin. The price is insulting.`,
+        action.good === 'fleece'
+          ? `Sold ${qty} fleece at ${node.name} for ${qty * price} coin. The price is insulting.`
+          : `Sold ${qty} ${action.good} at ${node.name} for ${qty * price} coin.` +
+              (qty < held ? ` The town will take no more today.` : ''),
+      );
+      return;
+    }
+
+    case 'sellToDutchman': {
+      const cart = findCart(state, action.cartId);
+      if (!cart) return;
+      if (cart.location.kind !== 'node' || cart.location.nodeId !== 'shingle') return;
+      if (!state.dutchman.present) {
+        logEvent(state, 'Shingle and sea-wrack. Nobody is buying wool from the water tonight.');
+        return;
+      }
+      const held = cart.cargo.fleece ?? 0;
+      const qty = Math.min(held, state.dutchman.fleeceAppetite);
+      if (qty <= 0) return;
+      const price = WOOL_PRICE_DOMESTIC * LEIDEN_PRICE_MULT;
+      cart.cargo.fleece = held - qty;
+      state.dutchman.fleeceAppetite -= qty;
+      state.coin += qty * price;
+      logEvent(
+        state,
+        `${qty} fleece over the gunwale for ${qty * price} coin. Four times the Ryne price, and no questions.`,
+      );
+      return;
+    }
+
+    case 'buyFromDutchman': {
+      const cart = findCart(state, action.cartId);
+      if (!cart) return;
+      if (cart.location.kind !== 'node' || cart.location.nodeId !== 'shingle') return;
+      if (!state.dutchman.present) return;
+      const price = DUTCHMAN_PRICE[action.good];
+      const stocked = state.dutchman.hold[action.good] ?? 0;
+      if (price === undefined || stocked <= 0) return;
+      const room = cart.capacity - cargoCount(cart.cargo);
+      const qty = Math.min(action.qty, stocked, room, Math.floor(state.coin / price));
+      if (qty <= 0) {
+        logEvent(state, 'He does not give credit. Nobody out here gives credit.');
+        return;
+      }
+      state.dutchman.hold[action.good] = stocked - qty;
+      state.coin -= qty * price;
+      addToStore(cart.cargo, action.good, qty);
+      logEvent(state, `Bought ${qty} ${action.good} off the lugger for ${qty * price} coin.`);
+      return;
+    }
+
+    case 'placeCuttingHouse': {
+      if (state.cuttingHouse) {
+        logEvent(state, 'One cutting house is quite enough to hang for.');
+        return;
+      }
+      if (!isPlaceable(action.x, action.y)) {
+        logEvent(state, 'No footing there. The cutting house wants open marsh.');
+        return;
+      }
+      if (state.coin < CUTTING_HOUSE_COST) {
+        logEvent(state, `A cutting house costs ${CUTTING_HOUSE_COST} coin, paid up front.`);
+        return;
+      }
+      state.coin -= CUTTING_HOUSE_COST;
+      state.cuttingHouse = { x: action.x, y: action.y };
+      state.stores['cutting-house'] = {};
+      logEvent(
+        state,
+        'A shed goes up on the marsh, quietly. Water, burnt sugar, and no sign over the door.',
+      );
+      return;
+    }
+
+    case 'cut': {
+      if (!state.cuttingHouse) return;
+      const store = state.stores['cutting-house'] ?? {};
+      const cut = CUTS[action.depth];
+      const tubs = Math.min(
+        action.tubs,
+        store.jenever ?? 0,
+        Math.floor(state.coin / CUT_SUGAR_COST),
+      );
+      if (tubs <= 0) {
+        logEvent(
+          state,
+          (store.jenever ?? 0) <= 0
+            ? 'No tubs at the cutting house. The Dutchman sells them.'
+            : 'Burnt sugar costs coin, and the till is empty.',
+        );
+        return;
+      }
+      store.jenever = (store.jenever ?? 0) - tubs;
+      state.coin -= tubs * CUT_SUGAR_COST;
+      addToStore(store, cut.brandy, tubs * cut.yield);
+      state.stores['cutting-house'] = store;
+      logEvent(
+        state,
+        `Cut ${tubs} tub${tubs === 1 ? '' : 's'} ${action.depth}: ${tubs * cut.yield} of ${cut.brandy} for the town.`,
       );
       return;
     }
@@ -193,7 +318,29 @@ function growWoolAtDawn(state: GameState): void {
     const grown = state.flockSize * FLEECE_PER_HEAD_PER_DAY;
     state.fleeceReady += grown;
     logEvent(state, `Dawn. The flock carries ${state.fleeceReady} fleece of wool.`);
+    // Ryne wakes hungry (spec §6.9): yesterday's saturation is forgiven.
+    state.demandRemaining = { ...DAILY_DEMAND };
   }
+}
+
+/**
+ * Spec §6.9 — the Dutchman stands off the shingle on night ∩ falling tide,
+ * once the first rent has been felt. His hold and appetite restock on the
+ * rising edge of his presence: each visit is its own market.
+ */
+function dutchmanTide(state: GameState): void {
+  const here =
+    state.dutchman.unlocked &&
+    dayPhaseOf(state.tick) === 'night' &&
+    !tideIsRising(state.tick);
+  if (here && !state.dutchman.present) {
+    state.dutchman.hold = { ...DUTCHMAN_HOLD };
+    state.dutchman.fleeceAppetite = DUTCHMAN_FLEECE_DEMAND;
+    logEvent(state, 'A lugger stands off the shingle. No lights, no flag, a falling tide.');
+  } else if (!here && state.dutchman.present) {
+    logEvent(state, 'The lugger slips out with the tide.');
+  }
+  state.dutchman.present = here;
 }
 
 /** Spec §6.8 — the agent calls at dawn. Pays what it can; distrains the rest. */
@@ -221,12 +368,16 @@ function collectRent(state: GameState): void {
     }
   }
   state.rentDueTick += RENT_PERIOD_DAYS * TICKS_PER_DAY;
+
+  // Spec §6.9: the first rent unlocks the Dutchman. The grind must be felt
+  // before the way out opens — he makes his argument to the freshly squeezed.
+  state.dutchman.unlocked = true;
 }
 
 function moveCarts(state: GameState): void {
   for (const cart of state.carts) {
     if (cart.location.kind !== 'edge') continue;
-    const edge = edgeById(cart.location.edgeId, state.farm);
+    const edge = edgeById(cart.location.edgeId, state.farm, state.cuttingHouse);
 
     // The low road floods at high tide. A cart caught on it halts —
     // it does not drown, it waits, and the player learns about tides.
@@ -245,7 +396,10 @@ function moveCarts(state: GameState): void {
     if (cart.location.progress >= edge.latency) {
       const arrived = cart.location.to;
       cart.location = { kind: 'node', nodeId: arrived };
-      logEvent(state, `${cart.name} arrives at ${nodeById(arrived, state.farm).name}.`);
+      logEvent(
+        state,
+        `${cart.name} arrives at ${nodeById(arrived, state.farm, state.cuttingHouse).name}.`,
+      );
     }
   }
 }
@@ -263,6 +417,7 @@ export function tick(state: GameState, actions: Action[]): GameState {
   next.tick += 1;
   growWoolAtDawn(next);
   collectRent(next);
+  dutchmanTide(next);
   moveCarts(next);
 
   return next;

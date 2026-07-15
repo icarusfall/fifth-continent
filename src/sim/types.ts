@@ -8,13 +8,26 @@ export type NodeId = string;
 export type EdgeId = string;
 export type CartId = string;
 
-export type Good = 'fleece'; // M2 adds cloth, woolpacks, jenever, tea, lace…
+// Brandy tiers are distinct goods: quality is what a thing sells as (§17.3),
+// and a plain string key keeps Store JSON-flat. Cloth and woolpacks arrive
+// with the market model (§17); overproof jenever has no legal buyer at all.
+export type Good =
+  | 'fleece'
+  | 'jenever'
+  | 'tea'
+  | 'lace'
+  | 'brandy-rough'
+  | 'brandy-fair'
+  | 'brandy-gent';
+
+/** Depth of the cut (spec §6.9): volume against tier. */
+export type CutDepth = 'gentle' | 'standard' | 'deep';
 
 export type Store = Partial<Record<Good, number>>;
 
 // ---- The map (static — lives in map.ts, never in GameState) ----
 
-export type NodeKind = 'farm' | 'market' | 'customs' | 'waypoint';
+export type NodeKind = 'farm' | 'market' | 'customs' | 'beach' | 'works' | 'waypoint';
 
 export interface MapNode {
   id: NodeId;
@@ -25,7 +38,7 @@ export interface MapNode {
   y: number;
 }
 
-export type EdgeCondition = 'open' | 'tideLocked'; // M2+: nightOnly, moonLocked
+export type EdgeCondition = 'open' | 'tideLocked'; // M3+: nightOnly, moonLocked
 
 export interface MapEdge {
   id: EdgeId;
@@ -85,6 +98,21 @@ export interface GameState {
   flockSize: number;
   /** Wool on the sheep's backs, grown at dawn, collected by the shear action. */
   fleeceReady: number;
+  /** The cutting house site, once raised on the marsh (spec §6.9). */
+  cuttingHouse: { x: number; y: number } | null;
+  /**
+   * The Dutchman (spec §6.9). Unlocked once the first rent is collected;
+   * present at the shingle on night ∩ falling tide. Hold and appetite are
+   * per-visit, restocked on arrival.
+   */
+  dutchman: {
+    unlocked: boolean;
+    present: boolean;
+    hold: Store;
+    fleeceAppetite: number;
+  };
+  /** Ryne's remaining appetite today, per good — reset at dawn (spec §6.9). */
+  demandRemaining: Store;
   /** Goods sitting at nodes (farm store, quay, …). */
   stores: Record<NodeId, Store>;
   carts: Cart[];
@@ -99,7 +127,11 @@ export type Action =
   | { type: 'loadCart'; cartId: CartId; good: Good; qty: number }
   | { type: 'unloadCart'; cartId: CartId; good: Good; qty: number }
   | { type: 'dispatchCart'; cartId: CartId; edgeId: EdgeId }
-  | { type: 'sell'; cartId: CartId; good: Good };
+  | { type: 'sell'; cartId: CartId; good: Good }
+  | { type: 'sellToDutchman'; cartId: CartId }
+  | { type: 'buyFromDutchman'; cartId: CartId; good: Good; qty: number }
+  | { type: 'placeCuttingHouse'; x: number; y: number }
+  | { type: 'cut'; depth: CutDepth; tubs: number };
 
 /** Actions to apply at a given tick, for replay: actionLog[tick] = Action[]. */
 export type ActionLog = Record<number, Action[]>;

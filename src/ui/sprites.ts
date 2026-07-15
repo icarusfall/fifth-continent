@@ -256,6 +256,96 @@ export function drawFarmGlow(
   ctx.globalAlpha = 1;
 }
 
+export function drawShingle(ctx: CanvasRenderingContext2D, site: { x: number; y: number }): void {
+  const c = tileCenter(site);
+  // wrack line and a mooring post: just enough beach to click on
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = OUT * 0.7;
+  ctx.globalAlpha = 0.55;
+  ctx.beginPath();
+  ctx.moveTo(c.x - 14, c.y + 6);
+  ctx.quadraticCurveTo(c.x - 4, c.y + 9, c.x + 12, c.y + 5);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  ctx.beginPath();
+  ctx.moveTo(c.x + 4, c.y + 2);
+  ctx.lineTo(c.x + 4, c.y - 6);
+  ctx.stroke();
+  // scattered stones, deterministic
+  ctx.fillStyle = INK;
+  for (let i = 0; i < 5; i++) {
+    const sx = c.x - 10 + hash2(site.x, site.y, 40 + i) * 20;
+    const sy = c.y + 1 + hash2(site.x, site.y, 50 + i) * 6;
+    ctx.globalAlpha = 0.35;
+    ctx.beginPath();
+    ctx.ellipse(sx, sy, 1.4, 0.9, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+/** The Dutchman's lugger, standing off the shingle. No lights, no flag. */
+export function drawLugger(ctx: CanvasRenderingContext2D, site: { x: number; y: number }): void {
+  const c = tileCenter({ x: site.x + 2.4, y: site.y + 0.4 });
+  ctx.save();
+  // hull
+  ctx.fillStyle = INK;
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = OUT * 0.8;
+  ctx.beginPath();
+  ctx.moveTo(c.x - 11, c.y);
+  ctx.quadraticCurveTo(c.x, c.y + 6.5, c.x + 11, c.y);
+  ctx.lineTo(c.x + 8.5, c.y - 3);
+  ctx.lineTo(c.x - 9, c.y - 3);
+  ctx.closePath();
+  ctx.fill();
+  // masts
+  ctx.beginPath();
+  ctx.moveTo(c.x - 4, c.y - 3);
+  ctx.lineTo(c.x - 3, c.y - 17);
+  ctx.moveTo(c.x + 5, c.y - 3);
+  ctx.lineTo(c.x + 5.5, c.y - 13);
+  ctx.stroke();
+  // lug sails, half-dropped, pale enough to read at night
+  ctx.fillStyle = LIMEWASH;
+  ctx.globalAlpha = 0.75;
+  ctx.beginPath();
+  ctx.moveTo(c.x - 8.5, c.y - 5);
+  ctx.lineTo(c.x - 3.2, c.y - 16);
+  ctx.lineTo(c.x + 1.5, c.y - 5);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(c.x + 2.5, c.y - 5);
+  ctx.lineTo(c.x + 5.3, c.y - 12);
+  ctx.lineTo(c.x + 9, c.y - 5);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+/** The cutting house: a low shed with no sign over the door (spec §6.9). */
+export function drawCuttingHouse(
+  ctx: CanvasRenderingContext2D,
+  site: { x: number; y: number },
+): void {
+  const c = tileCenter(site);
+  drawHouse(ctx, { cx: c.x, cy: c.y, w: 15, h: 11, roof: MARSH_DARK, salt: 40 });
+  // tubs by the wall
+  ctx.fillStyle = CLAY;
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = OUT * 0.6;
+  for (const dx of [-9.5, -7]) {
+    ctx.beginPath();
+    ctx.ellipse(c.x + dx, c.y + 4.5, 1.5, 1.9, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+}
+
 export function drawTileHighlight(
   ctx: CanvasRenderingContext2D,
   tx: number,

@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { HIGH_ROAD_TICKS_PER_TILE, LOW_ROAD_TICKS_PER_TILE } from '../balance';
+import {
+  HIGH_ROAD_TICKS_PER_TILE,
+  LOW_ROAD_TICKS_PER_TILE,
+  MARSH_TICKS_PER_TILE,
+} from '../balance';
 import {
   FARM_SITE,
   MAP_HEIGHT,
   MAP_WIDTH,
+  SHINGLE,
   TERRAIN,
   edgesFor,
   isPlaceable,
@@ -12,6 +17,7 @@ import {
   otherEnd,
   pathTileLength,
   roadLatency,
+  terrainAt,
 } from '../map';
 
 const SITE = { x: 8, y: 11 };
@@ -59,9 +65,61 @@ describe('the farm site and buildable ground', () => {
     expect(isPlaceable(5, 400)).toBe(false); // off the map
   });
 
-  it('the farm node and both roads exist at the site', () => {
+  it('the farm node, both roads, and the marsh track exist at the site', () => {
     expect(nodeById('farm', SITE)).toMatchObject({ kind: 'farm', ...SITE });
-    expect(edgesFor(SITE).map((e) => e.id).sort()).toEqual(['high-road', 'low-road']);
+    expect(edgesFor(SITE).map((e) => e.id).sort()).toEqual([
+      'high-road',
+      'low-road',
+      'marsh-track',
+    ]);
+  });
+});
+
+describe('the shingle and the cutting house (spec §6.9)', () => {
+  it('the shingle sits on shingle', () => {
+    expect(terrainAt(SHINGLE.x, SHINGLE.y)).toBe('s');
+  });
+
+  it('the marsh track runs farm → shingle with marsh latency', () => {
+    const track = edgesFor(SITE).find((e) => e.id === 'marsh-track')!;
+    expect([track.a, track.b].sort()).toEqual(['farm', 'shingle']);
+    expect(track.condition).toBe('open');
+    expect(track.latency).toBe(roadLatency(track.path, MARSH_TICKS_PER_TILE));
+  });
+
+  it('no cutting house, no cutting-house node or tracks', () => {
+    expect(nodesFor(SITE).some((n) => n.id === 'cutting-house')).toBe(false);
+    expect(edgesFor(SITE).some((e) => e.id.startsWith('cut-'))).toBe(false);
+    expect(() => nodeById('cutting-house', SITE)).toThrow();
+  });
+
+  it('a sited cutting house grows tracks to farm, shingle, and Ryne', () => {
+    const ch = { x: 20, y: 12 };
+    expect(isPlaceable(ch.x, ch.y)).toBe(true);
+    const node = nodeById('cutting-house', SITE, ch);
+    expect(node).toMatchObject({ kind: 'works', ...ch });
+    const tracks = edgesFor(SITE, ch).filter((e) => e.id.startsWith('cut-'));
+    expect(tracks.map((e) => e.id).sort()).toEqual([
+      'cut-farm-track',
+      'cut-ryne-track',
+      'cut-shingle-track',
+    ]);
+    for (const t of tracks) {
+      expect(t.a).toBe('cutting-house');
+      expect(t.latency).toBe(roadLatency(t.path, MARSH_TICKS_PER_TILE));
+      expect(t.path[0]).toEqual(ch);
+    }
+  });
+
+  it('siting the triangle moves the latencies (the decision is real)', () => {
+    const nearShingle = edgesFor(SITE, { x: 30, y: 9 });
+    const nearRyne = edgesFor(SITE, { x: 24, y: 20 });
+    const shingleLegNear = nearShingle.find((e) => e.id === 'cut-shingle-track')!.latency;
+    const shingleLegFar = nearRyne.find((e) => e.id === 'cut-shingle-track')!.latency;
+    const ryneLegNear = nearRyne.find((e) => e.id === 'cut-ryne-track')!.latency;
+    const ryneLegFar = nearShingle.find((e) => e.id === 'cut-ryne-track')!.latency;
+    expect(shingleLegNear).toBeLessThan(shingleLegFar);
+    expect(ryneLegNear).toBeLessThan(ryneLegFar);
   });
 });
 

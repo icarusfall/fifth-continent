@@ -1,5 +1,7 @@
 // All balance numbers live here. Never inline a magic number. (Spec §13)
 
+import type { CutDepth, Good } from './types';
+
 // ---- Time ----
 export const TICKS_PER_HOUR = 6; // one tick = 10 minutes
 export const HOURS_PER_DAY = 24;
@@ -36,10 +38,63 @@ export const HIGH_ROAD_TICKS_PER_TILE = 0.53; // climbs the upland, minds its ma
 export const LOW_ROAD_EXPOSURE = 0.5; // base Heat per unit moved (unused until M3)
 export const HIGH_ROAD_EXPOSURE = 1.0; // the Customs House watches it (unused until M3)
 
+// ---- Marsh tracks (spec §6.9: no road, just marsh) ----
+export const MARSH_TICKS_PER_TILE = 0.33;
+export const MARSH_TRACK_EXPOSURE = 0.7; // recorded, not consumed until M3
+
 // ---- Prices ----
 // The domestic price is insulting on purpose (spec §10 rung 2).
 export const WOOL_PRICE_DOMESTIC = 2; // coin per fleece at Ryne
-export const LEIDEN_PRICE_MULT = 4; // M2: the Dutchman's offer
+export const LEIDEN_PRICE_MULT = 4; // the Dutchman's offer
+
+// ---- The Dutchman (spec §6.9: night, falling tide, no credit) ----
+export const DUTCHMAN_FLEECE_DEMAND = 24; // fleece he'll take per visit
+/** His hold on arrival — restocked each visit. */
+export const DUTCHMAN_HOLD: Partial<Record<Good, number>> = {
+  jenever: 12,
+  tea: 8,
+  lace: 4,
+};
+/** What he charges, coin per unit. */
+export const DUTCHMAN_PRICE: Partial<Record<Good, number>> = {
+  jenever: 10,
+  tea: 4,
+  lace: 15,
+};
+
+// ---- The cutting house (spec §6.9) ----
+export const CUTTING_HOUSE_COST = 60; // coin, sited on open marsh
+export const CUT_SUGAR_COST = 2; // coin per tub — water and burnt sugar
+/** Depth of cut: volume against tier. The player's hand on the till. */
+export const CUTS: Record<CutDepth, { yield: number; brandy: Good }> = {
+  gentle: { yield: 2, brandy: 'brandy-gent' },
+  standard: { yield: 3, brandy: 'brandy-fair' },
+  deep: { yield: 4, brandy: 'brandy-rough' },
+};
+
+// ---- The Ryne market: fixed prices, daily appetite (spec §6.9) ----
+// §17's moving prices wait for their milestone. Jenever price 0 = no legal buyer.
+export const BRANDY_BASE_PRICE = 6;
+export const QUALITY_MULT = { rough: 0.6, fair: 1.0, gent: 1.8 } as const; // §17.3
+export const RYNE_PRICE: Record<Good, number> = {
+  fleece: WOOL_PRICE_DOMESTIC,
+  jenever: 0,
+  tea: 7,
+  lace: 24,
+  'brandy-rough': Math.round(BRANDY_BASE_PRICE * QUALITY_MULT.rough),
+  'brandy-fair': Math.round(BRANDY_BASE_PRICE * QUALITY_MULT.fair),
+  'brandy-gent': Math.round(BRANDY_BASE_PRICE * QUALITY_MULT.gent),
+};
+/** Units Ryne will buy per day, reset at dawn. Saturation as a wall. */
+export const DAILY_DEMAND: Record<Good, number> = {
+  fleece: 24,
+  jenever: 0,
+  tea: 8,
+  lace: 2,
+  'brandy-rough': 10,
+  'brandy-fair': 6,
+  'brandy-gent': 2,
+};
 
 // ---- Rent (spec §6.8: the first squeeze) ----
 export const RENT_AMOUNT = 120; // coin, per period

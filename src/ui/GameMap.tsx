@@ -5,11 +5,20 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { CART_CAPACITY, LEIDEN_PRICE_MULT, WOOL_PRICE_DOMESTIC } from '../sim/balance';
-import { edgesFor } from '../sim/map';
+import {
+  CART_CAPACITY,
+  CUTS,
+  CUTTING_HOUSE_COST,
+  CUT_SUGAR_COST,
+  DUTCHMAN_PRICE,
+  LEIDEN_PRICE_MULT,
+  RYNE_PRICE,
+  WOOL_PRICE_DOMESTIC,
+} from '../sim/balance';
+import { SHINGLE, edgesFor, isPlaceable, nodeById } from '../sim/map';
 import { clockOf, dayPhaseOf, isFlooded, ticksUntilTideTurn } from '../sim/time';
-import { spanOf } from './format';
-import type { GameState } from '../sim/types';
+import { GOOD_LABEL, spanOf, storeSummary } from './format';
+import type { CutDepth, GameState, Good } from '../sim/types';
 import { useGameStore } from '../state/store';
 import { CameraController } from './camera';
 import { pathPoints, pointAlong, TILE, tileCenter } from './geometry';
@@ -17,26 +26,34 @@ import { getTerrainCanvas } from './paint';
 import {
   drawCart,
   drawCustoms,
+  drawCuttingHouse,
   drawFarm,
   drawFarmGlow,
   drawLabel,
+  drawLugger,
   drawRoad,
   drawRyne,
   drawSheep,
+  drawShingle,
+  drawTileHighlight,
 } from './sprites';
 
-type Selection = 'farm' | 'ryne' | 'customs' | 'cart' | null;
+type Selection = 'farm' | 'ryne' | 'customs' | 'cart' | 'shingle' | 'cutting-house' | null;
+
+function cargoCount(cargo: Partial<Record<Good, number>>): number {
+  return Object.values(cargo).reduce((a, b) => a + (b ?? 0), 0);
+}
 
 /** Cart position in world coords. */
 function cartWorldPos(state: GameState): { x: number; y: number; angle: number } | null {
   const cart = state.carts[0];
   if (!cart) return null;
   if (cart.location.kind === 'node') {
-    const anchor =
-      cart.location.nodeId === 'farm' ? tileCenter(state.farm) : tileCenter({ x: 28, y: 22 });
+    const node = nodeById(cart.location.nodeId, state.farm, state.cuttingHouse);
+    const anchor = tileCenter(node);
     return { x: anchor.x + 14, y: anchor.y + 8, angle: 0 };
   }
-  const edge = edgesFor(state.farm).find(
+  const edge = edgesFor(state.farm, state.cuttingHouse).find(
     (e) => e.id === (cart.location as { edgeId: string }).edgeId,
   );
   if (!edge) return null;
@@ -71,6 +88,10 @@ function anchorWorld(sel: Selection, state: GameState): { x: number; y: number }
       return tileCenter({ x: 28, y: 21 });
     case 'customs':
       return tileCenter({ x: 26, y: 19 });
+    case 'shingle':
+      return tileCenter(SHINGLE);
+    case 'cutting-house':
+      return state.cuttingHouse ? tileCenter(state.cuttingHouse) : null;
     case 'cart':
       return cartWorldPos(state);
     default:
@@ -93,6 +114,11 @@ export function GameMap({ state }: { state: GameState }) {
   selectedRef.current = selected;
   // The startup glow dies the first time the farm menu opens.
   const farmVisitedRef = useRef(false);
+  // Placement mode: choosing ground for the cutting house (spec §6.9).
+  const [placing, setPlacing] = useState(false);
+  const placingRef = useRef(false);
+  placingRef.current = placing;
+  const hoverTileRef = useRef<{ x: number; y: number } | null>(null);
 
   const flooded = isFlooded(state.tick);
   const phase = dayPhaseOf(state.tick);
@@ -144,8 +170,17 @@ export function GameMap({ state }: { state: GameState }) {
 
       // Layer 1: roads, flock, buildings, cart.
       const floodedNow = isFlooded(s.tick);
-      if (routesVisible(s)) {
-        for (const edge of edgesFor(s.farm)) {
+      for (const edge of edgesFor(s.farm, s.cuttingHouse)) {
+        // Progressive disclosure: the roads once there is something to move;
+        // the marsh track once the Dutchman is in the world; a sited cutting
+        // house shows its own tracks always (the player paid for them).
+        const visible =
+          edge.id === 'marsh-track'
+            ? s.dutchman.unlocked
+            : edge.id.startsWith('cut-')
+              ? true
+              : routesVisible(s);
+        if (visible) {
           drawRoad(ctx, pathPoints(edge, false), edge.condition === 'tideLocked' && floodedNow);
         }
       }
@@ -161,10 +196,28 @@ export function GameMap({ state }: { state: GameState }) {
       drawCustoms(ctx);
       drawLabel(ctx, 'Customs House', 26.5 * TILE, 17.9 * TILE);
 
+      if (s.dutchman.unlocked) {
+        drawShingle(ctx, SHINGLE);
+        const sc = tileCenter(SHINGLE);
+        drawLabel(ctx, 'The Shingle', sc.x - 4, sc.y - 12);
+        if (s.dutchman.present) drawLugger(ctx, SHINGLE);
+      }
+      if (s.cuttingHouse) {
+        drawCuttingHouse(ctx, s.cuttingHouse);
+        const cc = tileCenter(s.cuttingHouse);
+        drawLabel(ctx, 'Cutting House', cc.x, cc.y - 12);
+      }
+
       const cart = s.carts[0];
       const cp = cartWorldPos(s);
       if (cart && cp) {
-        drawCart(ctx, cp.x, cp.y, cart.location.kind === 'edge' ? cp.angle : 0, (cart.cargo.fleece ?? 0) > 0);
+        drawCart(ctx, cp.x, cp.y, cart.location.kind === 'edge' ? cp.angle : 0, cargoCount(cart.cargo) > 0);
+      }
+
+      // Placement mode: the hovered tile answers before the coin is spent.
+      if (placingRef.current && hoverTileRef.current) {
+        const t = hoverTileRef.current;
+        drawTileHighlight(ctx, t.x, t.y, isPlaceable(t.x, t.y) && s.coin >= CUTTING_HOUSE_COST);
       }
 
       // Layer 3 helper: keep the popover pinned to its anchor.
@@ -203,12 +256,25 @@ export function GameMap({ state }: { state: GameState }) {
     return { x: e.clientX - r.left, y: e.clientY - r.top };
   }
 
+  const enqueue = useGameStore((s) => s.enqueue);
+
   function onClick(e: React.MouseEvent) {
     const cam = camRef.current!;
     if (cam.wasDrag()) return;
     const s = stateRef.current;
     const p = localPos(e);
     const w = cam.screenToWorld(p.x, p.y);
+
+    // Placement mode eats the click: build on marsh, or think better of it.
+    if (placing) {
+      const tx = Math.floor(w.x / TILE);
+      const ty = Math.floor(w.y / TILE);
+      if (isPlaceable(tx, ty) && s.coin >= CUTTING_HOUSE_COST) {
+        enqueue({ type: 'placeCuttingHouse', x: tx, y: ty });
+      }
+      setPlacing(false);
+      return;
+    }
 
     // Hit-test the assets, nearest first.
     const targets: Array<{ sel: Selection; x: number; y: number; r: number }> = [];
@@ -220,6 +286,14 @@ export function GameMap({ state }: { state: GameState }) {
     targets.push({ sel: 'ryne', x: rc.x, y: rc.y, r: 42 });
     const cc = tileCenter({ x: 26, y: 19 });
     targets.push({ sel: 'customs', x: cc.x, y: cc.y, r: 16 });
+    if (s.dutchman.unlocked) {
+      const sc = tileCenter(SHINGLE);
+      targets.push({ sel: 'shingle', x: sc.x + 14, y: sc.y, r: 34 }); // lugger included
+    }
+    if (s.cuttingHouse) {
+      const hc = tileCenter(s.cuttingHouse);
+      targets.push({ sel: 'cutting-house', x: hc.x, y: hc.y, r: 18 });
+    }
 
     let best: { sel: Selection; d: number } | null = null;
     for (const t of targets) {
@@ -233,7 +307,7 @@ export function GameMap({ state }: { state: GameState }) {
   return (
     <div
       ref={shellRef}
-      className="map-shell"
+      className={placing ? 'map-shell placing' : 'map-shell'}
       onPointerDown={(e) => {
         if (e.button === 0 || e.button === 1) {
           const p = localPos(e);
@@ -248,6 +322,10 @@ export function GameMap({ state }: { state: GameState }) {
       onPointerMove={(e) => {
         const p = localPos(e);
         camRef.current!.pointerMove(p.x, p.y);
+        if (placingRef.current) {
+          const w = camRef.current!.screenToWorld(p.x, p.y);
+          hoverTileRef.current = { x: Math.floor(w.x / TILE), y: Math.floor(w.y / TILE) };
+        }
       }}
       onPointerUp={(e) => {
         camRef.current!.pointerUp();
@@ -263,12 +341,21 @@ export function GameMap({ state }: { state: GameState }) {
 
       {nightOpacity > 0 && <div className="night-veil" style={{ opacity: nightOpacity }} />}
 
+      {placing && (
+        <div className="banner">
+          Choose ground for the cutting house — open marsh, {CUTTING_HOUSE_COST} coin. Click
+          elsewhere to think better of it.
+        </div>
+      )}
+
       {state.lost && <ForfeitOverlay />}
 
-      {selected && (
+      {selected && !placing && (
         <div ref={popRef} className="popover-anchor">
           <Popover onClose={() => setSelected(null)}>
-            {selected === 'farm' && <FarmMenu state={state} flooded={flooded} />}
+            {selected === 'farm' && (
+              <FarmMenu state={state} flooded={flooded} onPlace={() => setPlacing(true)} />
+            )}
             {selected === 'ryne' && <RyneMenu state={state} flooded={flooded} />}
             {selected === 'customs' && (
               <>
@@ -276,6 +363,10 @@ export function GameMap({ state }: { state: GameState }) {
                 <p className="flavour">Quiet today. It counts things. It is counting now.</p>
               </>
             )}
+            {selected === 'shingle' && (
+              <ShingleMenu state={state} onPlace={() => setPlacing(true)} />
+            )}
+            {selected === 'cutting-house' && <CuttingHouseMenu state={state} />}
             {selected === 'cart' && <CartMenu state={state} flooded={flooded} />}
           </Popover>
         </div>
@@ -321,12 +412,20 @@ function useEnqueue() {
   return useGameStore((s) => s.enqueue);
 }
 
-function FarmMenu({ state, flooded }: { state: GameState; flooded: boolean }) {
+function FarmMenu({
+  state,
+  flooded,
+  onPlace,
+}: {
+  state: GameState;
+  flooded: boolean;
+  onPlace: () => void;
+}) {
   const enqueue = useEnqueue();
   const cart = state.carts[0];
   const cartHere = cart?.location.kind === 'node' && cart.location.nodeId === 'farm';
   const store = state.stores.farm?.fleece ?? 0;
-  const held = cart?.cargo.fleece ?? 0;
+  const held = cart ? cargoCount(cart.cargo) : 0;
 
   return (
     <>
@@ -352,35 +451,77 @@ function FarmMenu({ state, flooded }: { state: GameState; flooded: boolean }) {
             Load cart with fleece
           </button>
         )}
+        {state.dutchman.unlocked && !state.cuttingHouse && (
+          <button
+            disabled={state.coin < CUTTING_HOUSE_COST}
+            title={
+              state.coin < CUTTING_HOUSE_COST
+                ? `${CUTTING_HOUSE_COST} coin, paid up front. Nobody out here gives credit.`
+                : 'Water, burnt sugar, and no sign over the door.'
+            }
+            onClick={onPlace}
+          >
+            Raise a cutting house · {CUTTING_HOUSE_COST} coin
+          </button>
+        )}
       </div>
 
-      {cartHere && held > 0 && (
+      {cartHere && (
         <>
-          <p className="flavour">
-            The cart stands laden ({held}/{CART_CAPACITY}). Ryne pays {WOOL_PRICE_DOMESTIC} coin a
-            fleece.
-          </p>
+          {held > 0 && (
+            <p className="flavour">
+              The cart stands laden ({held}/{CART_CAPACITY}): {storeSummary(cart!.cargo)}. Ryne
+              pays {WOOL_PRICE_DOMESTIC} coin a fleece.
+            </p>
+          )}
           <div className="menu-buttons">
-            <button
-              disabled={flooded}
-              title={
-                flooded
-                  ? `Under the tide. Clears in ${spanOf(ticksUntilTideTurn(state.tick))}.`
-                  : `Short and flat. Floods in ${spanOf(ticksUntilTideTurn(state.tick))}.`
-              }
-              onClick={() => enqueue({ type: 'dispatchCart', cartId: cart!.id, edgeId: 'low-road' })}
-            >
-              Send by the low road{' '}
-              {flooded
-                ? `· clears in ${spanOf(ticksUntilTideTurn(state.tick))}`
-                : `· floods in ${spanOf(ticksUntilTideTurn(state.tick))}`}
-            </button>
-            <button
-              title="Slow, dry, and past the Customs House."
-              onClick={() => enqueue({ type: 'dispatchCart', cartId: cart!.id, edgeId: 'high-road' })}
-            >
-              Send by the high road · slow
-            </button>
+            {held > 0 && (
+              <>
+                <button
+                  disabled={flooded}
+                  title={
+                    flooded
+                      ? `Under the tide. Clears in ${spanOf(ticksUntilTideTurn(state.tick))}.`
+                      : `Short and flat. Floods in ${spanOf(ticksUntilTideTurn(state.tick))}.`
+                  }
+                  onClick={() =>
+                    enqueue({ type: 'dispatchCart', cartId: cart!.id, edgeId: 'low-road' })
+                  }
+                >
+                  Send by the low road{' '}
+                  {flooded
+                    ? `· clears in ${spanOf(ticksUntilTideTurn(state.tick))}`
+                    : `· floods in ${spanOf(ticksUntilTideTurn(state.tick))}`}
+                </button>
+                <button
+                  title="Slow, dry, and past the Customs House."
+                  onClick={() =>
+                    enqueue({ type: 'dispatchCart', cartId: cart!.id, edgeId: 'high-road' })
+                  }
+                >
+                  Send by the high road · slow
+                </button>
+              </>
+            )}
+            {state.dutchman.unlocked && (
+              <button
+                title="Across the open marsh to the sea. Nobody counts what crosses it."
+                onClick={() =>
+                  enqueue({ type: 'dispatchCart', cartId: cart!.id, edgeId: 'marsh-track' })
+                }
+              >
+                Send over the marsh to the shingle
+              </button>
+            )}
+            {state.cuttingHouse && (
+              <button
+                onClick={() =>
+                  enqueue({ type: 'dispatchCart', cartId: cart!.id, edgeId: 'cut-farm-track' })
+                }
+              >
+                Send to the cutting house
+              </button>
+            )}
           </div>
         </>
       )}
@@ -392,7 +533,10 @@ function RyneMenu({ state, flooded }: { state: GameState; flooded: boolean }) {
   const enqueue = useEnqueue();
   const cart = state.carts[0];
   const cartHere = cart?.location.kind === 'node' && cart.location.nodeId === 'ryne';
-  const held = cart?.cargo.fleece ?? 0;
+  const sellables = (Object.entries(cart?.cargo ?? {}) as Array<[Good, number]>).filter(
+    ([g, n]) => n > 0 && g !== 'jenever',
+  );
+  const tubsAboard = cart?.cargo.jenever ?? 0;
 
   return (
     <>
@@ -401,16 +545,37 @@ function RyneMenu({ state, flooded }: { state: GameState; flooded: boolean }) {
         Wool fetches {WOOL_PRICE_DOMESTIC} coin the fleece here, and every buyer on the quay knows
         it cannot lawfully leave the country.
       </p>
-      <p className="flavour">
-        Across the water they pay {WOOL_PRICE_DOMESTIC * LEIDEN_PRICE_MULT} the fleece. Not that
-        anyone would know about that.
-      </p>
-      {cartHere && held > 0 && (
+      {!state.dutchman.unlocked && (
+        <p className="flavour">
+          Across the water they pay {WOOL_PRICE_DOMESTIC * LEIDEN_PRICE_MULT} the fleece. Not that
+          anyone would know about that.
+        </p>
+      )}
+      {cartHere && sellables.length > 0 && (
         <div className="menu-buttons">
-          <button onClick={() => enqueue({ type: 'sell', cartId: cart!.id, good: 'fleece' })}>
-            Sell {held} fleece · {held * WOOL_PRICE_DOMESTIC} coin
-          </button>
+          {sellables.map(([good, n]) => {
+            const appetite = state.demandRemaining[good] ?? 0;
+            const q = Math.min(n, appetite);
+            return (
+              <button
+                key={good}
+                disabled={q <= 0}
+                title={q <= 0 ? 'The town has had its fill today. Dawn brings appetite.' : undefined}
+                onClick={() => enqueue({ type: 'sell', cartId: cart!.id, good })}
+              >
+                {q > 0
+                  ? `Sell ${q} ${GOOD_LABEL[good]} · ${q * RYNE_PRICE[good]} coin` +
+                    (q < n ? ' · all the town will take' : '')
+                  : `${GOOD_LABEL[good]} · Ryne is sated until dawn`}
+              </button>
+            );
+          })}
         </div>
+      )}
+      {cartHere && tubsAboard > 0 && (
+        <p className="flavour">
+          No buyer on the quay will touch overproof jenever. It wants cutting first.
+        </p>
       )}
       {cartHere && (
         <div className="menu-buttons">
@@ -424,6 +589,192 @@ function RyneMenu({ state, flooded }: { state: GameState; flooded: boolean }) {
           <button onClick={() => enqueue({ type: 'dispatchCart', cartId: cart!.id, edgeId: 'high-road' })}>
             Home by the high road · slow
           </button>
+          {state.cuttingHouse && (
+            <button
+              onClick={() =>
+                enqueue({ type: 'dispatchCart', cartId: cart!.id, edgeId: 'cut-ryne-track' })
+              }
+            >
+              Out to the cutting house
+            </button>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
+function ShingleMenu({ state, onPlace }: { state: GameState; onPlace: () => void }) {
+  const enqueue = useEnqueue();
+  const cart = state.carts[0];
+  const cartHere = cart?.location.kind === 'node' && cart.location.nodeId === 'shingle';
+  const d = state.dutchman;
+  const fleeceHeld = cart?.cargo.fleece ?? 0;
+  const fleeceSale = Math.min(fleeceHeld, d.fleeceAppetite);
+  const room = cart ? cart.capacity - cargoCount(cart.cargo) : 0;
+  const beachPrice = WOOL_PRICE_DOMESTIC * LEIDEN_PRICE_MULT;
+
+  return (
+    <>
+      <h4>The Shingle</h4>
+      {!d.present ? (
+        <p className="flavour">
+          Shingle and grey water. They say a lugger stands off here some nights — after dark, on a
+          falling tide, while the Customs House is counting other things.
+        </p>
+      ) : (
+        <>
+          <p className="flavour">
+            The Dutchman. {beachPrice} coin the fleece, and he&rsquo;ll take {d.fleeceAppetite}{' '}
+            more tonight. Coin on the nail; no credit, no names, no questions in either direction.
+          </p>
+          {cartHere && (
+            <div className="menu-buttons">
+              {fleeceSale > 0 && (
+                <button onClick={() => enqueue({ type: 'sellToDutchman', cartId: cart!.id })}>
+                  Sell {fleeceSale} fleece · {fleeceSale * beachPrice} coin
+                </button>
+              )}
+              {(['jenever', 'tea', 'lace'] as Good[]).map((good) => {
+                const stock = d.hold[good] ?? 0;
+                const price = DUTCHMAN_PRICE[good]!;
+                const can = Math.min(stock, room, Math.floor(state.coin / price));
+                if (stock <= 0) return null;
+                return (
+                  <button
+                    key={good}
+                    disabled={can <= 0}
+                    title={can <= 0 ? 'No room in the cart, or no coin. He does not give credit.' : undefined}
+                    onClick={() =>
+                      enqueue({ type: 'buyFromDutchman', cartId: cart!.id, good, qty: 99 })
+                    }
+                  >
+                    {can > 0
+                      ? `Buy ${can} ${GOOD_LABEL[good]} · ${can * price} coin`
+                      : `${GOOD_LABEL[good]} · ${price} coin each`}{' '}
+                    · {stock} aboard
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+      {cartHere && (cart?.cargo.jenever ?? 0) > 0 && !state.cuttingHouse && (
+        <>
+          <p className="flavour">The tubs want cutting before any buyer in Ryne dares look at them.</p>
+          <div className="menu-buttons">
+            <button
+              disabled={state.coin < CUTTING_HOUSE_COST}
+              onClick={onPlace}
+            >
+              Raise a cutting house · {CUTTING_HOUSE_COST} coin
+            </button>
+          </div>
+        </>
+      )}
+      {cartHere && (
+        <div className="menu-buttons">
+          <button
+            onClick={() => enqueue({ type: 'dispatchCart', cartId: cart!.id, edgeId: 'marsh-track' })}
+          >
+            Home over the marsh
+          </button>
+          {state.cuttingHouse && (
+            <button
+              onClick={() =>
+                enqueue({ type: 'dispatchCart', cartId: cart!.id, edgeId: 'cut-shingle-track' })
+              }
+            >
+              To the cutting house
+            </button>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
+function CuttingHouseMenu({ state }: { state: GameState }) {
+  const enqueue = useEnqueue();
+  const cart = state.carts[0];
+  const cartHere = cart?.location.kind === 'node' && cart.location.nodeId === 'cutting-house';
+  const store = state.stores['cutting-house'] ?? {};
+  const tubs = store.jenever ?? 0;
+  const cuttable = Math.min(tubs, Math.floor(state.coin / CUT_SUGAR_COST));
+  const brandies = (['brandy-gent', 'brandy-fair', 'brandy-rough'] as Good[]).filter(
+    (g) => (store[g] ?? 0) > 0,
+  );
+
+  return (
+    <>
+      <h4>The Cutting House</h4>
+      <p className="flavour">
+        In store: {storeSummary(store, 'bare shelves')}.
+        {cartHere ? ` The cart stands by: ${storeSummary(cart!.cargo, 'empty')}.` : ''}
+      </p>
+
+      <div className="menu-buttons">
+        {cartHere && (cart!.cargo.jenever ?? 0) > 0 && (
+          <button
+            onClick={() => enqueue({ type: 'unloadCart', cartId: cart!.id, good: 'jenever', qty: 99 })}
+          >
+            Unload {cart!.cargo.jenever} tubs into the house
+          </button>
+        )}
+        {tubs > 0 &&
+          (['gentle', 'standard', 'deep'] as CutDepth[]).map((depth) => {
+            const { yield: perTub, brandy } = CUTS[depth];
+            return (
+              <button
+                key={depth}
+                disabled={cuttable <= 0}
+                title={
+                  cuttable <= 0
+                    ? 'Burnt sugar costs coin, and the till is empty.'
+                    : `Sugar: ${cuttable * CUT_SUGAR_COST} coin.`
+                }
+                onClick={() => enqueue({ type: 'cut', depth, tubs: 99 })}
+              >
+                Cut {depth} · {cuttable} tubs → {cuttable * perTub} {GOOD_LABEL[brandy]} (
+                {RYNE_PRICE[brandy]} coin ea)
+              </button>
+            );
+          })}
+        {cartHere &&
+          brandies.map((good) => (
+            <button
+              key={good}
+              onClick={() => enqueue({ type: 'loadCart', cartId: cart!.id, good, qty: 99 })}
+            >
+              Load {GOOD_LABEL[good]} ({store[good]})
+            </button>
+          ))}
+      </div>
+
+      {cartHere && (
+        <div className="menu-buttons">
+          <button
+            onClick={() =>
+              enqueue({ type: 'dispatchCart', cartId: cart!.id, edgeId: 'cut-ryne-track' })
+            }
+          >
+            Send to Ryne
+          </button>
+          <button
+            onClick={() =>
+              enqueue({ type: 'dispatchCart', cartId: cart!.id, edgeId: 'cut-farm-track' })
+            }
+          >
+            Send home to the farm
+          </button>
+          <button
+            onClick={() =>
+              enqueue({ type: 'dispatchCart', cartId: cart!.id, edgeId: 'cut-shingle-track' })
+            }
+          >
+            Send to the shingle
+          </button>
         </div>
       )}
     </>
@@ -433,10 +784,10 @@ function RyneMenu({ state, flooded }: { state: GameState; flooded: boolean }) {
 function CartMenu({ state, flooded }: { state: GameState; flooded: boolean }) {
   const cart = state.carts[0];
   if (!cart) return null;
-  const held = cart.cargo.fleece ?? 0;
+  const cargo = storeSummary(cart.cargo, 'Empty');
 
   if (cart.location.kind === 'edge') {
-    const edge = edgesFor(state.farm).find(
+    const edge = edgesFor(state.farm, state.cuttingHouse).find(
       (e) => e.id === (cart.location as { edgeId: string }).edgeId,
     );
     const pct = edge ? Math.round((cart.location.progress / edge.latency) * 100) : 0;
@@ -445,22 +796,22 @@ function CartMenu({ state, flooded }: { state: GameState; flooded: boolean }) {
       <>
         <h4>The Cart</h4>
         <p className="flavour">
-          {held > 0 ? `${held} fleece aboard.` : 'Empty.'} {edge?.name}, {pct}% along.
+          {cargo} aboard. {edge?.name}, {pct}% along.
           {halted ? ' The tide has the road — waiting on high ground.' : ''}
         </p>
       </>
     );
   }
 
-  const whereabouts = cart.location.nodeId === 'farm' ? 'in the farmyard' : 'on the quay at Ryne';
+  const here = nodeById(cart.location.nodeId, state.farm, state.cuttingHouse);
   return (
     <>
       <h4>The Cart</h4>
       <p className="flavour">
-        Standing {whereabouts}. {held > 0 ? `${held} fleece aboard.` : 'Empty.'}{' '}
+        Standing at {here.name}. {cargo} aboard.{' '}
         {clockOf(state.tick).hour >= 20 ? 'The pony would rather not.' : ''}
       </p>
-      <p className="flavour">Use the farm or town for orders.</p>
+      <p className="flavour">Orders are given where the cart stands.</p>
     </>
   );
 }

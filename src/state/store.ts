@@ -7,8 +7,9 @@ import { create } from 'zustand';
 import { initialState, tick } from '../sim/tick';
 import type { Action, ActionLog, GameState } from '../sim/types';
 
-// v4: the farm is fixed from tick 0 (no placement phase); older saves are incompatible.
-const SAVE_KEY = 'fifth-continent-save-v4';
+// v5: M2 adds the Dutchman, the cutting house, and demand caps to GameState;
+// older saves are incompatible and are silently abandoned.
+const SAVE_KEY = 'fifth-continent-save-v5';
 const AUTOSAVE_EVERY_TICKS = 30;
 
 interface SaveFile {
@@ -42,6 +43,8 @@ function loadSave(): SaveFile | null {
     if (typeof parsed.state.farm?.x !== 'number' || typeof parsed.state.fleeceReady !== 'number')
       return null;
     if (typeof parsed.state.rentDueTick !== 'number' || typeof parsed.state.lost !== 'boolean')
+      return null;
+    if (typeof parsed.state.dutchman?.present !== 'boolean' || !parsed.state.demandRemaining)
       return null;
     return parsed;
   } catch {
