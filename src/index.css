@@ -315,3 +315,57 @@ button.danger {
   font-variant-numeric: tabular-nums;
   margin-right: 4px;
 }
+
+/* Phone: the map keeps the screen; the bookkeeping shrinks to fit.
+   Pinch-to-zoom lives in the camera (GameMap pointer handlers), not here. */
+@media (max-width: 640px) {
+  header {
+    gap: 8px 14px;
+    padding: 4px 10px;
+  }
+
+  header h1 {
+    display: none; /* the game is the map; the title yields the room */
+  }
+
+  .hud {
+    gap: 6px 14px;
+  }
+
+  .hud-block {
+    min-width: 64px;
+  }
+
+  .hud-clock,
+  .hud-coin {
+    font-size: 14px;
+  }
+
+  .tide-gauge {
+    width: 72px;
+  }
+
+  /* Fat-finger targets. */
+  .popover button,
+  .speed-controls button {
+    padding: 9px 12px;
+    font-size: 14px;
+  }
+
+  .popover {
+    max-width: calc(100vw - 16px);
+  }
+
+  /* The log must never bury the map: newest lines only, fading out below. */
+  .log-float {
+    max-width: 60vw;
+  }
+
+  .event-log {
+    max-height: 22vh;
+    overflow: hidden;
+    font-size: 11px;
+    -webkit-mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
+    mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
+  }
+}

@@ -119,6 +119,8 @@ export function GameMap({ state }: { state: GameState }) {
   const placingRef = useRef(false);
   placingRef.current = placing;
   const hoverTileRef = useRef<{ x: number; y: number } | null>(null);
+  // Live touch points, for two-finger pinch. One pointer pans; two pinch.
+  const pointersRef = useRef(new Map<number, { x: number; y: number }>());
 
   const flooded = isFlooded(state.tick);
   const phase = dayPhaseOf(state.tick);
@@ -311,7 +313,13 @@ export function GameMap({ state }: { state: GameState }) {
       onPointerDown={(e) => {
         if (e.button === 0 || e.button === 1) {
           const p = localPos(e);
-          camRef.current!.pointerDown(p.x, p.y);
+          const pts = pointersRef.current;
+          pts.set(e.pointerId, p);
+          if (pts.size === 1) {
+            camRef.current!.pointerDown(p.x, p.y);
+          } else if (pts.size === 2) {
+            camRef.current!.pointerUp(); // one-finger pan yields to the pinch
+          }
           try {
             (e.currentTarget as Element).setPointerCapture(e.pointerId);
           } catch {
@@ -321,19 +329,54 @@ export function GameMap({ state }: { state: GameState }) {
       }}
       onPointerMove={(e) => {
         const p = localPos(e);
-        camRef.current!.pointerMove(p.x, p.y);
+        const pts = pointersRef.current;
+        if (pts.size === 2 && pts.has(e.pointerId)) {
+          // Two fingers: zoom about their midpoint, pan by its travel.
+          const [idA, idB] = [...pts.keys()];
+          const oldA = pts.get(idA)!;
+          const oldB = pts.get(idB)!;
+          const newA = e.pointerId === idA ? p : oldA;
+          const newB = e.pointerId === idB ? p : oldB;
+          const oldDist = Math.hypot(oldB.x - oldA.x, oldB.y - oldA.y);
+          const newDist = Math.hypot(newB.x - newA.x, newB.y - newA.y);
+          const mid = { x: (newA.x + newB.x) / 2, y: (newA.y + newB.y) / 2 };
+          const oldMid = { x: (oldA.x + oldB.x) / 2, y: (oldA.y + oldB.y) / 2 };
+          camRef.current!.pinch(
+            mid.x,
+            mid.y,
+            oldDist > 1 ? newDist / oldDist : 1,
+            mid.x - oldMid.x,
+            mid.y - oldMid.y,
+          );
+          pts.set(e.pointerId, p);
+        } else {
+          if (pts.has(e.pointerId)) pts.set(e.pointerId, p);
+          camRef.current!.pointerMove(p.x, p.y);
+        }
         if (placingRef.current) {
           const w = camRef.current!.screenToWorld(p.x, p.y);
           hoverTileRef.current = { x: Math.floor(w.x / TILE), y: Math.floor(w.y / TILE) };
         }
       }}
       onPointerUp={(e) => {
-        camRef.current!.pointerUp();
+        const pts = pointersRef.current;
+        pts.delete(e.pointerId);
+        if (pts.size === 1) {
+          // The surviving finger keeps panning; the click stays suppressed.
+          const [rest] = pts.values();
+          camRef.current!.reanchor(rest.x, rest.y);
+        } else if (pts.size === 0) {
+          camRef.current!.pointerUp();
+        }
         try {
           (e.currentTarget as Element).releasePointerCapture(e.pointerId);
         } catch {
           /* already released */
         }
+      }}
+      onPointerCancel={(e) => {
+        pointersRef.current.delete(e.pointerId);
+        if (pointersRef.current.size === 0) camRef.current!.pointerUp();
       }}
       onClick={onClick}
     >

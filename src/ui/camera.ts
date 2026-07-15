@@ -1,6 +1,7 @@
 // Eased pan/zoom camera per spec §15.2: input moves a *target*; the camera
 // lerps toward it every frame and never snaps. Cursor-anchored wheel zoom,
-// drag-to-pan, pinch (ctrl+wheel) for free. Pure UI state, no React.
+// drag-to-pan, trackpad pinch (ctrl+wheel) for free, and true two-finger
+// touch pinch via pinch(). Pure UI state, no React.
 
 import { WORLD_H, WORLD_W } from './geometry';
 
@@ -64,6 +65,34 @@ export class CameraController {
     const worldAfterY = this.ty + sy / this.tzoom;
     this.tx += worldBeforeX - worldAfterX;
     this.ty += worldBeforeY - worldAfterY;
+  }
+
+  /**
+   * Two-finger pinch: the wheel's midpoint-anchored zoom math, driven by a
+   * scale factor, plus the midpoint's own travel as a pan. A pinch is a
+   * gesture, never a click — it marks the interaction as a drag.
+   */
+  pinch(sx: number, sy: number, scale: number, panDx: number, panDy: number): void {
+    this.dragged = true;
+    this.tx -= panDx / this.tzoom;
+    this.ty -= panDy / this.tzoom;
+    const worldBeforeX = this.tx + sx / this.tzoom;
+    const worldBeforeY = this.ty + sy / this.tzoom;
+    const minZoom = this.fitZoom * 0.85;
+    this.tzoom = Math.min(ZOOM_MAX, Math.max(minZoom, this.tzoom * scale));
+    const worldAfterX = this.tx + sx / this.tzoom;
+    const worldAfterY = this.ty + sy / this.tzoom;
+    this.tx += worldBeforeX - worldAfterX;
+    this.ty += worldBeforeY - worldAfterY;
+  }
+
+  /**
+   * Re-anchor panning mid-gesture (a second finger lifted): the surviving
+   * finger takes over the drag without resetting the click suppression that
+   * pinch() set.
+   */
+  reanchor(sx: number, sy: number): void {
+    this.dragStart = { sx, sy, camX: this.tx, camY: this.ty };
   }
 
   pointerDown(sx: number, sy: number): void {
