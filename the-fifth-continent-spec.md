@@ -162,10 +162,12 @@ fleeceReady      += flockSize × FLEECE_PER_HEAD_PER_DAY at dawn (wool on the
 shear             farmStore.fleece += fleeceReady; fleeceReady = 0 (a player
                   verb at the farm, not an automatic process)
 ```
-"Tend flock" is an inspection verb (flock size, fleece ready) — no formula,
-no effect, until §19.2 gives the flock its real job in M3. On a fresh game
-the farm pulses gently until the player first opens its menu — the one
-non-diegetic affordance the opening allows itself.
+Flock numbers (size, wool ready) are shown in the farm menu; there is no
+"tend" verb — a button with no formula teaches players that buttons lie.
+Flock inspection gets a real home in the Ledger (§20.1) when §19.2 gives the
+flock its job in M3. On a fresh game the farm pulses gently until the player
+first opens its menu — the one non-diegetic affordance the opening allows
+itself.
 
 ### 6.8 M1½ — rent (the first squeeze)
 You are a tenant grazier. The landlord is in Applesham; his agent is punctual.

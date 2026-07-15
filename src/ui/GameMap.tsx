@@ -91,7 +91,6 @@ export function GameMap({ state }: { state: GameState }) {
   const [selected, setSelected] = useState<Selection>(null);
   const selectedRef = useRef<Selection>(null);
   selectedRef.current = selected;
-  const [tending, setTending] = useState(false);
   // The startup glow dies the first time the farm menu opens.
   const farmVisitedRef = useRef(false);
 
@@ -229,7 +228,6 @@ export function GameMap({ state }: { state: GameState }) {
     }
     if (best?.sel === 'farm') farmVisitedRef.current = true;
     setSelected(best?.sel ?? null);
-    setTending(false);
   }
 
   return (
@@ -270,9 +268,7 @@ export function GameMap({ state }: { state: GameState }) {
       {selected && (
         <div ref={popRef} className="popover-anchor">
           <Popover onClose={() => setSelected(null)}>
-            {selected === 'farm' && (
-              <FarmMenu state={state} tending={tending} setTending={setTending} flooded={flooded} />
-            )}
+            {selected === 'farm' && <FarmMenu state={state} flooded={flooded} />}
             {selected === 'ryne' && <RyneMenu state={state} flooded={flooded} />}
             {selected === 'customs' && (
               <>
@@ -325,17 +321,7 @@ function useEnqueue() {
   return useGameStore((s) => s.enqueue);
 }
 
-function FarmMenu({
-  state,
-  tending,
-  setTending,
-  flooded,
-}: {
-  state: GameState;
-  tending: boolean;
-  setTending: (b: boolean) => void;
-  flooded: boolean;
-}) {
+function FarmMenu({ state, flooded }: { state: GameState; flooded: boolean }) {
   const enqueue = useEnqueue();
   const cart = state.carts[0];
   const cartHere = cart?.location.kind === 'node' && cart.location.nodeId === 'farm';
@@ -350,7 +336,6 @@ function FarmMenu({
       </p>
 
       <div className="menu-buttons">
-        <button onClick={() => setTending(!tending)}>Tend flock</button>
         <button
           disabled={state.fleeceReady <= 0}
           title={state.fleeceReady <= 0 ? 'The wool grows by dawn.' : undefined}
@@ -368,16 +353,6 @@ function FarmMenu({
           </button>
         )}
       </div>
-
-      {tending && (
-        <p className="flavour tend">
-          You walk the flock. {state.flockSize} ewes on the salt grass; they regard you without
-          opinion.{' '}
-          {state.fleeceReady > 0
-            ? `Their coats are heavy — ${state.fleeceReady} fleece of wool, come dawn shears.`
-            : 'Shorn bare. The wool grows by dawn.'}
-        </p>
-      )}
 
       {cartHere && held > 0 && (
         <>

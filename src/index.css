@@ -190,11 +190,6 @@ header h1 {
   line-height: 1.45;
 }
 
-.popover .tend {
-  border-left: 2px solid var(--marsh-dark);
-  padding-left: 8px;
-}
-
 .popover-close {
   position: absolute;
   top: 4px;
