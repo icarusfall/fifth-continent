@@ -189,6 +189,90 @@ survive on wool; you cannot live on it. Distraint compounds: every seized
 sheep shrinks future income now and the smuggler's alibi later (§19.2).
 This arithmetic is the Dutchman's opening argument in M2.
 
+### 6.9 M2 — the crime (the Dutchman, the shingle, running, cutting)
+
+The crime arrives before the law. The Revenue is M3: in M2 smuggling *works*;
+in M3 it starts to *cost*. Route exposure and storage heat are recorded, not
+consumed — same as the `exposure` numbers the roads have carried since M1.
+
+**The shingle.** One new node on the beach, north-east across the open marsh,
+and one new edge to reach it:
+```
+SHINGLE_SITE       fixed, on the shingle north-east of the farm
+marshTrackLatency  = max(1, round(pathTileLength × MARSH_TICKS_PER_TILE))
+                   MARSH_TICKS_PER_TILE = 0.33   // no road, just marsh
+```
+
+**The Dutchman.**
+```
+unlocked    once the first rent has been collected (§6.8) — the grind must be
+            felt before the way out opens, and dawn on day six is late enough
+            to hurt but early enough not to bore
+present(t)  = unlocked && night(t) && tideFalling(t)
+```
+Because the tide period is deliberately not a divisor of the day (§6.7 M1),
+the night∩falling-tide window walks around the clock: some nights it is long,
+some nights it never opens. The existing tide gauge already forecasts it — a
+run to the shingle is a timed bet, like everything else on this marsh.
+
+Per visit, his lugger's hold:
+```
+buys   fleece, up to DUTCHMAN_FLEECE_DEMAND = 24 per visit,
+       at WOOL_PRICE_DOMESTIC × LEIDEN_PRICE_MULT = 8 coin
+sells  jenever  12 tubs   @ JENEVER_COST = 10
+       bohea tea 8 chests @ TEA_COST     = 4
+       lace      4 parcels @ LACE_COST   = 15
+       (the hold restocks each visit)
+```
+No credit. He pays coin on the spot; the wool going out funds the tubs coming
+back, and the same cart carries both legs. Bidirectionality is discovered as
+margin, not presented as a feature (§10 rung 4).
+
+**The cutting house** — the first player-sited building; the placement
+machinery held back in §6.7 finally earns its keep.
+```
+placement  any open-marsh tile (isPlaceable); costs CUTTING_HOUSE_COST = 60 coin
+tracks     placing it generates plain marsh tracks (MARSH_TICKS_PER_TILE) to
+           the farm, the shingle, and Ryne — latency by distance, so siting
+           the triangle IS the decision
+cut        1 tub jenever + CUT_SUGAR_COST = 2 coin (water and burnt sugar) →
+           depth of cut   yield per tub   tier
+           gentle         2               Gentleman's
+           standard       3               Fair
+           deep           4               Rough
+```
+The depth of the cut is the player's hand on the till: volume against tier —
+and, come M3+, against the buyers' patience (§17.3's Standing damage is
+deferred along with Standing itself).
+
+**Domestic prices — fixed, capped, dumb on purpose.** §17's moving prices
+wait for their milestone. An M2 market is a fixed price and a daily appetite:
+```
+sellPrice[good]        fleece 2 · brandy round(BRANDY_BASE_PRICE × tierMult)
+                       · tea 7 · lace 24        (BRANDY_BASE_PRICE = 6)
+tierMult               Rough 0.6 / Fair 1.0 / Gentleman's 1.8   (§17.3)
+demandRemaining        resets at dawn to DAILY_DEMAND[ryne][good]:
+                       fleece 24 · brandy Rough 10 / Fair 6 / Gentleman's 2
+                       · tea 8 · lace 2
+overproof jenever has no legal buyer — it cannot be sold at Ryne at all
+```
+When the appetite is spent, the town is done buying until dawn. This is the
+first, crude taste of §17's second ceiling — saturation as a wall — without a
+single moving price.
+
+**What M2 does not do** (each deferred with the system that gives it meaning):
+no Heat consumed (M3); no Standing, so quality only prices goods (buyer damage
+comes with buyers who remember); no smouching — tea sells as-is, bulking
+enters with the market model; no fulling/packing — the Dutchman takes raw
+fleece, outbound refining enters with §17.
+
+The arithmetic, against §6.8's squeeze: 12 fleece a day is 24 coin at Ryne or
+96 at the shingle. A full cart of 8 tubs costs 80 + 16 sugar and cuts standard
+into 24 Fair brandy = 144 coin — but Ryne's Fair appetite is 6 a day, so one
+batch is four days of selling, or a spread of cuts across tiers. Rent holds at
+20 a day. One good night on the shingle out-earns a lawful week; that is the
+whole argument, and the player does the moral bookkeeping themselves.
+
 ---
 
 ## 7. THE REVENUE — A LEARNING ADVERSARY
@@ -320,7 +404,7 @@ rent and distraint (§6.8), popover menus on the assets themselves, drag-to-pan
 / cursor-anchored zoom (§15.2), painterly warped terrain (§15.3), progressive
 disclosure: routes appear only once there is something to move.
 
-**M2 — The Crime.** Dutchman, the beach, inbound goods, cutting house, quality tiers, bidirectional routing.
+**M2 — The Crime.** Dutchman, the beach, inbound goods, cutting house, quality tiers, bidirectional routing (§6.9). Fixed prices and daily demand caps — §17's market model comes later.
 **M3 — The Revenue.** `RevenueModel`, suspicion inference, the fogged player-facing intel map, cover & leak, first Riding Officer.
 **M4 — Force.** Hawksmere, raid resolution, fortification tiers, the visibility trade-off.
 **M5 — The Trees.** Ichor and Phlogiston, Debt, Publication, the two unlock events.
