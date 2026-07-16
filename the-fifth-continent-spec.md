@@ -453,6 +453,114 @@ cart (50) plus wages eats most of a rent period's lawful margin: expansion
 is bought with crime's proceeds, which is the game's whole loop in
 miniature.
 
+### 6.12 M4 — fortification & the visibility trade-off
+
+The spec's oldest promise (§9): *a fortified building is a visible building.*
+M3 left §6.1's leak term and `fortificationVisibility` switched off on purpose
+(the M3 note in §6.10 says so). M4 turns them on. Fortification is the first
+half of Force and it stands on its own, before a single raider appears: you
+harden a building up a ladder of coin, and every rung you climb the Revenue
+sees you the better. Nothing else in the game asks the player to *choose to be
+seen* — this is that choice.
+
+**The Trade fortification line (§8, §22).** Fortification is a per-building
+tier, `fortTier: 0..4`, climbed one rung at a time at the building itself. The
+ladder is mundane — bought with coin, not researched — and is the only fort
+line available until the trees open (M5). Each rung is a visible change to the
+silhouette (the art is the tell, below).
+
+```
+tier 0  Bare              the building as M1–M3 drew it
+tier 1  Dogs & hedge      FORT_COST[1]=40   +intelligence, not +alpha (see below)
+tier 2  Bolted doors &    FORT_COST[2]=80   the first men who shoot back
+        blunderbuss men
+tier 3  Gunported barn    FORT_COST[3]=160
+tier 4  The Fortified     FORT_COST[4]=320  a blockhouse in a smock
+        Farm
+```
+
+Cost roughly doubles per rung: the top of the ladder is a fortune, and — the
+trap — the *loudest* thing you can build. Fort is bought outright (no upkeep);
+the men who hold it are separate and come with the garrison (§6.13).
+
+**The alpha is latent until §6.13.** Each tier adds `+0.05` to the building's
+defender alpha in a raid (§14.2) — dead weight until there is a raid and a
+garrison to spend it. Tier 1 is the exception the weaponry table demands
+(§22): **dogs give intelligence, not alpha** — a fortified-with-dogs building
+sees a muster coming (advance warning of a raid, §6.13), where higher tiers
+win the fight. Buying tier 1 for its warning and never climbing higher is a
+legitimate, cheap, *quiet* choice — and quiet is the point.
+
+**The visibility trade-off — this is the live half in M4b.** Two things now
+consume `fortificationVisibility`, per §6.1 and §6.4:
+
+```
+fortVisibility   = Σ(tier ≤ fortTier) VISIBILITY[tier] / concealment[building]
+                   VISIBILITY = { 1: 0.1, 2: 0.3, 3: 0.6, 4: 1.0 }  // superlinear
+                   concealment = 1 until marsh tech divides it (§6.4, M5)
+
+// §6.1, the leak term M3 deferred: throughput over cover now leaks *more*
+// from a hard building than a soft one.
+heatFromBuilding = max(0, load − cover) × LEAK_COEFF × (1 + fortVisibility)
+
+// …and a hard building is a tell even when nothing moves through it: each
+// dawn it stains its own node, the way gunports draw the eye.
+fortHeat         = fortVisibility × FORT_VISIBILITY_HEAT   // regional + node stain, per dawn
+```
+
+`VISIBILITY` climbs faster than the `+0.05` alpha: the fourth rung roughly
+doubles the third's defence but sextuples its first rung's visibility. Hardness
+and hiddenness pull apart on purpose. The intended play is spatial (§9): harden
+the building you will *fight* for, hide the building you *store* in, and route
+goods between — you cannot be both in one place, and the numbers are tuned so
+that trying bankrupts you in Heat.
+
+**Arithmetic (opening bid, for the distribution test to beat into shape).** A
+tier-3 cutting house running a day's brandy leaks its over-cover throughput at
+`1 + 0.7 ≈ 1.7×` the bare rate, and stands off `~0.7 × FORT_VISIBILITY_HEAT`
+of fresh suspicion every dawn on top — enough that the officer, who rides to
+the sorest stain (§6.10), now rides to your fort by choice. Fortifying pulls
+the Revenue toward you. That is not a bug; it is the whole trade, and M4c is
+where you make him regret the visit.
+
+**Art — the silhouette is the tell (§15.3).** The five tiers are five
+escalating silhouettes, flat-filled and ink-outlined: bare barn → spiked-hedge
+ring + a dog → bolted door with two figures at the wall → gunported walls with
+dark slits → crenellated blockhouse behind a palisade. A small Heat-red meter
+under the building rises with `fortVisibility`, so the trade is legible at a
+glance in the Yard view. Reserved palette is untouched (house rule 7): fort
+uses ink, clay, and roof-tile, darkening as it hardens.
+
+### 6.13 M4 — the raid: standing garrison, Hawksmere, and resolution *(spec stub — formulas next)*
+
+*Decisions taken (2026-07-16) in the M4 design pass; to be expanded into
+formulas before M4c code, the way §6.9–6.12 were.* This subsection records
+them so nothing is lost; it is **not yet buildable.**
+
+- **Defenders are a standing garrison (chosen over per-raid muster).** Men are
+  *posted at a building* and draw a daily wage at dawn, exactly like the carter
+  (§6.11) — visible in the yard between raids, an ongoing cost, and ready when
+  a muster rides in. Two kinds, matching the §14.2 alpha split: **marsh militia**
+  (α 0.10, cheap, "they have families" — dying costs Standing, §14.6) and
+  **smuggler crew** (α 0.18, dearer wage). A building's garrison spends its
+  `fortTier` alpha (§6.12) and its dogs' warning (tier 1).
+- **Raids are localised, never a swarm.** A force *musters* off-map and **rides
+  the edge network to one target node**; combat resolves *there*, watched at the
+  Yard zoom (§15.2), defenders loitering by the walls rather than manning
+  turrets. Dykes force mounted attackers onto crossings — square→linear law
+  (§14.1, §21). The county never fills with enemies; §22's thinness is the law.
+- **The Hawksmere Company** is the new antagonist Force answers (§9): a rival
+  smuggling concern that wants your routes and buyers, provoked by your success,
+  and beaten only by fighting. Colour: **oxblood `#7A3B32`** — a new,
+  non-reserved faction hue (added to §15.3 when they enter, not before).
+- **The Crown escalates by national Heat.** The lone Riding Officer (§6.10) is
+  the floor; national Heat past thresholds summons the Preventive Water Guard
+  and, at the top, Dragoons who do not rout (§14.3). Revenue blue clothes them
+  all — the doom clock wears one coat.
+- **Still to pin as formulas:** garrison wage/cap per building, Hawksmere
+  arrival & raid-cadence triggers, raid force size vs. your Heat/Standing,
+  target selection, and the national-Heat rungs that buy each enemy tier.
+
 ---
 
 ## 7. THE REVENUE — A LEARNING ADVERSARY
@@ -606,6 +714,21 @@ disclosure: routes appear only once there is something to move.
 
 **Do not fake this.** Combat is a sub-tick loop *inside the pure sim*. It runs the attrition for real, emits a frame log, and the renderer plays the log back. The player watches something that genuinely happened.
 
+**The sim/render boundary — house rule 1, made explicit (settled M4 design pass).**
+The sim owns only *outcome-bearing* position and the abstract combat counts. A
+unit is at a node or a fraction along an edge, exactly like the officer
+(§6.10), and moves there deterministically by pathfinding — never by a random
+walk. Combat is the `CombatLog`'s frame counts and events, never per-man
+coordinates. **Everything finer than that is render, and render may take
+liberties.** The milling of individual men — defenders loitering by the walls,
+a raiding party's Brownian shuffle inside its patch of ground (bounded to the
+terrain, e.g. penned to a dyke crossing, §21), combat blobs jostling during
+playback — is owned by the layer above (§15.1). It may use its own randomness,
+seeded per entity id so it does not shimmer (§15.3), and it is **never**
+stored in GameState. The test that decides where a thing belongs: *a tweak to
+how men wander must never be able to break a saved replay.* If it could, it is
+in the wrong layer.
+
 ```ts
 interface CombatFrame {
   t: number;                    // sub-tick index
@@ -712,7 +835,7 @@ debt         += guardianActiveFrames * 2
 **Canvas 2D, layered.** Not SVG DOM — hundreds of moving entities plus a battle log playing back will choke the DOM.
 
 - **Layer 0 (static):** terrain, water, roads. Rendered once to an offscreen canvas, redrawn only on zoom-level change or terrain edit.
-- **Layer 1 (dynamic):** buildings, carts, boats, people, combat blobs. Redrawn every frame.
+- **Layer 1 (dynamic):** buildings, carts, boats, people, combat blobs. Redrawn every frame. This layer owns all figure-level motion — the ambient bounded-wander of men around a node or battle (§14) — and may use its own randomness; none of it touches GameState.
 - **Layer 2 (overlay):** the Revenue intel map, heat heatmap, route graph. Toggled.
 - **Layer 3 (UI):** React, DOM, above the canvas.
 
