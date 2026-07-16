@@ -6,6 +6,7 @@ export * from './balance';
 export * from './rng';
 export * from './time';
 export * from './map';
+export * from './combat';
 export * from './tick';
 export * from './run';
 export * from './policy';

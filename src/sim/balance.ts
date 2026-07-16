@@ -137,5 +137,79 @@ export const RENT_AMOUNT = 120; // coin, per period
 export const RENT_PERIOD_DAYS = 6; // first due at dawn, this many days after placement
 export const SHEEP_VALUE = 10; // the agent's valuation under distraint
 
+// ---- M4: combat — deterministic attrition (spec §14) ----
+// The battle is a sub-tick loop that runs the attrition for real; the render
+// plays back the frame log. No dice here — combat is a pure function of the
+// setup and the player's Calls. Numbers are opening bids; §14 says tune here.
+
+/** Integration step for the Lanchester equations (§14.1). */
+export const COMBAT_DT = 0.05;
+/** Safety cap on sub-ticks; a real battle ends in rout or annihilation first. */
+export const COMBAT_MAX_FRAMES = 200;
+/** Both sides start whole-hearted. */
+export const COMBAT_START_MORALE = 100;
+/**
+ * Linear law divides losses by how many you can bring to bear against a
+ * reference cohort (§14.1): outnumbered on prepared ground hurts *far* less,
+ * and a crowd that cannot deploy takes *more*. This is the marsh's whole payoff.
+ */
+export const COMBAT_LINEAR_REF = 20;
+
+/** Base kill rate per man, per enemy, per dt (spec §14.2). */
+export const FACTION_ALPHA = {
+  'marsh-militia': 0.1, // fowling pieces; they have families
+  'smuggler-crew': 0.18, // armed, willing, experienced
+  'riding-officer': 0.15,
+  hawksmere: 0.3, // hard men, well armed
+  'water-guard': 0.35, // professionals
+  dragoons: 0.55,
+  wights: 0.4, // ignore fortification; halved by iron & salt (M5)
+} as const;
+
+/** Morale floor below which a force routs (spec §14.3). Two rows are the threat. */
+export const FACTION_BREAKPOINT = {
+  'riding-officer': 65, // one volley and they are gone
+  'marsh-militia': 55, // they have farms to go back to
+  hawksmere: 35, // they will take real losses first
+  'smuggler-crew': 30,
+  'water-guard': 25, // professionals
+  dragoons: 0, // they do not rout
+  wights: 0, // not alive; cannot be frightened
+} as const;
+
+/** Alpha added to the *defender* per tier of ground works (spec §14.2). */
+export const FORT_ALPHA_PER_TIER = 0.05;
+/** Leiden fence / ram and the marsh's Guardian — additive alpha (spec §14.2). */
+export const GALVANIC_FENCE_ALPHA = 0.12;
+export const STEAM_RAM_ALPHA = 0.2;
+export const BOUND_GUARDIAN_ALPHA = 0.35;
+
+// Morale erosion (spec §14.3): morale -= casualtyRate × coeff + (leaderDown ? 25 : 0).
+export const MORALE_CASUALTY_COEFF = 6;
+export const LEADER_DOWN_MORALE = 25;
+/** A side's leader falls once it has lost this fraction of its starting strength. */
+export const LEADER_DOWN_THRESHOLD = 0.5;
+/** Below this many men a side is spent — annihilated (headcount is fractional). */
+export const COMBAT_MIN_STRENGTH = 0.5;
+
+// The three Calls (spec §14.4).
+/** Fire the Engine: a one-shot spike added to the player's alpha for the rest. */
+export const ENGINE_SPIKE_ALPHA = 0.4;
+/** …and the Sluice-Cannon is seen for counties — national Heat, once. */
+export const ENGINE_FIRE_HEAT = 20;
+/** Pay Them Off: coin to end it, scaled to how badly you are losing (§14.4). */
+export const PAYOFF_BASE = 20;
+export const PAYOFF_PER_ENEMY_HEAD = 5;
+/** Coin only silences the venal; the button is greyed against the rest (§14.4). */
+export const PAY_OFFABLE: readonly string[] = ['hawksmere', 'riding-officer'];
+
+// Consequences — combat feeds the economy (spec §14.6).
+export const STANDING_LOSS_PER_FRIENDLY_DEAD = 3;
+export const NATIONAL_HEAT_PER_REVENUE_DEAD = 40; // one dead officer > a year of running
+export const NATIONAL_HEAT_PER_DRAGOON_DEAD = 15; // they expect casualties; you exist
+export const DEBT_PER_GUARDIAN_FRAME = 2;
+/** The Revenue's own men, for the heat tally (§14.6). */
+export const REVENUE_FACTIONS: readonly string[] = ['riding-officer', 'water-guard'];
+
 // ---- Bookkeeping ----
 export const MAX_LOG_EVENTS = 50; // event log ring buffer, part of state
