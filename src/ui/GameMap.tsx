@@ -14,8 +14,10 @@ import {
   CUT_SUGAR_COST,
   DUTCHMAN_PRICE,
   FARM_STORE_CAPACITY,
+  FORT_COST,
   LEIDEN_PRICE_MULT,
   MAX_CARTS,
+  MAX_FORT_TIER,
   RYNE_PRICE,
   WOOL_PRICE_DOMESTIC,
 } from '../sim/balance';
@@ -28,6 +30,7 @@ import {
   officerEdgesFor,
 } from '../sim/map';
 import { dayPhaseOf, isFlooded, ticksUntilTideTurn } from '../sim/time';
+import { fortVisibility } from '../sim/revenue';
 import { GOOD_LABEL, spanOf, storeSummary } from './format';
 import type { Cart, CutDepth, EdgeId, GameState, Good, NodeId } from '../sim/types';
 import { useGameStore } from '../state/store';
@@ -40,6 +43,7 @@ import {
   drawCuttingHouse,
   drawFarm,
   drawFarmGlow,
+  drawFortifications,
   drawGossipStain,
   drawLabel,
   drawLugger,
@@ -262,6 +266,9 @@ export function GameMap({ state }: { state: GameState }) {
       }
       drawSheep(ctx, s.farm, s.flockSize);
       drawFarm(ctx, s.farm);
+      if ((s.fortifications.farm ?? 0) > 0) {
+        drawFortifications(ctx, s.farm, s.fortifications.farm ?? 0, fortVisibility(s, 'farm'));
+      }
       const fc = tileCenter(s.farm);
       drawLabel(ctx, 'Walland Farm', fc.x, fc.y - 16);
       if (isFreshGame(s) && !farmVisitedRef.current) {
@@ -280,6 +287,14 @@ export function GameMap({ state }: { state: GameState }) {
       }
       if (s.cuttingHouse) {
         drawCuttingHouse(ctx, s.cuttingHouse);
+        if ((s.fortifications['cutting-house'] ?? 0) > 0) {
+          drawFortifications(
+            ctx,
+            s.cuttingHouse,
+            s.fortifications['cutting-house'] ?? 0,
+            fortVisibility(s, 'cutting-house'),
+          );
+        }
         const cc = tileCenter(s.cuttingHouse);
         drawLabel(ctx, 'Cutting House', cc.x, cc.y - 12);
       }
@@ -610,6 +625,47 @@ function useEnqueue() {
   return useGameStore((s) => s.enqueue);
 }
 
+// The Trade fortification ladder, for the menu (spec §6.12 / §22). Index = tier.
+const FORT_TIER_LABEL = ['open ground', 'dogs & hedge', 'blunderbuss men', 'gunported', 'a fortress'];
+
+/**
+ * Spec §6.12 — dig in one rung of the Trade line. The cost is coin now; the
+ * cost the player learns to fear is being *seen* — the button says so.
+ */
+function FortifyRow({ state, nodeId }: { state: GameState; nodeId: NodeId }) {
+  const enqueue = useEnqueue();
+  const tier = state.fortifications[nodeId] ?? 0;
+  const maxed = tier >= MAX_FORT_TIER;
+  const cost = maxed ? 0 : FORT_COST[tier + 1];
+  const canAfford = state.coin >= cost;
+
+  return (
+    <>
+      <p className="flavour">
+        Works: <strong>{FORT_TIER_LABEL[tier]}</strong> ({tier}/{MAX_FORT_TIER}).{' '}
+        {tier > 0
+          ? 'Harder to storm — and the Revenue sees the walls.'
+          : 'Undug, and quiet as wool.'}
+      </p>
+      <div className="menu-buttons">
+        <button
+          disabled={maxed || !canAfford}
+          title={
+            maxed
+              ? 'As hard as it gets.'
+              : canAfford
+                ? 'Every rung hardens the building — and shouts the louder to London.'
+                : `${cost} coin, and the till is short.`
+          }
+          onClick={() => enqueue({ type: 'fortifyBuilding', nodeId })}
+        >
+          {maxed ? 'Fully fortified' : `Dig in · ${FORT_TIER_LABEL[tier + 1]} · ${cost} coin`}
+        </button>
+      </div>
+    </>
+  );
+}
+
 function FarmMenu({
   state,
   flooded,
@@ -699,6 +755,9 @@ function FarmMenu({
           </button>
         )}
       </div>
+
+      {/* Fortification appears once you have something worth guarding (§10). */}
+      {state.dutchman.unlocked && <FortifyRow state={state} nodeId="farm" />}
 
       {state.dutchman.unlocked && (
         <>
@@ -1045,6 +1104,8 @@ function CuttingHouseMenu({ state }: { state: GameState }) {
           </button>
         </div>
       )}
+
+      <FortifyRow state={state} nodeId="cutting-house" />
 
       <CartsAtNode state={state} nodeId="cutting-house" />
     </>

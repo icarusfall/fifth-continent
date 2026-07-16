@@ -410,6 +410,112 @@ export function drawCuttingHouse(
   }
 }
 
+/**
+ * Spec §6.12 — the works that harden a building, and the meter that shows how
+ * loud they are. The silhouette escalates with `tier` (0..4); the Heat-red bar
+ * beneath rises with `visibility`. The trade is legible at a glance: the more
+ * military the walls look, the redder the tell.
+ */
+export function drawFortifications(
+  ctx: CanvasRenderingContext2D,
+  site: { x: number; y: number },
+  tier: number,
+  visibility: number,
+): void {
+  const c = tileCenter(site);
+  const cx = c.x;
+  const cy = c.y + 2;
+  const rx = 19;
+  const ry = 12;
+
+  if (tier > 0) {
+    // The defensive ring — an earth berm, stouter each rung.
+    ctx.strokeStyle = mix(CLAY, INK, 0.35);
+    ctx.lineWidth = OUT * (0.8 + tier * 0.35);
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Stakes around it: a hedge at tier 1, timber above, taller and darker as
+    // the works grow. Deterministic placement, so nothing shimmers (§15.3).
+    const stakes = tier * 6;
+    const isHedge = tier === 1;
+    const stakeH = 2.6 + tier * 0.9;
+    ctx.lineWidth = OUT * 0.7;
+    for (let i = 0; i < stakes; i++) {
+      const a = (i / stakes) * Math.PI * 2 + hash2(site.x, site.y, 60 + i) * 0.15;
+      const px = cx + Math.cos(a) * rx;
+      const py = cy + Math.sin(a) * ry;
+      const h = stakeH * (0.8 + hash2(site.x, site.y, 90 + i) * 0.4);
+      ctx.strokeStyle = isHedge ? MARSH_DARK : mix(CLAY, INK, 0.45);
+      if (isHedge) {
+        ctx.beginPath(); // little spiked-hedge chevrons
+        ctx.moveTo(px - 1.4, py);
+        ctx.lineTo(px, py - h);
+        ctx.lineTo(px + 1.4, py);
+        ctx.stroke();
+      } else {
+        ctx.fillStyle = mix(CLAY, INK, 0.45);
+        ctx.beginPath(); // a pointed timber stake
+        ctx.moveTo(px - 1.1, py);
+        ctx.lineTo(px - 1.1, py - h + 1.2);
+        ctx.lineTo(px, py - h);
+        ctx.lineTo(px + 1.1, py - h + 1.2);
+        ctx.lineTo(px + 1.1, py);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
+
+    // Gunports at tier 3+: dark slits punched into the ring's face.
+    if (tier >= 3) {
+      ctx.fillStyle = INK;
+      for (const a of [-0.9, 0.2, 1.3]) {
+        const px = cx + Math.cos(a) * rx;
+        const py = cy + Math.sin(a) * ry;
+        ctx.fillRect(px - 1.5, py - 2.2, 3, 2);
+      }
+    }
+
+    // A dog at the gate — the tier-1 warning, present at every rung (§22).
+    const dx = cx - rx * 0.5;
+    const dy = cy + ry * 0.72;
+    ctx.fillStyle = INK;
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = OUT * 0.6;
+    ctx.beginPath();
+    ctx.ellipse(dx, dy, 2, 1.1, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(dx - 1.9, dy - 0.5, 0.9, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // The visibility meter: a short bar beneath the works, filling Heat-red with
+  // how loud the building has become. Drawn even at tier 0? No — silence is
+  // silent; only a fortified building carries the tell.
+  if (tier > 0) {
+    const bw = 22;
+    const bx = cx - bw / 2;
+    const by = cy + ry + 4;
+    const frac = Math.max(0, Math.min(1, visibility / 2.0)); // 2.0 = a full fortress
+    ctx.fillStyle = mix(LIMEWASH, INK, 0.12);
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = OUT * 0.6;
+    ctx.beginPath();
+    ctx.roundRect(bx, by, bw, 3, 1.5);
+    ctx.fill();
+    ctx.stroke();
+    if (frac > 0) {
+      ctx.fillStyle = HEAT_RED;
+      ctx.beginPath();
+      ctx.roundRect(bx + 0.6, by + 0.6, (bw - 1.2) * frac, 1.8, 0.9);
+      ctx.fill();
+    }
+  }
+}
+
 export function drawTileHighlight(
   ctx: CanvasRenderingContext2D,
   tx: number,
