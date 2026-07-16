@@ -352,6 +352,15 @@ button.danger {
   font-weight: bold;
 }
 
+.event-card .event-danger {
+  background: var(--roof);
+  color: var(--limewash);
+}
+
+.event-card .event-danger:hover {
+  background: #c4453a; /* Heat red — the blow has come */
+}
+
 .event-check {
   display: flex;
   align-items: center;

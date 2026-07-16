@@ -48,6 +48,7 @@ import {
   dawnRevenue,
   officerTick,
 } from './revenue';
+import { raidTick, resolveRaid } from './raid';
 import { seedRng } from './rng';
 import { clockOf, dayPhaseOf, isFlooded, tideIsRising } from './time';
 import type {
@@ -109,6 +110,9 @@ export function initialState(seed: number): GameState {
     garrisons: {},
     standing: STANDING_START,
     informer: false,
+    contrabandSold: 0,
+    hawksmere: { provoked: false, raidsSurvived: 0, nextRaidTick: 0 },
+    raid: null,
     carts: [
       {
         id: 'cart-1',
@@ -203,23 +207,6 @@ export function garrisonCap(state: GameState, nodeId: NodeId): number {
 
 function garrisonWageBill(g: Garrison): number {
   return g.militia * MILITIA_WAGE + g.crew * CREW_WAGE;
-}
-
-/**
- * Spec §6.13 / §11 — the parish's regard falls when your people die. At zero
- * the country people give you up: a permanent informer, and the free hides of
- * the marsh close (§6.13 / revenue.ts coverOf). Survivable, not a loss.
- */
-export function loseStanding(state: GameState, amount: number): void {
-  if (amount <= 0) return;
-  state.standing = Math.max(0, state.standing - amount);
-  if (state.standing <= 0 && !state.informer) {
-    state.informer = true;
-    logEvent(
-      state,
-      'Someone talks. The country people close their doors — the free hides of the marsh are gone.',
-    );
-  }
 }
 
 /** The Trade fortification ladder, for the log (spec §6.12 / §22). Index = tier. */
@@ -596,6 +583,11 @@ function applyAction(state: GameState, action: Action): void {
       return;
     }
 
+    case 'resolveRaid': {
+      resolveRaid(state, action.calls);
+      return;
+    }
+
     case 'setDeclaredYield': {
       const declared = Math.max(0, Math.min(state.flockSize, Math.round(action.fleecePerDay)));
       state.ledger.declaredYield = declared;
@@ -860,6 +852,7 @@ export function tick(state: GameState, actions: Action[]): GameState {
   moveCarts(next);
   accrueStorageHeat(next);
   officerTick(next);
+  raidTick(next);
 
   return next;
 }

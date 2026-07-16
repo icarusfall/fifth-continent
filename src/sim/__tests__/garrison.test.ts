@@ -24,8 +24,8 @@ import {
   TICKS_PER_HOUR,
 } from '../balance';
 import { runPolicyGame, smugglerPolicy } from '../policy';
-import { coverOf } from '../revenue';
-import { garrisonCap, initialState, loseStanding, tick } from '../tick';
+import { coverOf, loseStanding } from '../revenue';
+import { garrisonCap, initialState, tick } from '../tick';
 import type { Action, GameState } from '../types';
 
 function withCoin(seed: number, coin: number): GameState {

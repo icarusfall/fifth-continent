@@ -51,6 +51,13 @@ export interface ForceSpec {
   techAlpha?: number;
   /** A Bound Guardian fights here — highest alpha, and Debt every frame (§14.2). */
   guardian?: boolean;
+  /**
+   * Override the faction's base alpha / break point. A mixed force — a garrison
+   * of militia and crew (§6.13) — passes a headcount-blend here; `faction` then
+   * only names it in the readout.
+   */
+  alpha?: number;
+  breakPoint?: number;
 }
 
 // ---- The player's Calls (§14.4) — queued so determinism survives ----
@@ -138,7 +145,7 @@ export interface CombatLog {
 
 /** A force's effective alpha. Fort works count only when the side defends. */
 export function effectiveAlpha(force: ForceSpec, isDefender: boolean): number {
-  let a = FACTION_ALPHA[force.faction] + (force.techAlpha ?? 0);
+  let a = (force.alpha ?? FACTION_ALPHA[force.faction]) + (force.techAlpha ?? 0);
   if (force.guardian) a += BOUND_GUARDIAN_ALPHA;
   if (isDefender) a += (force.fortTier ?? 0) * FORT_ALPHA_PER_TIER;
   return a;
@@ -172,7 +179,7 @@ function makeSide(force: ForceSpec, isDefender: boolean): SideRuntime {
     entered: force.strength,
     alpha: effectiveAlpha(force, isDefender),
     morale: COMBAT_START_MORALE,
-    breakPoint: FACTION_BREAKPOINT[force.faction],
+    breakPoint: force.breakPoint ?? FACTION_BREAKPOINT[force.faction],
     guardian: force.guardian ?? false,
     leaderDown: false,
     routed: false,

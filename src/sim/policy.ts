@@ -231,6 +231,8 @@ export function runPolicyGame(
     // The bots always meet the agent at the door (§6.8): the event card that
     // makes a human pause is a UI thing; headless, rent is paid the moment due.
     if (state.rentPending) actions.unshift({ type: 'payRent' });
+    // And they see a raid through the moment it lands (§6.13) — no player Calls.
+    if (state.raid?.pendingBattle) actions.unshift({ type: 'resolveRaid' });
     state = tick(state, actions);
   }
   return state;

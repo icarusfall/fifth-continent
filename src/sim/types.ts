@@ -2,6 +2,7 @@
 // no Maps, Sets, Dates, or class instances — so that GameState round-trips
 // through JSON byte-identically (persistence and the replay test rely on it).
 
+import type { Faction, ScheduledCall } from './combat';
 import type { RngState } from './rng';
 
 export type NodeId = string;
@@ -94,6 +95,29 @@ export interface Garrison {
 
 export type GarrisonKind = 'militia' | 'crew';
 
+/** A force riding for one of your buildings (spec §6.13). */
+export interface Raid {
+  faction: Faction;
+  /** Headcount of the attacking force. */
+  size: number;
+  /** The building it means to take. */
+  target: NodeId;
+  /** Tick the blow falls (the muster gathers `RAID_MUSTER_LEAD_DAYS` before). */
+  battleTick: number;
+  /** It has arrived and the battle awaits the player's answer (§14.4 Calls). */
+  pendingBattle: boolean;
+}
+
+/** Spec §6.13 — the Hawksmere Company's standing intent against you. */
+export interface Hawksmere {
+  /** Your market footprint has drawn them; raids now come on a cadence. */
+  provoked: boolean;
+  /** Raids weathered — each grows the next. */
+  raidsSurvived: number;
+  /** Tick the next blow is scheduled to fall. */
+  nextRaidTick: number;
+}
+
 export interface GameEvent {
   tick: number;
   text: string;
@@ -183,6 +207,11 @@ export interface GameState {
   standing: number;
   /** Spec §6.13 — the parish gave you up once (Standing hit zero). Permanent. */
   informer: boolean;
+  /** Spec §6.13 — cumulative contraband sold at Ryne; your market footprint. */
+  contrabandSold: number;
+  /** Spec §6.13 — the Hawksmere Company's intent, and the raid it has in the field. */
+  hawksmere: Hawksmere;
+  raid: Raid | null;
   carts: Cart[];
   /** Ring buffer of recent events, oldest first. Part of state: deterministic. */
   log: GameEvent[];
@@ -208,7 +237,8 @@ export type Action =
   | { type: 'hireCarter'; cartId: CartId; order: CarterOrder }
   | { type: 'dismissCarter'; cartId: CartId }
   | { type: 'setDeclaredYield'; fleecePerDay: number }
-  | { type: 'payRent' };
+  | { type: 'payRent' }
+  | { type: 'resolveRaid'; calls?: ScheduledCall[] };
 
 /** Actions to apply at a given tick, for replay: actionLog[tick] = Action[]. */
 export type ActionLog = Record<number, Action[]>;

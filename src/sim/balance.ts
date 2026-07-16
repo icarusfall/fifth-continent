@@ -144,6 +144,25 @@ export const RENT_AMOUNT = 120; // coin, per period
 export const RENT_PERIOD_DAYS = 6; // first due at dawn, this many days after placement
 export const SHEEP_VALUE = 10; // the agent's valuation under distraint
 
+// ---- M4c-2: the Hawksmere raid (spec §6.13) ----
+// A rival smuggling company, provoked by your market footprint, that raids to
+// take your goods. Numbers are opening bids for the distribution test (§13).
+/** Cumulative contraband units sold at Ryne before the Company takes notice. */
+export const HAWKSMERE_PROVOKE = 60;
+/** Days from provocation to the first muster. */
+export const HAWKSMERE_FIRST_RAID_DELAY_DAYS = 4;
+/** Days between one raid resolving and the next mustering. */
+export const RAID_INTERVAL_DAYS = 6;
+/** Days of warning between a muster gathering and the blow falling. */
+export const RAID_MUSTER_LEAD_DAYS = 2;
+/** The first raid is a gentle introduction: this many men, seizing only a share. */
+export const HAWKSMERE_FIRST_RAID = 6;
+export const FIRST_RAID_SEIZE_FRAC = 1 / 3;
+/** Every raid after the first: base, plus growth per raid survived, plus footprint. */
+export const HAWKSMERE_BASE = 12;
+export const HAWKSMERE_GROWTH = 4;
+export const HAWKSMERE_SCALE = 40; // +1 raider per this many contraband units sold
+
 // ---- M4c: the garrison & Standing (spec §6.13) ----
 // Men posted at a building against the raid to come. Muster is up-front, wages
 // fall at dawn with the carter's (§6.11); a building that cannot pay loses men.

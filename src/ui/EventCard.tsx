@@ -11,6 +11,7 @@ export function EventCard() {
   const payRent = useGameStore((s) => s.payRent);
   const setAutoPayRent = useGameStore((s) => s.setAutoPayRent);
   const dismissCard = useGameStore((s) => s.dismissCard);
+  const resolveRaid = useGameStore((s) => s.resolveRaid);
 
   if (!card) return null;
 
@@ -34,6 +35,10 @@ export function EventCard() {
               Pay future rents without asking
             </label>
           </>
+        ) : card.kind === 'raid' ? (
+          <button className="event-primary event-danger" onClick={resolveRaid}>
+            See it through
+          </button>
         ) : (
           <button className="event-primary" onClick={dismissCard}>
             Go on

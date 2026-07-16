@@ -4,16 +4,25 @@
 // so the log is saved alongside the state and replays are always possible.
 
 import { create } from 'zustand';
-import { CART_CAPACITY, CART_COST, MAX_CARTS, RENT_AMOUNT, SHEEP_VALUE } from '../sim/balance';
+import {
+  CART_CAPACITY,
+  CART_COST,
+  MAX_CARTS,
+  RENT_AMOUNT,
+  SHEEP_VALUE,
+  TICKS_PER_DAY,
+} from '../sim/balance';
+import { nodeById } from '../sim/map';
 import { initialState, tick } from '../sim/tick';
 import type { Action, ActionLog, GameState } from '../sim/types';
 
+// v10: M4c-2 adds contrabandSold, the Hawksmere record, and the raid (§6.13).
 // v9: rent is now player-settled (rentPending) for the event card (§6.8/§6.13).
 // v8: M4c adds the garrison, Standing, and the informer to GameState (§6.13).
 // v7: M4b adds per-building fortifications to GameState (spec §6.12).
 // v6: M3 adds Heat, the Revenue, the ledger, and carters to GameState.
 // Older saves are incompatible and are silently abandoned.
-const SAVE_KEY = 'fifth-continent-save-v9';
+const SAVE_KEY = 'fifth-continent-save-v10';
 const AUTOSAVE_EVERY_TICKS = 30;
 const AUTOPAY_KEY = 'fifth-continent-autopay-rent'; // a UI preference, not game state
 
@@ -24,9 +33,37 @@ const AUTOPAY_KEY = 'fifth-continent-autopay-rent'; // a UI preference, not game
  */
 export interface EventCard {
   id: string;
-  kind: 'rent' | 'info';
+  kind: 'rent' | 'info' | 'raid';
   title: string;
   body: string;
+}
+
+/** The muster warning (spec §6.13): a Company force is riding for a building. */
+function musterCard(next: GameState): EventCard {
+  const r = next.raid!;
+  const name = nodeById(r.target, next.farm, next.cuttingHouse).name;
+  const days = Math.max(1, Math.round((r.battleTick - next.tick) / TICKS_PER_DAY));
+  return {
+    id: `muster-${r.battleTick}`,
+    kind: 'info',
+    title: 'A muster gathers',
+    body: `The Hawksmere Company is riding for ${name} — the blow falls in about ${days} day${days === 1 ? '' : 's'}. Post men and dig in, or lose the goods.`,
+  };
+}
+
+/** The blow itself (spec §6.13): the raiders are at the wall, and it must be answered. */
+function raidCard(next: GameState): EventCard {
+  const r = next.raid!;
+  const name = nodeById(r.target, next.farm, next.cuttingHouse).name;
+  const g = next.garrisons[r.target];
+  const men = (g?.militia ?? 0) + (g?.crew ?? 0);
+  const defence = men > 0 ? `${men} of your men hold the wall` : 'and no one holds the wall';
+  return {
+    id: `raid-${r.battleTick}`,
+    kind: 'raid',
+    title: 'The Company is at the gate',
+    body: `${r.size} of the Hawksmere Company fall on ${name}, ${defence}.`,
+  };
 }
 
 /** The rent-day card, its warning shaped by what the purse can meet (§6.8). */
@@ -159,6 +196,8 @@ export interface GameStore {
   setSpeed: (ticksPerSecond: number) => void;
   /** Settle the rent from the card and dismiss it. */
   payRent: () => void;
+  /** See a pending raid through (§6.13) — resolve the battle and dismiss the card. */
+  resolveRaid: () => void;
   /** Remember to pay future rents automatically (dismisses the ask thereafter). */
   setAutoPayRent: (on: boolean) => void;
   /** Dismiss an informational card and let the world run on. */
@@ -188,6 +227,7 @@ function loadSave(): SaveFile | null {
     if (!parsed.state.fortifications || typeof parsed.state.fortifications !== 'object') return null;
     if (!parsed.state.garrisons || typeof parsed.state.standing !== 'number') return null;
     if (typeof parsed.state.rentPending !== 'boolean') return null;
+    if (!parsed.state.hawksmere || typeof parsed.state.contrabandSold !== 'number') return null;
     return parsed;
   } catch {
     return null;
@@ -235,10 +275,18 @@ export const useGameStore = create<GameStore>()((set, get) => {
       let card: EventCard | null = null;
       let shown = shownCards;
 
+      // Raid beats (§6.13): the muster gathering, then the blow at the wall.
+      const musterGathered = !!next.raid && !state.raid;
+      const battlePending = !!next.raid?.pendingBattle && !state.raid?.pendingBattle;
+
       if (rentJustDue && !autoPayRent) {
         card = rentCard(next);
       } else if (rentJustDue) {
         nextPending = [{ type: 'payRent' }];
+      } else if (battlePending) {
+        card = raidCard(next);
+      } else if (musterGathered) {
+        card = musterCard(next);
       } else {
         const m = detectMilestone(next, shownCards);
         if (m) {
@@ -256,6 +304,9 @@ export const useGameStore = create<GameStore>()((set, get) => {
     setSpeed: (ticksPerSecond) => set({ ticksPerSecond }),
 
     payRent: () => set((s) => ({ pending: [...s.pending, { type: 'payRent' }], activeCard: null })),
+
+    resolveRaid: () =>
+      set((s) => ({ pending: [...s.pending, { type: 'resolveRaid' }], activeCard: null })),
 
     setAutoPayRent: (on) => {
       try {

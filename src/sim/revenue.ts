@@ -104,10 +104,12 @@ export function accrueStorageHeat(state: GameState): void {
   }
 }
 
-/** The town drinks happily and talks constantly (§6.10). */
+/** The town drinks happily and talks constantly (§6.10); and every contraband
+ *  sale widens your footprint on the Company's market (§6.13). */
 export function accrueMarketTattle(state: GameState, good: Good, qty: number): void {
   if (!CONTRABAND.includes(good)) return;
   addHeat(state, qty * MARKET_TATTLE, 'ryne');
+  state.contrabandSold += qty;
 }
 
 /** Tubs carry no name: regional heat only, no stain (§6.10). */
@@ -163,6 +165,23 @@ export function dawnRevenue(state: GameState): void {
   // The day's plan: the sorest stain if any is sore enough, else his beat.
   officer.inspectedToday = false;
   officer.targetNodeId = patrolTarget(state);
+}
+
+/**
+ * Spec §6.13 / §11 — the parish's regard falls when your people die. At zero
+ * the country people give you up: a permanent informer, and the free hides of
+ * the marsh close (coverOf). Survivable, not a loss.
+ */
+export function loseStanding(state: GameState, amount: number): void {
+  if (amount <= 0) return;
+  state.standing = Math.max(0, state.standing - amount);
+  if (state.standing <= 0 && !state.informer) {
+    state.informer = true;
+    logEvent(
+      state,
+      'Someone talks. The country people close their doors — the free hides of the marsh are gone.',
+    );
+  }
 }
 
 /** The dawn tell of visible works (§6.12): each hard building stains itself. */
