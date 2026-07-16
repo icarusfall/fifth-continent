@@ -9,10 +9,18 @@ import {
   CARTER_WAGE,
   CUTS,
   FARM_STORE_CAPACITY,
+  CREW_MUSTER,
+  CREW_WAGE,
   CUTTING_HOUSE_COST,
   CUT_SUGAR_COST,
   DAILY_DEMAND,
   FORT_COST,
+  GARRISON_BASE,
+  GARRISON_PER_TIER,
+  MILITIA_MUSTER,
+  MILITIA_WAGE,
+  STANDING_RECOVERY,
+  STANDING_START,
   DUTCHMAN_FLEECE_DEMAND,
   DUTCHMAN_HOLD,
   DUTCHMAN_PRICE,
@@ -42,7 +50,16 @@ import {
 } from './revenue';
 import { seedRng } from './rng';
 import { clockOf, dayPhaseOf, isFlooded, tideIsRising } from './time';
-import type { Action, Cart, GameState, Good, NodeId, Store } from './types';
+import type {
+  Action,
+  Cart,
+  GameState,
+  Garrison,
+  GarrisonKind,
+  Good,
+  NodeId,
+  Store,
+} from './types';
 
 export function initialState(seed: number): GameState {
   return {
@@ -88,6 +105,9 @@ export function initialState(seed: number): GameState {
       shingle: {},
     },
     fortifications: {},
+    garrisons: {},
+    standing: STANDING_START,
+    informer: false,
     carts: [
       {
         id: 'cart-1',
@@ -161,6 +181,44 @@ function marketSale(state: GameState, cart: Cart, good: Good): number {
     accrueMarketTattle(state, good, qty);
   }
   return qty;
+}
+
+/** Spec §6.13 — the garrison's two kinds: muster cost, daily wage, and a name. */
+const GARRISON_MUSTER: Record<GarrisonKind, number> = { militia: MILITIA_MUSTER, crew: CREW_MUSTER };
+const GARRISON_LABEL: Record<GarrisonKind, string> = { militia: 'militiaman', crew: 'smuggler' };
+
+function isYourBuilding(state: GameState, nodeId: NodeId): boolean {
+  return nodeId === 'farm' || (nodeId === 'cutting-house' && state.cuttingHouse !== null);
+}
+
+function garrisonCount(g?: Garrison): number {
+  return g ? g.militia + g.crew : 0;
+}
+
+/** How many men a building can quarter: base plus its fort tier (§6.13). */
+export function garrisonCap(state: GameState, nodeId: NodeId): number {
+  return GARRISON_BASE + (state.fortifications[nodeId] ?? 0) * GARRISON_PER_TIER;
+}
+
+function garrisonWageBill(g: Garrison): number {
+  return g.militia * MILITIA_WAGE + g.crew * CREW_WAGE;
+}
+
+/**
+ * Spec §6.13 / §11 — the parish's regard falls when your people die. At zero
+ * the country people give you up: a permanent informer, and the free hides of
+ * the marsh close (§6.13 / revenue.ts coverOf). Survivable, not a loss.
+ */
+export function loseStanding(state: GameState, amount: number): void {
+  if (amount <= 0) return;
+  state.standing = Math.max(0, state.standing - amount);
+  if (state.standing <= 0 && !state.informer) {
+    state.informer = true;
+    logEvent(
+      state,
+      'Someone talks. The country people close their doors — the free hides of the marsh are gone.',
+    );
+  }
 }
 
 /** The Trade fortification ladder, for the log (spec §6.12 / §22). Index = tier. */
@@ -471,6 +529,39 @@ function applyAction(state: GameState, action: Action): void {
       return;
     }
 
+    case 'raiseGarrison': {
+      // Spec §6.13 — post one man of a kind at one of your buildings.
+      if (!isYourBuilding(state, action.nodeId)) {
+        logEvent(state, 'You can only post men in your own walls.');
+        return;
+      }
+      const name = nodeById(action.nodeId, state.farm, state.cuttingHouse).name;
+      const g = state.garrisons[action.nodeId] ?? { militia: 0, crew: 0 };
+      if (garrisonCount(g) >= garrisonCap(state, action.nodeId)) {
+        logEvent(state, `${name} can quarter no more men. Dig in deeper to hold a larger garrison.`);
+        return;
+      }
+      const cost = GARRISON_MUSTER[action.kind];
+      if (state.coin < cost) {
+        logEvent(state, `A ${GARRISON_LABEL[action.kind]} costs ${cost} coin to raise.`);
+        return;
+      }
+      state.coin -= cost;
+      g[action.kind] += 1;
+      state.garrisons[action.nodeId] = g;
+      logEvent(state, `A ${GARRISON_LABEL[action.kind]} takes the wall at ${name}. ${cost} coin.`);
+      return;
+    }
+
+    case 'dismissGarrison': {
+      const g = state.garrisons[action.nodeId];
+      if (!g || g[action.kind] <= 0) return;
+      g[action.kind] -= 1;
+      const name = nodeById(action.nodeId, state.farm, state.cuttingHouse).name;
+      logEvent(state, `A ${GARRISON_LABEL[action.kind]} is stood down from ${name}.`);
+      return;
+    }
+
     case 'hireCarter': {
       const cart = findCart(state, action.cartId);
       if (!cart) return;
@@ -541,6 +632,38 @@ function payCartersAtDawn(state: GameState): void {
         `No wage, no carter: the man walks off ${cart.name} and leaves it standing.`,
       );
     }
+  }
+}
+
+/**
+ * Spec §6.13 — the garrison draws its wage at dawn, with the carter's. A wall
+ * that cannot be paid loses men to desertion, the cheapest (militia) first,
+ * until the remaining bill can be met.
+ */
+function payGarrisonsAtDawn(state: GameState): void {
+  if (!isDawn(state.tick)) return;
+  for (const nodeId of Object.keys(state.garrisons)) {
+    const g = state.garrisons[nodeId];
+    if (!g) continue;
+    let bill = garrisonWageBill(g);
+    while (bill > state.coin && garrisonCount(g) > 0) {
+      if (g.militia > 0) g.militia -= 1;
+      else g.crew -= 1;
+      logEvent(
+        state,
+        `No wage at ${nodeById(nodeId, state.farm, state.cuttingHouse).name}: a man walks off the wall.`,
+      );
+      bill = garrisonWageBill(g);
+    }
+    state.coin -= bill;
+  }
+}
+
+/** Spec §6.13 — the parish's memory of a dead neighbour fades, slowly. */
+function recoverStandingAtDawn(state: GameState): void {
+  if (!isDawn(state.tick)) return;
+  if (state.standing < STANDING_START) {
+    state.standing = Math.min(STANDING_START, state.standing + STANDING_RECOVERY);
   }
 }
 
@@ -708,6 +831,8 @@ export function tick(state: GameState, actions: Action[]): GameState {
   next.tick += 1;
   growWoolAtDawn(next);
   payCartersAtDawn(next);
+  payGarrisonsAtDawn(next);
+  recoverStandingAtDawn(next);
   collectRent(next);
   if (isDawn(next.tick)) dawnRevenue(next);
   dutchmanTide(next);

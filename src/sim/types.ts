@@ -86,6 +86,14 @@ export interface Cart {
   carter: CarterOrder | null;
 }
 
+/** A building's posted men (spec §6.13): the two kinds of the §14.2 pair. */
+export interface Garrison {
+  militia: number;
+  crew: number;
+}
+
+export type GarrisonKind = 'militia' | 'crew';
+
 export interface GameEvent {
   tick: number;
   text: string;
@@ -159,6 +167,15 @@ export interface GameState {
    * the works are visible, by design (§9).
    */
   fortifications: Partial<Record<NodeId, number>>;
+  /**
+   * Spec §6.13 — men posted at each building against the raid. Absent = none.
+   * The cap is a function of the building's fortTier (fort = capacity too).
+   */
+  garrisons: Partial<Record<NodeId, Garrison>>;
+  /** Spec §6.13 / §11 — the parish's regard for you; falls when your people die. */
+  standing: number;
+  /** Spec §6.13 — the parish gave you up once (Standing hit zero). Permanent. */
+  informer: boolean;
   carts: Cart[];
   /** Ring buffer of recent events, oldest first. Part of state: deterministic. */
   log: GameEvent[];
@@ -179,6 +196,8 @@ export type Action =
   | { type: 'cut'; depth: CutDepth; tubs: number }
   | { type: 'buyCart' }
   | { type: 'fortifyBuilding'; nodeId: NodeId }
+  | { type: 'raiseGarrison'; nodeId: NodeId; kind: GarrisonKind }
+  | { type: 'dismissGarrison'; nodeId: NodeId; kind: GarrisonKind }
   | { type: 'hireCarter'; cartId: CartId; order: CarterOrder }
   | { type: 'dismissCarter'; cartId: CartId }
   | { type: 'setDeclaredYield'; fleecePerDay: number };

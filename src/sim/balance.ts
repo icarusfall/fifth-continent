@@ -144,6 +144,25 @@ export const RENT_AMOUNT = 120; // coin, per period
 export const RENT_PERIOD_DAYS = 6; // first due at dawn, this many days after placement
 export const SHEEP_VALUE = 10; // the agent's valuation under distraint
 
+// ---- M4c: the garrison & Standing (spec §6.13) ----
+// Men posted at a building against the raid to come. Muster is up-front, wages
+// fall at dawn with the carter's (§6.11); a building that cannot pay loses men.
+export const MILITIA_MUSTER = 15; // coin to raise one marsh militiaman
+export const MILITIA_WAGE = 1; // coin/day
+export const CREW_MUSTER = 40; // coin to raise one smuggler
+export const CREW_WAGE = 3; // coin/day
+/** A building holds this many, plus more per fort tier (fort = capacity too). */
+export const GARRISON_BASE = 4;
+export const GARRISON_PER_TIER = 2; // bare holds 4, a fortress 12
+
+// Standing — the parish's regard (spec §6.13 / §11). Falls when your people
+// die (STANDING_LOSS_PER_FRIENDLY_DEAD, in the combat block above), drifts back
+// in peace. At zero the parish gives you up — survivable, not a loss.
+export const STANDING_START = 100;
+export const STANDING_RECOVERY = 0.5; // per day, up to the start
+/** With an informer set (Standing hit zero), the free hides close to this. */
+export const INFORMER_COVER = 0;
+
 // ---- M4b: fortification & the visibility trade-off (spec §6.12) ----
 // A per-building tier ladder (the Trade line, §22). Bought with coin, no
 // upkeep. Each rung hardens the building (+alpha in a raid, §14.2) and, the

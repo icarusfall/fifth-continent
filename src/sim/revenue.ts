@@ -7,6 +7,7 @@ import {
   DITCH_HEAT,
   FORT_VISIBILITY,
   FORT_VISIBILITY_HEAT,
+  INFORMER_COVER,
   MARKET_TATTLE,
   MAX_FORT_TIER,
   MAX_LOG_EVENTS,
@@ -42,6 +43,15 @@ export const CONTRABAND: readonly Good[] = [
 
 export function illicitCount(store: Store): number {
   return CONTRABAND.reduce((sum, g) => sum + (store[g] ?? 0), 0);
+}
+
+/**
+ * What a building can hide in plain sight (§18, §6.1). With an informer set
+ * (Standing hit zero, §6.13), the marsh's free hides close: cover drops to
+ * INFORMER_COVER and every tub is visible to a search.
+ */
+export function coverOf(state: GameState, nodeId: NodeId): number {
+  return state.informer ? INFORMER_COVER : (COVER_CAPACITY[nodeId] ?? 0);
 }
 
 // ---- Heat plumbing ----
@@ -83,7 +93,7 @@ export function fortVisibility(state: GameState, nodeId: NodeId): number {
 /** Storage heat, per tick (§18): stores hide up to their cover; carts hide nothing. */
 export function accrueStorageHeat(state: GameState): void {
   for (const nodeId of Object.keys(state.stores)) {
-    const over = illicitCount(state.stores[nodeId]) - (COVER_CAPACITY[nodeId] ?? 0);
+    const over = illicitCount(state.stores[nodeId]) - coverOf(state, nodeId);
     // §6.1/§6.12: what a hard building cannot hide, it leaks the louder.
     if (over > 0) addHeat(state, over * STORAGE_HEAT_COEFF * (1 + fortVisibility(state, nodeId)), nodeId);
   }
@@ -204,7 +214,7 @@ function searchNode(state: GameState, nodeId: NodeId): void {
   );
   const inStore = illicitCount(store);
   const aboard = cartsHere.reduce((sum, c) => sum + illicitCount(c.cargo), 0);
-  const cover = COVER_CAPACITY[nodeId] ?? 0;
+  const cover = coverOf(state, nodeId);
   // The building's clutter hides its own stock; a cart in the yard hides nothing.
   const found = Math.max(0, inStore - cover) + aboard;
   const name = nodeById(nodeId, state.farm, state.cuttingHouse).name;

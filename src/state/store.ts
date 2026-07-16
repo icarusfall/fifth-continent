@@ -7,10 +7,11 @@ import { create } from 'zustand';
 import { initialState, tick } from '../sim/tick';
 import type { Action, ActionLog, GameState } from '../sim/types';
 
+// v8: M4c adds the garrison, Standing, and the informer to GameState (§6.13).
 // v7: M4b adds per-building fortifications to GameState (spec §6.12).
 // v6: M3 adds Heat, the Revenue, the ledger, and carters to GameState.
 // Older saves are incompatible and are silently abandoned.
-const SAVE_KEY = 'fifth-continent-save-v7';
+const SAVE_KEY = 'fifth-continent-save-v8';
 const AUTOSAVE_EVERY_TICKS = 30;
 
 interface SaveFile {
@@ -54,6 +55,7 @@ function loadSave(): SaveFile | null {
     )
       return null;
     if (!parsed.state.fortifications || typeof parsed.state.fortifications !== 'object') return null;
+    if (!parsed.state.garrisons || typeof parsed.state.standing !== 'number') return null;
     return parsed;
   } catch {
     return null;
