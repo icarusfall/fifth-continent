@@ -13,11 +13,18 @@ import type { GameState } from '../types';
 
 const FIRST_DUE = RENT_PERIOD_DAYS * TICKS_PER_DAY + SHEARING_HOUR * TICKS_PER_HOUR;
 
+// Rent no longer auto-collects (§6.13): it is marked pending at the due dawn
+// and settled by a payRent action. Like the headless bots, this helper meets
+// the agent at once, so the §6.8 arithmetic below is unchanged.
 function runTicks(state: GameState, n: number): GameState {
   let s = state;
-  for (let i = 0; i < n; i++) s = tick(s, []);
+  for (let i = 0; i < n; i++) s = tick(s, s.rentPending ? [{ type: 'payRent' }] : []);
   return s;
 }
+
+// The agent knocks at the due tick; the coin moves on the next. A short margin
+// past each due date lets the pending rent settle before the assertions.
+const SETTLE = 2;
 
 /** A fresh game with coin set by fiat for the scenario. */
 function placedWithCoin(coin: number): GameState {
@@ -31,7 +38,7 @@ describe('rent (spec §6.8)', () => {
 
   it('collects in full when the coin is there', () => {
     let s = placedWithCoin(150);
-    s = runTicks(s, FIRST_DUE - s.tick);
+    s = runTicks(s, FIRST_DUE - s.tick + SETTLE);
     expect(s.coin).toBe(150 - RENT_AMOUNT);
     expect(s.rentPaid).toBe(RENT_AMOUNT);
     expect(s.flockSize).toBe(STARTING_FLOCK);
@@ -41,7 +48,7 @@ describe('rent (spec §6.8)', () => {
 
   it('distrains sheep at valuation when short', () => {
     let s = placedWithCoin(70); // 50 short → ceil(50/10) = 5 sheep
-    s = runTicks(s, FIRST_DUE - s.tick);
+    s = runTicks(s, FIRST_DUE - s.tick + SETTLE);
     expect(s.coin).toBe(0);
     expect(s.rentPaid).toBe(70);
     expect(s.flockSize).toBe(STARTING_FLOCK - Math.ceil((RENT_AMOUNT - 70) / SHEEP_VALUE));
@@ -51,7 +58,7 @@ describe('rent (spec §6.8)', () => {
 
   it('a smaller flock grows less wool the next dawn', () => {
     let s = placedWithCoin(70);
-    s = runTicks(s, FIRST_DUE - s.tick); // 5 seized → 7 left
+    s = runTicks(s, FIRST_DUE - s.tick + SETTLE); // 5 seized → 7 left
     const before = s.fleeceReady;
     s = runTicks(s, TICKS_PER_DAY); // through the next dawn
     expect(s.fleeceReady - before).toBe(s.flockSize);
@@ -59,7 +66,7 @@ describe('rent (spec §6.8)', () => {
 
   it('losing the whole flock forfeits the tenancy and freezes the sim', () => {
     let s = placedWithCoin(0); // 120 short → 12 sheep → all of them
-    s = runTicks(s, FIRST_DUE - s.tick);
+    s = runTicks(s, FIRST_DUE - s.tick + SETTLE);
     expect(s.flockSize).toBe(0);
     expect(s.lost).toBe(true);
     expect(s.log.some((e) => e.text.includes('forfeit'))).toBe(true);
@@ -72,7 +79,7 @@ describe('rent (spec §6.8)', () => {
 
   it('rent recurs every period', () => {
     let s = placedWithCoin(1000);
-    s = runTicks(s, FIRST_DUE + RENT_PERIOD_DAYS * TICKS_PER_DAY - s.tick);
+    s = runTicks(s, FIRST_DUE + RENT_PERIOD_DAYS * TICKS_PER_DAY - s.tick + SETTLE);
     expect(s.rentPaid).toBe(2 * RENT_AMOUNT);
     expect(s.coin).toBe(1000 - 2 * RENT_AMOUNT);
   });

@@ -56,27 +56,32 @@ describe('the Dutchman — unlock (spec §6.9: the grind first)', () => {
     expect(next.dutchman.present).toBe(false);
   });
 
-  it('the first rent collection unlocks him — paid or distrained', () => {
-    const paid = tick(fresh((s) => {
+  // Rent is marked pending at the due dawn (§6.13) and settled by payRent the
+  // next tick; the Dutchman unlocks when it is settled, paid or distrained.
+  const rentSettled = (mutate: (s: GameState) => void): GameState =>
+    tick(tick(fresh(mutate), []), [{ type: 'payRent' }]);
+
+  it('the first rent, once settled, unlocks him — paid or distrained', () => {
+    const paid = rentSettled((s) => {
       s.tick = FIRST_RENT_EVE;
       s.coin = RENT_AMOUNT;
-    }), []);
+    });
     expect(paid.dutchman.unlocked).toBe(true);
 
-    const squeezed = tick(fresh((s) => {
+    const squeezed = rentSettled((s) => {
       s.tick = FIRST_RENT_EVE;
       s.coin = 50; // short: distraint, but the tenancy survives
-    }), []);
+    });
     expect(squeezed.lost).toBe(false);
     expect(squeezed.flockSize).toBeLessThan(12);
     expect(squeezed.dutchman.unlocked).toBe(true);
   });
 
   it('a forfeit tenancy unlocks nothing', () => {
-    const lost = tick(fresh((s) => {
+    const lost = rentSettled((s) => {
       s.tick = FIRST_RENT_EVE;
       s.coin = 0; // 12 sheep at valuation cannot cover 120
-    }), []);
+    });
     expect(lost.lost).toBe(true);
     expect(lost.dutchman.unlocked).toBe(false);
   });

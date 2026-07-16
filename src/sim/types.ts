@@ -108,6 +108,13 @@ export interface GameState {
   farm: { x: number; y: number };
   /** Tick at which the next rent falls due. */
   rentDueTick: number;
+  /**
+   * Spec §6.8 — rent has fallen due and awaits the player's hand (§6.13 event
+   * card): the agent is at the door and the sim marks it, but the coin does not
+   * move until a `payRent` action. The UI pauses and surfaces it; the headless
+   * bots pay at once.
+   */
+  rentPending: boolean;
   /** Cumulative coin paid in rent — the ledger will want it later. */
   rentPaid: number;
   /** The tenancy is forfeit: the sim freezes, the game is over. */
@@ -200,7 +207,8 @@ export type Action =
   | { type: 'dismissGarrison'; nodeId: NodeId; kind: GarrisonKind }
   | { type: 'hireCarter'; cartId: CartId; order: CarterOrder }
   | { type: 'dismissCarter'; cartId: CartId }
-  | { type: 'setDeclaredYield'; fleecePerDay: number };
+  | { type: 'setDeclaredYield'; fleecePerDay: number }
+  | { type: 'payRent' };
 
 /** Actions to apply at a given tick, for replay: actionLog[tick] = Action[]. */
 export type ActionLog = Record<number, Action[]>;

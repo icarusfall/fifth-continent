@@ -70,6 +70,7 @@ export function initialState(seed: number): GameState {
     farm: { ...FARM_SITE },
     // The tenancy runs from the first morning (spec §6.8).
     rentDueTick: RENT_PERIOD_DAYS * TICKS_PER_DAY + SHEARING_HOUR * TICKS_PER_HOUR,
+    rentPending: false,
     rentPaid: 0,
     lost: false,
     flockSize: STARTING_FLOCK,
@@ -590,6 +591,11 @@ function applyAction(state: GameState, action: Action): void {
       return;
     }
 
+    case 'payRent': {
+      payRent(state);
+      return;
+    }
+
     case 'setDeclaredYield': {
       const declared = Math.max(0, Math.min(state.flockSize, Math.round(action.fleecePerDay)));
       state.ledger.declaredYield = declared;
@@ -756,9 +762,21 @@ function dutchmanTide(state: GameState): void {
   state.dutchman.present = here;
 }
 
-/** Spec §6.8 — the agent calls at dawn. Pays what it can; distrains the rest. */
-function collectRent(state: GameState): void {
-  if (state.tick !== state.rentDueTick) return;
+/**
+ * Spec §6.8 / §6.13 — the agent arrives at the due dawn and knocks. The coin
+ * does not move here: rent is marked *pending* and waits for the player's hand
+ * (the `payRent` action, surfaced by the event card). The bots pay at once.
+ */
+function markRentDue(state: GameState): void {
+  if (state.tick >= state.rentDueTick && !state.rentPending) {
+    state.rentPending = true;
+    logEvent(state, `Rent day. The agent is at the door, and he wants his ${RENT_AMOUNT} coin.`);
+  }
+}
+
+/** Spec §6.8 — settle the pending rent: pay what the purse holds, distrain the rest. */
+function payRent(state: GameState): void {
+  if (!state.rentPending) return;
 
   const paid = Math.min(state.coin, RENT_AMOUNT);
   state.coin -= paid;
@@ -776,10 +794,12 @@ function collectRent(state: GameState): void {
     );
     if (state.flockSize <= 0) {
       state.lost = true;
+      state.rentPending = false;
       logEvent(state, 'The tenancy is forfeit. The Gault keeps no one who cannot pay.');
       return;
     }
   }
+  state.rentPending = false;
   state.rentDueTick += RENT_PERIOD_DAYS * TICKS_PER_DAY;
 
   // Spec §6.9: the first rent unlocks the Dutchman. The grind must be felt
@@ -833,7 +853,7 @@ export function tick(state: GameState, actions: Action[]): GameState {
   payCartersAtDawn(next);
   payGarrisonsAtDawn(next);
   recoverStandingAtDawn(next);
-  collectRent(next);
+  markRentDue(next);
   if (isDawn(next.tick)) dawnRevenue(next);
   dutchmanTide(next);
   runCarters(next);

@@ -227,7 +227,11 @@ export function runPolicyGame(
 ): GameState {
   let state = initialState(seed);
   for (let t = 0; t < ticks; t++) {
-    state = tick(state, policy(state));
+    const actions = policy(state);
+    // The bots always meet the agent at the door (§6.8): the event card that
+    // makes a human pause is a UI thing; headless, rent is paid the moment due.
+    if (state.rentPending) actions.unshift({ type: 'payRent' });
+    state = tick(state, actions);
   }
   return state;
 }
