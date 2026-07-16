@@ -547,40 +547,163 @@ under the building rises with `fortVisibility`, so the trade is legible at a
 glance in the Yard view. Reserved palette is untouched (house rule 7): fort
 uses ink, clay, and roof-tile, darkening as it hardens.
 
-### 6.13 M4 — the raid: standing garrison, Hawksmere, and resolution *(spec stub — formulas next)*
+### 6.13 M4c — the raid: standing garrison, Hawksmere, and resolution
 
-*Decisions taken (2026-07-16) in the M4 design pass; to be expanded into
-formulas before M4c code, the way §6.9–6.12 were.* This subsection records
-them so nothing is lost; it is **not yet buildable.**
+Force is the second half of M4 and the milestone's namesake. M4b made a
+building *hard*; M4c gives it something to be hard *against*. The loop: your
+success draws raiders, they muster off-map and ride to one of your buildings,
+and the fight resolves through the deterministic engine already built (§14) —
+you defend with the men you posted and the works you dug. Numbers below are
+opening bids for the distribution test (§13) to beat into shape.
 
-- **Defenders are a standing garrison (chosen over per-raid muster).** Men are
-  *posted at a building* and draw a daily wage at dawn, exactly like the carter
-  (§6.11) — visible in the yard between raids, an ongoing cost, and ready when
-  a muster rides in. Two kinds, matching the §14.2 alpha split: **marsh militia**
-  (α 0.10, cheap, "they have families" — dying costs Standing, §14.6) and
-  **smuggler crew** (α 0.18, dearer wage). A building's garrison spends its
-  `fortTier` alpha (§6.12) and its dogs' warning (tier 1).
-- **Raids are localised, never a swarm.** A force *musters* off-map and **rides
-  the edge network to one target node**; combat resolves *there*, watched at the
-  Yard zoom (§15.2), defenders loitering by the walls rather than manning
-  turrets. Dykes force mounted attackers onto crossings — square→linear law
-  (§14.1, §21). The county never fills with enemies; §22's thinness is the law.
-- **The Hawksmere Company** is the new antagonist Force answers (§9): a rival
-  smuggling concern that wants your routes and buyers, provoked by your success,
-  and beaten only by fighting. Colour: **oxblood `#7A3B32`** — a new,
-  non-reserved faction hue (added to §15.3 when they enter, not before).
-- **The Crown escalates by national Heat.** The lone Riding Officer (§6.10) is
-  the floor; national Heat past thresholds summons the Preventive Water Guard
-  and, at the top, Dragoons who do not rout (§14.3). Revenue blue clothes them
-  all — the doom clock wears one coat.
-- **An attack is always a pause-notification event.** A muster arriving is one
-  of the big centre-screen, sim-pausing event cards (the deferred pop-up system,
-  todo #1): the player never misses a raid or resolves one on autopilot. The
-  pause lives in the UI/store, never in `/src/sim` (house rule 1). Sounding the
-  three Calls (§14.4) happens against a paused world.
-- **Still to pin as formulas:** garrison wage/cap per building, Hawksmere
-  arrival & raid-cadence triggers, raid force size vs. your Heat/Standing,
-  target selection, and the national-Heat rungs that buy each enemy tier.
+**The engine exists; M4c is the wiring.** `simulateBattle(setup)` (§14) is done
+and tested. M4c raises the two sides, moves the raider on the map, hands the
+`CombatLog` to the renderer, and applies the §14.6 consequences to the world.
+No new combat maths.
+
+#### The garrison (your defenders)
+
+Men are *posted at a building* and drawn from two kinds, the §14.2 pair:
+
+```
+marsh militia   α 0.10, breakpoint 55   MILITIA_MUSTER 15 coin, MILITIA_WAGE 1/day
+smuggler crew   α 0.18, breakpoint 30   CREW_MUSTER   40 coin, CREW_WAGE   3/day
+raise           a verb at the building; men appear in its garrison next tick
+wages           at dawn, with the carter's (§6.11); a building that cannot pay
+                its garrison loses men to desertion (cheapest first)
+cap             GARRISON_BASE 4 + fortTier × GARRISON_PER_TIER 2  → a bare
+                building holds 4, a fortress 12. Fortification now does *three*
+                things: alpha, capacity, and visibility (§6.12).
+```
+
+`garrisons: Partial<Record<NodeId, { militia: number; crew: number }>>` joins
+GameState (save bump). Militia are cheap and break early ("they have families");
+crew hold. The building's works add to the defender's alpha in the fight —
+`fortAlpha = max(0, fortTier − 1) × 0.05` (tier-1 dogs give **intelligence,
+not alpha**, §22; refine §14.2's flat "+0.05/tier" to honour the carve-out).
+
+#### Standing — introduced here, minimal (spec §11)
+
+Combat already prices friendly dead in Standing (§14.6); M4c gives Standing a
+home. A single number, the parish's regard for you:
+
+```
+standing        starts STANDING_START 100, floored at 0
+falls           friendlyDead × STANDING_LOSS_PER_FRIENDLY_DEAD 3, per battle
+recovers        + STANDING_RECOVERY 0.5 / day, capped at start (the parish's
+                memory of a dead neighbour fades — slowly)
+at zero         "someone talks" (§11) — but *not* the end (design call): a
+                permanent `informer` is set and the marsh's free hides close
+                (building cover falls to INFORMER_COVER, an opening bid of 0 —
+                every tub now visible to a search). Standing recovers with peace;
+                the informer does not. Severe, survivable, and meant to be lived
+                through — into a harder, more exposed game.
+```
+
+Standing's fuller economy — conspicuous spend (§6.5), gentry buyers, buying the
+informer *off* — is **deferred**; in M4c it moves one way under fire and drifts
+back in peace, and its floor is the informer scar. It is the cost that makes
+"every dead neighbour a family that now hates you" (§14.3) a number, not a line
+of flavour: a player can *win* every fight and still bleed the parish white.
+
+#### Two raiders, two meters (the orthogonal threats of §9)
+
+Raids come from two sources, and keeping their triggers separate keeps the
+threats legible:
+
+```
+HAWKSMERE (rival) — wants your market. Provoked by your FOOTPRINT:
+  contrabandSold (cumulative illicit units sold at Ryne) ≥ HAWKSMERE_PROVOKE 60
+  Once provoked, they raid on a cadence; each raid you survive grows the next.
+
+THE CROWN (state force) — wants you gone. Summoned by national HEAT (§6.3, the
+  doom clock):
+    national ≥ WATER_GUARD_HEAT 40  → the Preventive Water Guard rides (α 0.35, bp 25)
+    national ≥ DRAGOON_HEAT     80  → Dragoons (α 0.55, bp 0 — they do not rout)
+  The raider's faction is the worst its national Heat has earned. This is §11's
+  spiral made real: kill the Crown's men and national Heat leaps (§14.6,
+  revenueDead × 40), summoning worse — Force against the state is a trap that
+  pays in Dragoons.
+```
+
+The Revenue's officer (§6.10) still only searches; he never storms. Force is for
+the two who bring it.
+
+#### The raid — muster, ride, resolve
+
+```
+target      the building holding the most contraband (illicitCount), tie-break
+            to the cutting house, then the farm — they take what they can carry
+size        HAWKSMERE_BASE 12 + raidsSurvived × HAWKSMERE_GROWTH 4
+            + floor(contrabandSold / HAWKSMERE_SCALE 40); Crown raids read their
+            base off the faction (WATER_GUARD_BASE, DRAGOON_BASE)
+first raid  a deliberate gentle introduction (design call): HAWKSMERE_FIRST_RAID
+            6, well under the base, announced with FIRST_RAID_LEAD +2 extra days
+            of warning, and on a loss it seizes only FIRST_RAID_SEIZE_FRAC ⅓ of
+            the building's stock, not all of it. Even a token garrison holds it;
+            losing it teaches the whole system cheaply. Every raid after uses the
+            full size and takes everything.
+muster      announced RAID_MUSTER_LEAD 2 days before it arrives — the window to
+            raise men or sound the retreat. Dogs (fortTier ≥ 1) add
+            DOGS_WARNING_LEAD 1 day: the tier-1 intelligence payoff (§22).
+ride        a raid entity with a graph location (node | edge+progress), moving
+            each tick toward the target by the officer's own machinery
+            (revenue.ts firstHop/horseLatency) — deterministic, not a random walk
+            (§14/§15 sim-render line). No dykes yet (§21 is mid-game), so the
+            law is SQUARE: numbers dominate, and the pre-battle readout says so.
+cadence     next raid at RAID_INTERVAL 6 days after the last resolves
+```
+
+**Resolution.** When the raid reaches the target node the sim *marks* a pending
+battle; the store pauses (§6.13 pause-event, house rule 1 keeps the pause out of
+`/src/sim`). The player queues up to three Calls (§14.4), then `simulateBattle`
+runs a defender-side setup — garrison as `strength`, `fortAlpha` as tech alpha,
+square law — and the renderer plays the `CombatLog` back. Then §14.6 lands:
+
+```
+win (attacker routs/annihilated)   the goods are safe; friendly dead cost Standing
+lose (defender routs/annihilated)  the raider seizes the target's contraband
+                                   (all of it — they came for it; the gentle
+                                   first raid takes only its ⅓); Standing hit
+Sound Retreat                      goods seized, but your people live: far less
+                                   Standing lost than dying on the pile
+no garrison at all                 an unopposed raid — they simply take it (the
+                                   first one still only its fraction): how the
+                                   player learns, cheaply, to post men (§10)
+```
+
+#### What joins GameState (save bump)
+
+`standing`, `garrisons`, `contrabandSold`, and a `raid`/`hawksmere` record
+(provoked, raidsSurvived, next-raid tick, the active raider's faction/size/
+location/target/pending-battle flag) — all JSON-plain. The three Calls are
+actions queued into `simulateBattle`, so replay stays byte-identical.
+
+#### Build order (stop at each, as ever)
+
+- **M4c-1 — garrison & Standing.** Raise/dismiss/wage militia and crew, the
+  cap off fortTier, Standing and its loss. Sim + 200-game test. *(No raider
+  yet: this is the defensive apparatus standing ready.)*
+- **M4c-2 — the Hawksmere raid.** Provocation, muster, the ride, resolution
+  through `simulateBattle`, consequences, the pause. Sim + test.
+- **M4c-3 — the Crown escalation + render.** Water Guard and Dragoons off
+  national Heat; the raid drawn on the map, the `CombatLog` played back, the
+  three-Call UI, and the pause card.
+
+#### Decisions taken (2026-07-16 design pass)
+
+1. **Two meters, orthogonal.** Hawksmere is provoked by your market footprint
+   (`contrabandSold`, §9's "wants your buyers"); the Crown's force is summoned by
+   national Heat. Two threats, managed separately — not one doom clock.
+2. **Standing at zero is survivable, not a loss.** It sets the permanent
+   informer and closes the marsh's free hides (above), and the game goes on,
+   harder. (This softens §11's "someone talks → loss": in M4c it is a scar, not
+   an ending. A harder Standing-death may return with the fuller economy.)
+3. **The first raid eases the player in** — small, well-telegraphed, and cheap
+   to lose (above). The stakes climb from there, not on the first contact.
+
+These are opening-bid numbers; the §13 distribution test is what beats them into
+shape once M4c-2 can field a raid.
 
 ---
 
