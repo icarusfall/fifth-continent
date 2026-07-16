@@ -4,7 +4,7 @@
 // so the log is saved alongside the state and replays are always possible.
 
 import { create } from 'zustand';
-import { RENT_AMOUNT, SHEEP_VALUE } from '../sim/balance';
+import { CART_CAPACITY, CART_COST, MAX_CARTS, RENT_AMOUNT, SHEEP_VALUE } from '../sim/balance';
 import { initialState, tick } from '../sim/tick';
 import type { Action, ActionLog, GameState } from '../sim/types';
 
@@ -48,6 +48,91 @@ function loadAutoPay(): boolean {
   }
 }
 
+// ---- Milestone cards (spec §6.13 / §10) --------------------------------------
+// Punchy one-shot notices when something new opens up. Each fires the first
+// time its condition holds; a persisted "seen" latch keeps it from repeating.
+
+const SHOWN_KEY = 'fifth-continent-shown-cards';
+type Shown = Record<string, true>;
+
+function loadShown(): Shown {
+  try {
+    return JSON.parse(localStorage.getItem(SHOWN_KEY) ?? '{}') as Shown;
+  } catch {
+    return {};
+  }
+}
+
+function saveShown(shown: Shown): void {
+  try {
+    localStorage.setItem(SHOWN_KEY, JSON.stringify(shown));
+  } catch {
+    // a lost latch only risks showing a card twice — no catastrophe
+  }
+}
+
+function clearShown(): void {
+  try {
+    localStorage.removeItem(SHOWN_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+function hasOverproofJenever(s: GameState): boolean {
+  return (
+    s.carts.some((c) => (c.cargo.jenever ?? 0) > 0) ||
+    Object.values(s.stores).some((st) => (st.jenever ?? 0) > 0)
+  );
+}
+
+interface Milestone {
+  key: string;
+  when: (s: GameState) => boolean;
+  title: string;
+  body: string;
+}
+
+// Order is priority when several come true at once — the pause sequences them.
+const MILESTONES: Milestone[] = [
+  {
+    key: 'dutchman-offshore',
+    when: (s) => s.dutchman.present,
+    title: 'A light on the water',
+    body: 'A lugger stands off the shingle — no lights, no flag, a falling tide. He pays four times Ryne’s price for wool, and asks nothing. Run a cartload down to the beach while the tide falls.',
+  },
+  {
+    key: 'cutting-house',
+    when: (s) => !s.cuttingHouse && hasOverproofJenever(s),
+    title: 'Spirit no one will buy',
+    body: 'You are holding overproof jenever, and no honest buyer will touch a drop. Raise a cutting house on the marsh: cut it with water and burnt sugar and it sells in Ryne as brandy.',
+  },
+  {
+    key: 'carter-for-hire',
+    when: (s) => s.dutchman.unlocked || s.ledger.soldLawfully >= 2 * CART_CAPACITY,
+    title: 'Hands for hire',
+    body: 'You have walked the wool round enough to feel it. A carter will take the reins for 3 coin a day — hire one at a cart and free your own hands for other work.',
+  },
+  {
+    key: 'second-cart',
+    when: (s) => s.carts.length < MAX_CARTS && s.coin >= CART_COST && s.dutchman.unlocked,
+    title: 'Room in the yard',
+    body: 'There is coin enough for a second cart and pony now, and the yard holds three. More wheels move more at once — buy one at the farm.',
+  },
+  {
+    key: 'officer-arrived',
+    when: (s) => s.revenue.officer.arrived,
+    title: 'The blue coat',
+    body: 'A Riding Officer has taken rooms above the Customs House. He counts your sheep against the books and seizes what your cover cannot hide. Keep the stains moving, and mind the coat on the road.',
+  },
+];
+
+/** The first milestone whose moment has come and has not yet been shown. */
+function detectMilestone(s: GameState, shown: Shown): Milestone | null {
+  for (const m of MILESTONES) if (!shown[m.key] && m.when(s)) return m;
+  return null;
+}
+
 interface SaveFile {
   version: 1;
   state: GameState;
@@ -65,6 +150,8 @@ export interface GameStore {
   activeCard: EventCard | null;
   /** The player has chosen to pay future rents without being asked (§6.8). */
   autoPayRent: boolean;
+  /** Milestone cards already shown, so each punchy notice fires only once. */
+  shownCards: Shown;
 
   enqueue: (action: Action) => void;
   step: () => void;
@@ -120,6 +207,7 @@ const DEFAULT_SEED = 1740;
 
 export const useGameStore = create<GameStore>()((set, get) => {
   const saved = loadSave();
+  if (!saved) clearShown(); // a fresh game meets its milestones anew
   return {
     state: saved?.state ?? initialState(DEFAULT_SEED),
     actionLog: saved?.actionLog ?? {},
@@ -128,26 +216,39 @@ export const useGameStore = create<GameStore>()((set, get) => {
     ticksPerSecond: 3,
     activeCard: null,
     autoPayRent: loadAutoPay(),
+    shownCards: saved ? loadShown() : {},
 
     enqueue: (action) => set((s) => ({ pending: [...s.pending, action] })),
 
     step: () => {
-      const { state, pending, actionLog, autoPayRent, activeCard } = get();
+      const { state, pending, actionLog, autoPayRent, activeCard, shownCards } = get();
       if (activeCard) return; // the world is frozen behind a card until it is answered
       const nextLog =
         pending.length > 0 ? { ...actionLog, [state.tick]: pending } : actionLog;
       const next = tick(state, pending);
 
-      // Event cards (§6.13): rent is the first card-worthy moment. Raise it for
-      // an active click, unless the player has opted into paying automatically.
+      // Event cards (§6.13). Rent is the one that asks for a click; a milestone
+      // is a punchy notice when something new opens up (§10). Rent takes the
+      // slot when it and a milestone come at once — the pause sequences the rest.
       const rentJustDue = next.rentPending && !state.rentPending;
+      let nextPending: Action[] = [];
+      let card: EventCard | null = null;
+      let shown = shownCards;
+
       if (rentJustDue && !autoPayRent) {
-        set({ state: next, pending: [], actionLog: nextLog, activeCard: rentCard(next) });
+        card = rentCard(next);
       } else if (rentJustDue) {
-        set({ state: next, pending: [{ type: 'payRent' }], actionLog: nextLog });
+        nextPending = [{ type: 'payRent' }];
       } else {
-        set({ state: next, pending: [], actionLog: nextLog });
+        const m = detectMilestone(next, shownCards);
+        if (m) {
+          card = { id: m.key, kind: 'info', title: m.title, body: m.body };
+          shown = { ...shownCards, [m.key]: true };
+          saveShown(shown);
+        }
       }
+
+      set({ state: next, pending: nextPending, actionLog: nextLog, activeCard: card, shownCards: shown });
       if (next.tick % AUTOSAVE_EVERY_TICKS === 0) writeSave(next, nextLog);
     },
 
@@ -174,12 +275,14 @@ export const useGameStore = create<GameStore>()((set, get) => {
 
     reset: () => {
       localStorage.removeItem(SAVE_KEY);
+      clearShown(); // a new tenancy meets its milestones fresh
       set({
         state: initialState(DEFAULT_SEED),
         actionLog: {},
         pending: [],
         paused: false,
         activeCard: null,
+        shownCards: {},
       });
     },
   };
