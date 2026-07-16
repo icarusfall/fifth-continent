@@ -8,6 +8,7 @@ import type { ReactNode } from 'react';
 import {
   CART_CAPACITY,
   CART_COST,
+  CARTER_UNLOCK_FLEECE,
   CARTER_WAGE,
   CUTS,
   CUTTING_HOUSE_COST,
@@ -1129,6 +1130,12 @@ function CartsAtNode({ state, nodeId }: { state: GameState; nodeId: NodeId }) {
   );
   if (carts.length === 0) return null;
 
+  // §6.11 / §10 — a carter is offered only once the manual round is a felt
+  // chore: two cart-loads sold by hand, or crime already begun (by which point
+  // you have hauled plenty). Before that, automation would only overwhelm.
+  const carterAvailable =
+    state.dutchman.unlocked || (state.ledger.soldLawfully >= CARTER_UNLOCK_FLEECE);
+
   // A standing order runs from where the cart stands (spec §6.11).
   const haulables = Array.from(
     new Set([
@@ -1182,7 +1189,7 @@ function CartsAtNode({ state, nodeId }: { state: GameState; nodeId: NodeId }) {
                   ))}
                   <button onClick={() => setHiring(null)}>Think better of it</button>
                 </>
-              ) : (
+              ) : carterAvailable ? (
                 haulables.map((good) => (
                   <button
                     key={good}
@@ -1191,7 +1198,7 @@ function CartsAtNode({ state, nodeId }: { state: GameState; nodeId: NodeId }) {
                     Hire a carter to haul {GOOD_LABEL[good]} · {CARTER_WAGE} coin a day
                   </button>
                 ))
-              )}
+              ) : null}
               {laden && !cart.carter && (
                 <button onClick={() => enqueue({ type: 'ditchCargo', cartId: cart.id })}>
                   Tip {cart.name.toLowerCase()}&rsquo;s load into a dyke · nothing comes back

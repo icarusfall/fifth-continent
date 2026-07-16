@@ -26,7 +26,9 @@ describe('replay (spec §0: a full game is (seed, actionLog))', () => {
     const s = runGame(1740, script, TICKS_PER_DAY);
     expect(s.coin).toBe(8 * WOOL_PRICE_DOMESTIC);
     expect(s.carts[0].location).toEqual({ kind: 'node', nodeId: 'farm' });
-    expect(s.stores.farm?.fleece).toBe(4); // the shearing the cart couldn't hold
+    // The dawn shear takes the starting clip plus the day's growth (24); the
+    // cart carried 8 to Ryne, so the barn holds the 16 it could not.
+    expect(s.stores.farm?.fleece).toBe(16);
   });
 
   it('a different seed differs only where randomness has flowed', () => {

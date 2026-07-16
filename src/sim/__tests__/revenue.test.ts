@@ -226,6 +226,7 @@ describe('the Riding Officer (spec §6.10)', () => {
 describe('the books (spec §6.10 / §19.2)', () => {
   function inspectionAt(mutate: (s: GameState) => void): { before: GameState; after: GameState } {
     const before = initialState(1);
+    before.fleeceReady = 0; // these tests set on-hand wool via the stores below
     before.revenue.officer.arrived = true;
     before.revenue.officer.location = { kind: 'node', nodeId: 'farm' };
     before.revenue.officer.targetNodeId = 'farm';

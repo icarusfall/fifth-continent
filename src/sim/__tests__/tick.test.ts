@@ -24,6 +24,19 @@ function runTicks(state: GameState, n: number, actionsAt: Record<number, Action[
   return s;
 }
 
+/**
+ * A fresh game with the opening clip cleared (§6.7): the flock arrives in wool,
+ * but the grow/shear/barn mechanics are cleaner to test from a bare flock, so
+ * these tests isolate the mechanic from the starting stock. The opening clip
+ * itself is covered in 'the opening state' above.
+ */
+function bareStart(seed = 1): GameState {
+  const s = initialState(seed);
+  s.fleeceReady = 0;
+  s.ledger.openingStock = 0;
+  return s;
+}
+
 describe('tick purity', () => {
   it('never mutates its input', () => {
     const s0 = initialState(1);
@@ -45,8 +58,16 @@ describe('the opening state (spec §6.7: the farm is given)', () => {
     expect(s0.farm).toEqual(FARM_SITE);
     expect(s0.carts).toHaveLength(1);
     expect(s0.carts[0].location).toEqual({ kind: 'node', nodeId: 'farm' });
-    expect(s0.stores.farm).toEqual({ fleece: 0 });
+    expect(s0.stores.farm).toEqual({ fleece: 0 }); // the clip is on the sheep, not in the store
     expect(s0.flockSize).toBeGreaterThan(0);
+  });
+
+  it('the flock arrives already in wool — a shear is possible at tick 0 (§6.7)', () => {
+    const s0 = initialState(1);
+    expect(s0.fleeceReady).toBe(STARTING_FLOCK); // no waiting for the first dawn
+    const sheared = tick(s0, [{ type: 'shear' }]);
+    expect(sheared.stores.farm?.fleece).toBe(STARTING_FLOCK);
+    expect(sheared.fleeceReady).toBe(0);
   });
 
   it('the rent clock starts at once', () => {
@@ -57,7 +78,7 @@ describe('the opening state (spec §6.7: the farm is given)', () => {
 describe('the flock and the shears', () => {
   /** Run to just past dawn: wool is on the sheep. */
   function dawnState(): GameState {
-    return runTicks(initialState(1), SHEARING_HOUR * TICKS_PER_HOUR + 1);
+    return runTicks(bareStart(), SHEARING_HOUR * TICKS_PER_HOUR + 1);
   }
 
   it('wool grows onto the sheep at dawn, one fleece per head', () => {
@@ -67,7 +88,7 @@ describe('the flock and the shears', () => {
   });
 
   it('grows every day and accumulates if unshorn', () => {
-    const s = runTicks(initialState(1), 24 * TICKS_PER_HOUR * 2);
+    const s = runTicks(bareStart(), 24 * TICKS_PER_HOUR * 2);
     expect(s.fleeceReady).toBe(STARTING_FLOCK * 2);
   });
 
@@ -88,7 +109,7 @@ describe('the flock and the shears', () => {
 describe('the cart', () => {
   /** Dawn passed, flock sheared: fleece in the store. */
   function stateWithFleece(): GameState {
-    const s = runTicks(initialState(1), SHEARING_HOUR * TICKS_PER_HOUR);
+    const s = runTicks(bareStart(), SHEARING_HOUR * TICKS_PER_HOUR);
     return tick(s, [{ type: 'shear' }]);
   }
 
@@ -148,7 +169,7 @@ describe('the cart', () => {
 describe('the barn and the ditch (spec §6.9)', () => {
   /** Three dawns unshorn: more wool on the sheep than the barn can hold. */
   function threeDawnsState(): GameState {
-    return runTicks(initialState(1), 2 * TICKS_PER_DAY + SHEARING_HOUR * TICKS_PER_HOUR + 1);
+    return runTicks(bareStart(), 2 * TICKS_PER_DAY + SHEARING_HOUR * TICKS_PER_HOUR + 1);
   }
 
   it('shearing stops at the barn wall; the rest stays on the sheep', () => {

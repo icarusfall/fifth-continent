@@ -56,7 +56,9 @@ export function initialState(seed: number): GameState {
     rentPaid: 0,
     lost: false,
     flockSize: STARTING_FLOCK,
-    fleeceReady: 0,
+    // The flock takes the tenancy already in wool (spec §6.7): the very first
+    // action is a shear, not a wait for dawn.
+    fleeceReady: STARTING_FLOCK * FLEECE_PER_HEAD_PER_DAY,
     cuttingHouse: null,
     dutchman: { unlocked: false, present: false, hold: {}, fleeceAppetite: 0 },
     demandRemaining: { ...DAILY_DEMAND },
@@ -77,7 +79,8 @@ export function initialState(seed: number): GameState {
       declaredToDate: 0,
       grownToDate: 0,
       soldLawfully: 0,
-      openingStock: 0,
+      // The clip the flock arrives with is stock on hand, not new-grown wool.
+      openingStock: STARTING_FLOCK * FLEECE_PER_HEAD_PER_DAY,
     },
     stores: {
       farm: { fleece: 0 },
@@ -96,7 +99,7 @@ export function initialState(seed: number): GameState {
       },
     ],
     log: [
-      { tick: 0, text: 'Walland Farm. Twelve sheep, one cart, and a price in Ryne.' },
+      { tick: 0, text: 'Walland Farm. Twelve sheep in wool, one cart, and a price in Ryne.' },
       { tick: 0, text: `The agent notes your name. Rent is ${RENT_AMOUNT} coin, six days hence.` },
     ],
   };

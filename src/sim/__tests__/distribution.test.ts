@@ -36,7 +36,9 @@ describe(`${GAMES} seeded games, ${DAYS} days each`, () => {
       expect(s.rentPaid).toBe(2 * RENT_AMOUNT); // both dues met in full
 
       // Theoretical ceiling: every fleece sheared, sold same day, rent paid.
-      const totalFleece = STARTING_FLOCK * FLEECE_PER_HEAD_PER_DAY * DAYS;
+      // The flock arrives already in wool (§6.7), so one extra clip beyond the
+      // daily growth passes through the life.
+      const totalFleece = STARTING_FLOCK * FLEECE_PER_HEAD_PER_DAY * (DAYS + 1);
       const ceiling = totalFleece * WOOL_PRICE_DOMESTIC - s.rentPaid;
 
       expect(Number.isFinite(s.coin)).toBe(true);
@@ -74,9 +76,10 @@ describe(`${GAMES} seeded games, ${DAYS} days each`, () => {
     // widen this into a real distribution check, don't delete it.
     const distinct = new Set(coins);
     expect(distinct.size).toBe(1);
-    // The margin of a lawful life: solvent, but thin (spec §6.8).
+    // The margin of a lawful life: solvent, but thin — a fortnight of honest
+    // wool, one starting clip and all, comes to about a single rent (spec §6.8).
     expect(coins[0]).toBeGreaterThan(0);
-    expect(coins[0]).toBeLessThan(RENT_AMOUNT);
+    expect(coins[0]).toBeLessThanOrEqual(RENT_AMOUNT);
   });
 });
 
@@ -105,7 +108,7 @@ describe(`${GAMES} seeded games, 20 days each — the smuggler (spec §6.9)`, ()
       // A purely lawful life over the same span tops out at
       // totalFleece × domestic price − rent (spec §6.8 arithmetic):
       const lawfulCeiling =
-        STARTING_FLOCK * FLEECE_PER_HEAD_PER_DAY * SMUGGLER_DAYS * WOOL_PRICE_DOMESTIC -
+        STARTING_FLOCK * FLEECE_PER_HEAD_PER_DAY * (SMUGGLER_DAYS + 1) * WOOL_PRICE_DOMESTIC -
         3 * RENT_AMOUNT;
       expect(s.coin).toBeGreaterThan(lawfulCeiling);
 
@@ -137,7 +140,7 @@ describe(`${GAMES} seeded games, ${DAYS} days each — the delegator (spec §6.1
       // Solvent after wages — the carter roughly pays for himself (§6.11),
       // and cannot out-earn the same wool sold by hand.
       expect(s.coin).toBeGreaterThan(0);
-      const totalFleece = STARTING_FLOCK * FLEECE_PER_HEAD_PER_DAY * DAYS;
+      const totalFleece = STARTING_FLOCK * FLEECE_PER_HEAD_PER_DAY * (DAYS + 1);
       expect(s.coin).toBeLessThanOrEqual(
         totalFleece * WOOL_PRICE_DOMESTIC - s.rentPaid - CARTER_WAGE,
       );

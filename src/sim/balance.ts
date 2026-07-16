@@ -131,6 +131,13 @@ export const WOOL_GAP_COEFF = 1.0; // regional heat per fleece adrift at inspect
 export const CART_COST = 50; // coin, cart and pony, bought at the farm
 export const MAX_CARTS = 3; // the yard holds three
 export const CARTER_WAGE = 3; // coin per carter, due at dawn with the wool
+/**
+ * Lawful fleece sold by hand before a carter may be hired (spec §6.11 / §10):
+ * automation is offered only once the manual round is a felt chore — about two
+ * cart-loads hauled and sold. (A lawful life makes no Heat, so no officer comes
+ * to reset the tally before this; see revenue.ts.)
+ */
+export const CARTER_UNLOCK_FLEECE = 2 * CART_CAPACITY;
 
 // ---- Rent (spec §6.8: the first squeeze) ----
 export const RENT_AMOUNT = 120; // coin, per period

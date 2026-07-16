@@ -159,6 +159,10 @@ roadLatency       = max(1, round(pathTileLength × ticksPerTile[road]))
                   ticksPerTile: low road 0.26 (flat, direct), high 0.53 (climbs)
 fleeceReady      += flockSize × FLEECE_PER_HEAD_PER_DAY at dawn (wool on the
                   sheep's backs, not in the store)
+start            the flock takes the tenancy already carrying one clip
+                  (fleeceReady = flockSize at tick 0; openingStock matches, so
+                  the books do not read it as new wool) — the very first action
+                  is a shear, not a wait for the first dawn (§10: no dead opening)
 shear             farmStore.fleece += fleeceReady; fleeceReady = 0 (a player
                   verb at the farm, not an automatic process)
 ```
@@ -421,7 +425,11 @@ Numbers are opening bids for the distribution tests to beat into shape.
 
 §5 promised haulers *assigned* to edges; here the promise is kept. The wool
 round — shear, load, road, sell, home — is by now a felt chore, and per §10
-the mechanic arrives only once the player has the problem it solves. The
+the mechanic arrives only once the player has the problem it solves: the
+option to hire a carter appears only after **two cart-loads of fleece have
+been sold by hand** (`CARTER_UNLOCK_FLEECE`), or once crime has begun (the
+Dutchman unlocked, by which point the round has been run many times). Before
+that it is not offered — automation ahead of the chore only overwhelms. The
 deeper move: automation frees the player's hands for crime. You automate the
 alibi and run the tubs yourself — and the moment carts move without you is
 the moment the officer starts stopping carts (§6.10).
