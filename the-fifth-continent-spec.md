@@ -499,9 +499,12 @@ fortVisibility   = Σ(tier ≤ fortTier) VISIBILITY[tier] / concealment[building
                    VISIBILITY = { 1: 0.1, 2: 0.3, 3: 0.6, 4: 1.0 }  // superlinear
                    concealment = 1 until marsh tech divides it (§6.4, M5)
 
-// §6.1, the leak term M3 deferred: throughput over cover now leaks *more*
-// from a hard building than a soft one.
-heatFromBuilding = max(0, load − cover) × LEAK_COEFF × (1 + fortVisibility)
+// §6.1 realised on M3's cover model, not a new subsystem: the over-cover
+// storage heat the game already accrues each tick (§18, STORAGE_HEAT_COEFF)
+// now leaks *more* from a hard building than a soft one. (§6.1's abstract
+// "load over cover" is that same over-cover stock here — M3 chose stock as
+// the cover model and M4 keeps it; no throughput accounting is introduced.)
+overCoverHeat    = max(0, stock − cover) × STORAGE_HEAT_COEFF × (1 + fortVisibility)
 
 // …and a hard building is a tell even when nothing moves through it: each
 // dawn it stains its own node, the way gunports draw the eye.
@@ -557,6 +560,11 @@ them so nothing is lost; it is **not yet buildable.**
   the floor; national Heat past thresholds summons the Preventive Water Guard
   and, at the top, Dragoons who do not rout (§14.3). Revenue blue clothes them
   all — the doom clock wears one coat.
+- **An attack is always a pause-notification event.** A muster arriving is one
+  of the big centre-screen, sim-pausing event cards (the deferred pop-up system,
+  todo #1): the player never misses a raid or resolves one on autopilot. The
+  pause lives in the UI/store, never in `/src/sim` (house rule 1). Sounding the
+  three Calls (§14.4) happens against a paused world.
 - **Still to pin as formulas:** garrison wage/cap per building, Hawksmere
   arrival & raid-cadence triggers, raid force size vs. your Heat/Standing,
   target selection, and the national-Heat rungs that buy each enemy tier.

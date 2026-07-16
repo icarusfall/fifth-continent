@@ -152,6 +152,13 @@ export interface GameState {
   };
   /** Goods sitting at nodes (farm store, quay, …). */
   stores: Record<NodeId, Store>;
+  /**
+   * Spec §6.12 — how hard each of your buildings is dug in, `fortTier 0..4`.
+   * Absent = tier 0. Only your own buildings (farm, cutting house) appear.
+   * A hard building leaks more Heat and stands off suspicion of its own —
+   * the works are visible, by design (§9).
+   */
+  fortifications: Partial<Record<NodeId, number>>;
   carts: Cart[];
   /** Ring buffer of recent events, oldest first. Part of state: deterministic. */
   log: GameEvent[];
@@ -171,6 +178,7 @@ export type Action =
   | { type: 'placeCuttingHouse'; x: number; y: number }
   | { type: 'cut'; depth: CutDepth; tubs: number }
   | { type: 'buyCart' }
+  | { type: 'fortifyBuilding'; nodeId: NodeId }
   | { type: 'hireCarter'; cartId: CartId; order: CarterOrder }
   | { type: 'dismissCarter'; cartId: CartId }
   | { type: 'setDeclaredYield'; fleecePerDay: number };

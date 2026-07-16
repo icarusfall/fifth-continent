@@ -137,6 +137,31 @@ export const RENT_AMOUNT = 120; // coin, per period
 export const RENT_PERIOD_DAYS = 6; // first due at dawn, this many days after placement
 export const SHEEP_VALUE = 10; // the agent's valuation under distraint
 
+// ---- M4b: fortification & the visibility trade-off (spec §6.12) ----
+// A per-building tier ladder (the Trade line, §22). Bought with coin, no
+// upkeep. Each rung hardens the building (+alpha in a raid, §14.2) and, the
+// trap, makes it louder to the Revenue — the silhouette is the tell.
+export const MAX_FORT_TIER = 4;
+/** Coin to climb *to* each tier (index = tier). Roughly doubles per rung. */
+export const FORT_COST: readonly number[] = [0, 40, 80, 160, 320];
+/**
+ * Each tier's contribution to a building's visibility (§6.4). Climbs faster
+ * than the +0.05/tier alpha: hardness and hiddenness pull apart on purpose.
+ * Index = tier; tier 0 is invisible, tier 1 (dogs & hedge) is nearly so.
+ */
+export const FORT_VISIBILITY: readonly number[] = [0, 0.1, 0.3, 0.6, 1.0];
+/**
+ * Regional heat a hard building stands off each dawn, per unit of visibility.
+ * Tuned against the 0.97 regional decay so dogs are all but silent, mid-tiers
+ * add real load, and a full fortress (visibility 2.0) draws the officer's
+ * arrival on its own inside a fortnight — its steady state (~86) sits just
+ * under the promotion threshold, so bare walls alone do not start the doom
+ * clock. An opening bid for the distribution test to beat into shape (§6.12).
+ */
+export const FORT_VISIBILITY_HEAT = 1.3;
+// (The dogs-give-intelligence-not-alpha rule of §22 bites in raids, so it lives
+//  with the combat wiring in M4c, not here — M4b's fort alpha stays latent.)
+
 // ---- M4: combat — deterministic attrition (spec §14) ----
 // The battle is a sub-tick loop that runs the attrition for real; the render
 // plays back the frame log. No dice here — combat is a pure function of the

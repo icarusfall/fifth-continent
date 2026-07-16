@@ -12,12 +12,14 @@ import {
   CUTTING_HOUSE_COST,
   CUT_SUGAR_COST,
   DAILY_DEMAND,
+  FORT_COST,
   DUTCHMAN_FLEECE_DEMAND,
   DUTCHMAN_HOLD,
   DUTCHMAN_PRICE,
   FLEECE_PER_HEAD_PER_DAY,
   LEIDEN_PRICE_MULT,
   MAX_CARTS,
+  MAX_FORT_TIER,
   MAX_LOG_EVENTS,
   RENT_AMOUNT,
   RENT_PERIOD_DAYS,
@@ -82,6 +84,7 @@ export function initialState(seed: number): GameState {
       ryne: {},
       shingle: {},
     },
+    fortifications: {},
     carts: [
       {
         id: 'cart-1',
@@ -156,6 +159,15 @@ function marketSale(state: GameState, cart: Cart, good: Good): number {
   }
   return qty;
 }
+
+/** The Trade fortification ladder, for the log (spec §6.12 / §22). Index = tier. */
+const FORT_WORKS: readonly ((name: string) => string)[] = [
+  () => '',
+  (n) => `Dogs and a spiked hedge go up around ${n}.`,
+  (n) => `${n} gets bolted doors, and men who will point a blunderbuss.`,
+  (n) => `Gunports are cut into the walls of ${n}.`,
+  (n) => `${n} is a fortress now — crenellations, a palisade, the lot.`,
+];
 
 // ---- Action application ----
 // Invalid actions never throw: they log and do nothing, so a stale or
@@ -425,6 +437,34 @@ function applyAction(state: GameState, action: Action): void {
         carter: null,
       });
       logEvent(state, `${ordinal} stands in the yard, pony and all. ${CART_COST} coin.`);
+      return;
+    }
+
+    case 'fortifyBuilding': {
+      // Spec §6.12 — climb one rung of the Trade line at one of your buildings.
+      const isYours =
+        action.nodeId === 'farm' || (action.nodeId === 'cutting-house' && state.cuttingHouse);
+      if (!isYours) {
+        logEvent(state, 'You can only dig in your own walls.');
+        return;
+      }
+      const tier = state.fortifications[action.nodeId] ?? 0;
+      if (tier >= MAX_FORT_TIER) {
+        logEvent(state, `${nodeById(action.nodeId, state.farm, state.cuttingHouse).name} is as hard as it gets.`);
+        return;
+      }
+      const cost = FORT_COST[tier + 1];
+      if (state.coin < cost) {
+        logEvent(state, `The next works cost ${cost} coin, and the till is short.`);
+        return;
+      }
+      state.coin -= cost;
+      state.fortifications[action.nodeId] = tier + 1;
+      const name = nodeById(action.nodeId, state.farm, state.cuttingHouse).name;
+      logEvent(
+        state,
+        FORT_WORKS[tier + 1](name) + ' The Revenue will not fail to notice.',
+      );
       return;
     }
 

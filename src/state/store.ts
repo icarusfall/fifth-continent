@@ -7,9 +7,10 @@ import { create } from 'zustand';
 import { initialState, tick } from '../sim/tick';
 import type { Action, ActionLog, GameState } from '../sim/types';
 
-// v6: M3 adds Heat, the Revenue, the ledger, and carters to GameState;
-// older saves are incompatible and are silently abandoned.
-const SAVE_KEY = 'fifth-continent-save-v6';
+// v7: M4b adds per-building fortifications to GameState (spec §6.12).
+// v6: M3 adds Heat, the Revenue, the ledger, and carters to GameState.
+// Older saves are incompatible and are silently abandoned.
+const SAVE_KEY = 'fifth-continent-save-v7';
 const AUTOSAVE_EVERY_TICKS = 30;
 
 interface SaveFile {
@@ -52,6 +53,7 @@ function loadSave(): SaveFile | null {
       typeof parsed.state.ledger?.declaredYield !== 'number'
     )
       return null;
+    if (!parsed.state.fortifications || typeof parsed.state.fortifications !== 'object') return null;
     return parsed;
   } catch {
     return null;

@@ -5,7 +5,10 @@
 import {
   COVER_CAPACITY,
   DITCH_HEAT,
+  FORT_VISIBILITY,
+  FORT_VISIBILITY_HEAT,
   MARKET_TATTLE,
+  MAX_FORT_TIER,
   MAX_LOG_EVENTS,
   NATIONAL_HEAT_DECAY,
   OFFICER_ARRIVAL_HEAT,
@@ -64,11 +67,25 @@ export function accrueRouteHeat(state: GameState, cart: Cart, edge: MapEdge): vo
   addHeat(state, amount, nearer);
 }
 
+/**
+ * Fortification visibility of a building (spec §6.4/§6.12): the sum of its
+ * tiers' visibility contributions. Concealment tech would divide this (§6.4,
+ * M5); until then a hard building is exactly as loud as its works. Tier 0 (or
+ * an un-listed node) is invisible.
+ */
+export function fortVisibility(state: GameState, nodeId: NodeId): number {
+  const tier = Math.min(state.fortifications[nodeId] ?? 0, MAX_FORT_TIER);
+  let v = 0;
+  for (let t = 1; t <= tier; t++) v += FORT_VISIBILITY[t];
+  return v;
+}
+
 /** Storage heat, per tick (§18): stores hide up to their cover; carts hide nothing. */
 export function accrueStorageHeat(state: GameState): void {
   for (const nodeId of Object.keys(state.stores)) {
     const over = illicitCount(state.stores[nodeId]) - (COVER_CAPACITY[nodeId] ?? 0);
-    if (over > 0) addHeat(state, over * STORAGE_HEAT_COEFF, nodeId);
+    // §6.1/§6.12: what a hard building cannot hide, it leaks the louder.
+    if (over > 0) addHeat(state, over * STORAGE_HEAT_COEFF * (1 + fortVisibility(state, nodeId)), nodeId);
   }
   for (const cart of state.carts) {
     if (cart.location.kind !== 'node') continue; // moving carts pay route heat instead
@@ -112,6 +129,11 @@ export function dawnRevenue(state: GameState): void {
   state.heat.regional -= spill;
   state.heat.national += spill;
 
+  // A hard building is a tell even when nothing moves through it (§6.12): each
+  // dawn its works stand off fresh suspicion of their own. Before the gossip
+  // snapshot and the officer's plan, so it shows in both.
+  accrueFortHeat(state);
+
   // The parish talks over breakfast: the player reads yesterday's mind.
   state.revenue.gossip = { ...state.revenue.suspicion };
 
@@ -131,6 +153,14 @@ export function dawnRevenue(state: GameState): void {
   // The day's plan: the sorest stain if any is sore enough, else his beat.
   officer.inspectedToday = false;
   officer.targetNodeId = patrolTarget(state);
+}
+
+/** The dawn tell of visible works (§6.12): each hard building stains itself. */
+export function accrueFortHeat(state: GameState): void {
+  for (const nodeId of Object.keys(state.fortifications)) {
+    const vis = fortVisibility(state, nodeId);
+    if (vis > 0) addHeat(state, vis * FORT_VISIBILITY_HEAT, nodeId);
+  }
 }
 
 /** Highest-suspicion node at or over the threshold; otherwise the Ryne beat. */
