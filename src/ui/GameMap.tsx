@@ -683,6 +683,11 @@ function FarmMenu({
   const barnRoom = FARM_STORE_CAPACITY - stored;
   const held = cart ? cargoCount(cart.cargo) : 0;
   const ledger = state.ledger;
+  // §10 — the cutting house is offered only once the player holds overproof
+  // jenever with no legal buyer: the building is caused by the problem it solves.
+  const hasOverproofJenever =
+    state.carts.some((c) => (c.cargo.jenever ?? 0) > 0) ||
+    Object.values(state.stores).some((st) => (st.jenever ?? 0) > 0);
 
   return (
     <>
@@ -732,13 +737,13 @@ function FarmMenu({
                 </button>
               );
             })}
-        {state.dutchman.unlocked && !state.cuttingHouse && (
+        {hasOverproofJenever && !state.cuttingHouse && (
           <button
             disabled={state.coin < CUTTING_HOUSE_COST}
             title={
               state.coin < CUTTING_HOUSE_COST
                 ? `${CUTTING_HOUSE_COST} coin, paid up front. Nobody out here gives credit.`
-                : 'Water, burnt sugar, and no sign over the door.'
+                : 'Overproof jenever has no legal buyer. Cut it here with water and burnt sugar and it sells in Ryne as brandy.'
             }
             onClick={onPlace}
           >

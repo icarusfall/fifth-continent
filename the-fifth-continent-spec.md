@@ -229,7 +229,12 @@ back, and the same cart carries both legs. Bidirectionality is discovered as
 margin, not presented as a feature (§10 rung 4).
 
 **The cutting house** — the first player-sited building; the placement
-machinery held back in §6.7 finally earns its keep.
+machinery held back in §6.7 finally earns its keep. Per §10 (the tutorial is
+the story), the option to raise it is offered **only once the player holds
+overproof jenever they cannot legally sell** — the building is caused by the
+problem it solves, never offered ahead of it. Its purpose is explained where
+the button lives: cut the unsellable spirit with water and burnt sugar and it
+becomes brandy the town will buy.
 ```
 placement  any open-marsh tile (isPlaceable); costs CUTTING_HOUSE_COST = 60 coin
 tracks     placing it generates plain marsh tracks (MARSH_TICKS_PER_TILE) to
