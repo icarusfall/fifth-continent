@@ -1,6 +1,6 @@
 // All balance numbers live here. Never inline a magic number. (Spec §13)
 
-import type { CutDepth, Good } from './types';
+import type { CutDepth, Difficulty, Good, ResearchTree } from './types';
 
 // ---- Time ----
 export const TICKS_PER_HOUR = 6; // one tick = 10 minutes
@@ -88,9 +88,11 @@ export const RYNE_PRICE: Record<Good, number> = {
   'brandy-fair': Math.round(BRANDY_BASE_PRICE * QUALITY_MULT.fair),
   'brandy-gent': Math.round(BRANDY_BASE_PRICE * QUALITY_MULT.gent),
 };
-/** Units Ryne will buy per day, reset at dawn. Saturation as a wall. */
+/** Units Ryne will buy per day, reset at dawn. Saturation as a wall. §6.16:
+ *  fleece demand sits just over the starting clip — a grown flock's surplus
+ *  wool moves only over the gunwale (owling), never through the ledger. */
 export const DAILY_DEMAND: Record<Good, number> = {
-  fleece: 24,
+  fleece: 16,
   jenever: 0,
   tea: 8,
   lace: 2,
@@ -287,6 +289,65 @@ export const NATIONAL_HEAT_PER_DRAGOON_DEAD = 15; // they expect casualties; you
 export const DEBT_PER_GUARDIAN_FRAME = 2;
 /** The Revenue's own men, for the heat tally (§14.6). */
 export const REVENUE_FACTIONS: readonly string[] = ['riding-officer', 'water-guard'];
+
+// ---- M5a: difficulty & mercy (spec §6.15) ----
+// The dial scales what the world does to you — never what your own economy
+// yields — so every player learns the same arithmetic. heatMult scales heat
+// *gained*, never decay; raidMult scales the muster; crisisSpacingDays keeps
+// existential events from stacking (later ones queue, they do not vanish).
+export interface DifficultyDials {
+  rentMult: number;
+  heatMult: number;
+  raidMult: number;
+  debtMult: number; // Debt arrives in M5b; the dial is ready for it
+  crisisSpacingDays: number;
+}
+export const DIFFICULTY: Record<Difficulty, DifficultyDials> = {
+  gentle: { rentMult: 0.75, heatMult: 0.8, raidMult: 0.7, debtMult: 0.75, crisisSpacingDays: 6 },
+  fair: { rentMult: 1.0, heatMult: 1.0, raidMult: 1.0, debtMult: 1.0, crisisSpacingDays: 4 },
+  hard: { rentMult: 1.25, heatMult: 1.2, raidMult: 1.3, debtMult: 1.0, crisisSpacingDays: 0 },
+};
+/** Lower-only ordering (§6.15): a player may step left, never right. */
+export const DIFFICULTY_ORDER: readonly Difficulty[] = ['gentle', 'fair', 'hard'];
+
+// Mercy — diegetic, visible, priced; active at every difficulty (§6.15).
+/** The Dutchman covers a rent shortfall at this vig; one loan at a time. */
+export const DUTCHMAN_VIG = 1.25;
+/** …and takes this slice off the top of every later sale until the book clears. */
+export const DUTCHMAN_SLICE = 0.5;
+/** The parish covers a forfeit-grade distraint if it still thinks well of you. */
+export const PARISH_VOUCH_STANDING = 30;
+export const PARISH_VOUCH_COST = 10; // Standing, spent
+export const PARISH_VOUCH_COOLDOWN_DAYS = 12;
+
+// ---- M5a: the shearer & the flock market (spec §6.16) ----
+// The designed identity, asserted in a test: flock × price − carter − shearer
+// = rent/day exactly. The fully hired farm pays the rent to the coin.
+export const SHEARER_WAGE = 1; // coin/day, due at dawn with the wool
+/** Hand-shears before the chore is felt and his offer appears (§6.11 pattern). */
+export const SHEARER_UNLOCK_SHEARS = 6;
+export const SHEEP_PRICE_BUY = 15; // coin, at Ryne; home by the next dawn
+export const SHEEP_PRICE_SELL = 8; // the market pays cash and pays worse than the agent values
+export const FLOCK_CAP = 24; // Walland's pasture holds what it holds (dykes raise it, M5½)
+
+// ---- M5a: the research bench (spec §6.14) ----
+// Coin is nominal everywhere in research — the real price is always a meter
+// (Debt, the Heat floor, Standing). Trade costs only coin: safe, and weak.
+export const RESEARCH_COST: Record<ResearchTree, readonly number[]> = {
+  trade: [40],
+  marsh: [30, 70, 140],
+  leiden: [50, 110, 220],
+};
+export const RESEARCH_DAYS: Record<ResearchTree, readonly number[]> = {
+  trade: [2],
+  marsh: [2, 3, 4],
+  leiden: [3, 4, 5],
+};
+/** Trade tier 1 — the false-bottom cart: route exposure eased, and a hollow
+ *  floor the road-stop cannot see into (§6.14). Yard searches still see all:
+ *  a stopped cart is searched at leisure. */
+export const FALSE_BOTTOM_EXPOSURE_MULT = 0.6;
+export const FALSE_BOTTOM_COVER = 4;
 
 // ---- Bookkeeping ----
 export const MAX_LOG_EVENTS = 50; // event log ring buffer, part of state

@@ -24,6 +24,24 @@ export type Good =
 /** Depth of the cut (spec §6.9): volume against tier. */
 export type CutDepth = 'gentle' | 'standard' | 'deep';
 
+/**
+ * Spec §6.15 — how hard the world leans. Scales what is done *to* you (rent,
+ * heat gained, raid muster), never what your own economy yields. Chosen at
+ * new game; may be lowered mid-run (a logged action), never raised.
+ */
+export type Difficulty = 'gentle' | 'fair' | 'hard';
+
+/** Spec §8 / §6.14 — the three trees. */
+export type ResearchTree = 'trade' | 'marsh' | 'leiden';
+
+/** Spec §6.14 — one bench, one project at a time. */
+export interface Research {
+  /** The active project: which tree, and the tick its tier completes. */
+  active: { tree: ResearchTree; doneTick: number } | null;
+  /** Tiers completed per tree (0 = nothing learned). */
+  completed: Record<ResearchTree, number>;
+}
+
 export type Store = Partial<Record<Good, number>>;
 
 // ---- The map (static — lives in map.ts, never in GameState) ----
@@ -127,6 +145,8 @@ export interface GameState {
   seed: number;
   tick: number;
   rngState: RngState;
+  /** Spec §6.15 — the dial. Scales the world's hand, never the player's yields. */
+  difficulty: Difficulty;
   coin: number;
   /** The farm's fixed site (spec §6.7: the tenancy at Walland). */
   farm: { x: number; y: number };
@@ -143,7 +163,23 @@ export interface GameState {
   rentPaid: number;
   /** The tenancy is forfeit: the sim freezes, the game is over. */
   lost: boolean;
+  /**
+   * Spec §6.15 — the Dutchman's book: coin owed him for a covered rent, with
+   * the vig already added. Repaid as a top-slice of every later sale.
+   */
+  dutchmanBook: number;
+  /** Spec §6.15 — the parish vouched (count, for the card) and when it may again. */
+  vouches: number;
+  vouchCooldownUntil: number;
+  /** Spec §6.15 — crisis spacing: tick of the last existential event landed. */
+  lastCrisisTick: number;
   flockSize: number;
+  /** Spec §6.16 — sheep bought at Ryne, on the drove road home; they join at dawn. */
+  sheepArriving: number;
+  /** Spec §6.16 — the hired shearer, and the hand-shears that earn his offer. */
+  shearer: { hired: boolean; handShears: number };
+  /** Spec §6.14 — the research bench. */
+  research: Research;
   /** Wool on the sheep's backs, grown at dawn, collected by the shear action. */
   fleeceReady: number;
   /** The cutting house site, once raised on the marsh (spec §6.9). */
@@ -238,6 +274,13 @@ export type Action =
   | { type: 'dismissCarter'; cartId: CartId }
   | { type: 'setDeclaredYield'; fleecePerDay: number }
   | { type: 'payRent' }
+  | { type: 'takeDutchmanLoan' }
+  | { type: 'setDifficulty'; difficulty: Difficulty }
+  | { type: 'hireShearer' }
+  | { type: 'dismissShearer' }
+  | { type: 'buySheep'; qty: number }
+  | { type: 'sellSheep'; qty: number }
+  | { type: 'startResearch'; tree: ResearchTree }
   | { type: 'resolveRaid'; calls?: ScheduledCall[] };
 
 /** Actions to apply at a given tick, for replay: actionLog[tick] = Action[]. */

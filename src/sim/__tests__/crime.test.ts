@@ -81,6 +81,7 @@ describe('the Dutchman — unlock (spec §6.9: the grind first)', () => {
     const lost = rentSettled((s) => {
       s.tick = FIRST_RENT_EVE;
       s.coin = 0; // 12 sheep at valuation cannot cover 120
+      s.standing = 0; // §6.15: a parish that thinks well of you would vouch instead
     });
     expect(lost.lost).toBe(true);
     expect(lost.dutchman.unlocked).toBe(false);

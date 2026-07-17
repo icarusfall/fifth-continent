@@ -66,6 +66,7 @@ describe('rent (spec §6.8)', () => {
 
   it('losing the whole flock forfeits the tenancy and freezes the sim', () => {
     let s = placedWithCoin(0); // 120 short → 12 sheep → all of them
+    s.standing = 0; // §6.15: a parish that thinks well of you would vouch instead
     s = runTicks(s, FIRST_DUE - s.tick + SETTLE);
     expect(s.flockSize).toBe(0);
     expect(s.lost).toBe(true);

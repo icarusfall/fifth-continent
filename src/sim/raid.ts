@@ -6,6 +6,7 @@
 // own: a pure function of GameState, like the officer (§6.10).
 
 import {
+  DIFFICULTY,
   FACTION_ALPHA,
   FACTION_BREAKPOINT,
   FIRST_RAID_SEIZE_FRAC,
@@ -70,13 +71,16 @@ function raidFaction(state: GameState): Faction {
 }
 
 /** Raid headcount (§6.13): the Crown reads its base off the faction; the
- *  Company opens gentle, then grows with each raid survived and your footprint. */
+ *  Company opens gentle, then grows with each raid survived and your footprint.
+ *  §6.15: the dial scales the muster — the world's hand, not your yields. */
 function raidSize(state: GameState, faction: Faction): number {
   const grown = state.hawksmere.raidsSurvived * HAWKSMERE_GROWTH;
-  if (faction === 'dragoons') return DRAGOON_BASE + grown;
-  if (faction === 'water-guard') return WATER_GUARD_BASE + grown;
-  if (state.hawksmere.raidsSurvived === 0) return HAWKSMERE_FIRST_RAID;
-  return HAWKSMERE_BASE + grown + Math.floor(state.contrabandSold / HAWKSMERE_SCALE);
+  let size: number;
+  if (faction === 'dragoons') size = DRAGOON_BASE + grown;
+  else if (faction === 'water-guard') size = WATER_GUARD_BASE + grown;
+  else if (state.hawksmere.raidsSurvived === 0) size = HAWKSMERE_FIRST_RAID;
+  else size = HAWKSMERE_BASE + grown + Math.floor(state.contrabandSold / HAWKSMERE_SCALE);
+  return Math.max(1, Math.round(size * DIFFICULTY[state.difficulty].raidMult));
 }
 
 /** The building's defenders as one force: a headcount-blend of militia and crew,
@@ -193,6 +197,7 @@ export function resolveRaid(state: GameState, calls?: ScheduledCall[]): void {
 
   state.hawksmere.raidsSurvived += 1;
   state.hawksmere.nextRaidTick = state.tick + RAID_INTERVAL_DAYS * TICKS_PER_DAY;
+  state.lastCrisisTick = state.tick; // §6.15 — crisis spacing anchors here
   state.raid = null;
 }
 
@@ -218,9 +223,14 @@ export function raidTick(state: GameState): void {
 
   if (!state.raid) {
     if (state.tick >= hw.nextRaidTick - RAID_MUSTER_LEAD) {
+      // §6.15 crisis spacing: a blow never falls hard on the heels of the last
+      // existential event — the muster waits, it does not vanish.
+      const spacing = DIFFICULTY[state.difficulty].crisisSpacingDays * TICKS_PER_DAY;
+      const earliest = state.lastCrisisTick + spacing;
+      if (state.tick < earliest - RAID_MUSTER_LEAD) return;
       const target = raidTarget(state);
       const faction = raidFaction(state);
-      const battleTick = Math.max(hw.nextRaidTick, state.tick + 1);
+      const battleTick = Math.max(hw.nextRaidTick, state.tick + 1, earliest);
       state.raid = { faction, size: raidSize(state, faction), target, battleTick, pendingBattle: false };
       const days = Math.max(1, Math.round((battleTick - state.tick) / TICKS_PER_DAY));
       const rider =

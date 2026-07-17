@@ -8,6 +8,20 @@ import {
   CART_COST,
   CARTER_WAGE,
   CUTS,
+  DIFFICULTY,
+  DIFFICULTY_ORDER,
+  DUTCHMAN_SLICE,
+  DUTCHMAN_VIG,
+  FLOCK_CAP,
+  PARISH_VOUCH_COOLDOWN_DAYS,
+  PARISH_VOUCH_COST,
+  PARISH_VOUCH_STANDING,
+  RESEARCH_COST,
+  RESEARCH_DAYS,
+  SHEARER_UNLOCK_SHEARS,
+  SHEARER_WAGE,
+  SHEEP_PRICE_BUY,
+  SHEEP_PRICE_SELL,
   FARM_STORE_CAPACITY,
   CREW_MUSTER,
   CREW_WAGE,
@@ -46,6 +60,7 @@ import {
   accrueRouteHeat,
   accrueStorageHeat,
   dawnRevenue,
+  loseStanding,
   officerTick,
 } from './revenue';
 import { raidTick, resolveRaid } from './raid';
@@ -54,6 +69,7 @@ import { clockOf, dayPhaseOf, isFlooded, tideIsRising } from './time';
 import type {
   Action,
   Cart,
+  Difficulty,
   GameState,
   Garrison,
   GarrisonKind,
@@ -62,11 +78,12 @@ import type {
   Store,
 } from './types';
 
-export function initialState(seed: number): GameState {
+export function initialState(seed: number, difficulty: Difficulty = 'fair'): GameState {
   return {
     seed,
     tick: 0,
     rngState: seedRng(seed),
+    difficulty,
     coin: 0,
     farm: { ...FARM_SITE },
     // The tenancy runs from the first morning (spec §6.8).
@@ -74,6 +91,13 @@ export function initialState(seed: number): GameState {
     rentPending: false,
     rentPaid: 0,
     lost: false,
+    dutchmanBook: 0,
+    vouches: 0,
+    vouchCooldownUntil: 0,
+    lastCrisisTick: 0,
+    sheepArriving: 0,
+    shearer: { hired: false, handShears: 0 },
+    research: { active: null, completed: { trade: 0, marsh: 0, leiden: 0 } },
     flockSize: STARTING_FLOCK,
     // The flock takes the tenancy already in wool (spec §6.7): the very first
     // action is a shear, not a wait for dawn.
@@ -125,9 +149,21 @@ export function initialState(seed: number): GameState {
     ],
     log: [
       { tick: 0, text: 'Walland Farm. Twelve sheep in wool, one cart, and a price in Ryne.' },
-      { tick: 0, text: `The agent notes your name. Rent is ${RENT_AMOUNT} coin, six days hence.` },
+      {
+        tick: 0,
+        text: `The agent notes your name. Rent is ${rentAmountFor(difficulty)} coin, six days hence.`,
+      },
     ],
   };
+}
+
+/** Spec §6.15 — the dial scales the rent, rounded to whole coin. */
+export function rentAmountFor(difficulty: Difficulty): number {
+  return Math.round(RENT_AMOUNT * DIFFICULTY[difficulty].rentMult);
+}
+
+export function rentAmount(state: GameState): number {
+  return rentAmountFor(state.difficulty);
 }
 
 /** Deep-clone via JSON: state is JSON-safe by construction (types.ts). */
@@ -167,6 +203,21 @@ function isDawn(tick: number): boolean {
 }
 
 /**
+ * Spec §6.15 — sale proceeds pass through the Dutchman's book: while coin is
+ * owed him, his man takes DUTCHMAN_SLICE off the top of every sale until the
+ * book clears. Returns what actually reaches the purse.
+ */
+function creditProceeds(state: GameState, proceeds: number): number {
+  if (state.dutchmanBook <= 0 || proceeds <= 0) return proceeds;
+  const slice = Math.min(state.dutchmanBook, Math.floor(proceeds * DUTCHMAN_SLICE));
+  state.dutchmanBook -= slice;
+  if (state.dutchmanBook <= 0) {
+    logEvent(state, 'The last of the Dutchman’s coin is repaid. The book closes, and he smiles.');
+  }
+  return proceeds - slice;
+}
+
+/**
  * The core of a Ryne sale, shared by the player's verb and the hired
  * carter (§6.11): demand cap, coin, the books, and the town's tattle.
  * Returns units sold; the caller does its own talking.
@@ -179,7 +230,7 @@ function marketSale(state: GameState, cart: Cart, good: Good): number {
   if (qty <= 0) return 0;
   cart.cargo[good] = held - qty;
   state.demandRemaining[good] = appetite - qty;
-  state.coin += qty * RYNE_PRICE[good];
+  state.coin += creditProceeds(state, qty * RYNE_PRICE[good]);
   if (good === 'fleece') {
     state.ledger.soldLawfully += qty; // lawful wool enters the books (§6.10)
   } else {
@@ -230,6 +281,7 @@ function applyAction(state: GameState, action: Action): void {
         logEvent(state, 'The sheep are shorn bare. Wool grows by dawn.');
         return;
       }
+      state.shearer.handShears += 1; // the chore, counted toward his offer (§6.16)
       state.stores.farm = state.stores.farm ?? {};
       // The barn is finite (spec §6.9): wool it cannot take stays on the sheep.
       const room = FARM_STORE_CAPACITY - cargoCount(state.stores.farm);
@@ -385,7 +437,7 @@ function applyAction(state: GameState, action: Action): void {
       const price = WOOL_PRICE_DOMESTIC * LEIDEN_PRICE_MULT;
       cart.cargo.fleece = held - qty;
       state.dutchman.fleeceAppetite -= qty;
-      state.coin += qty * price;
+      state.coin += creditProceeds(state, qty * price);
       logEvent(
         state,
         `${qty} fleece over the gunwale for ${qty * price} coin. Four times the Ryne price, and no questions.`,
@@ -583,6 +635,141 @@ function applyAction(state: GameState, action: Action): void {
       return;
     }
 
+    case 'takeDutchmanLoan': {
+      // Spec §6.15 — he covers the rent shortfall; the book opens at a vig.
+      if (!state.rentPending) return;
+      if (!state.dutchman.unlocked) {
+        logEvent(state, 'Nobody on the water knows your name yet. No one covers a stranger.');
+        return;
+      }
+      if (state.dutchmanBook > 0) {
+        logEvent(state, 'The book is already open. He carries one debt per man, and no more.');
+        return;
+      }
+      const shortfall = rentAmount(state) - state.coin;
+      if (shortfall <= 0) {
+        payRent(state); // nothing to cover: the purse holds it
+        return;
+      }
+      state.coin += shortfall;
+      state.dutchmanBook = Math.ceil(shortfall * DUTCHMAN_VIG);
+      logEvent(
+        state,
+        `The Dutchman covers your ${shortfall} coin. His book now says ${state.dutchmanBook}, and his book does not forget.`,
+      );
+      payRent(state);
+      return;
+    }
+
+    case 'setDifficulty': {
+      // Spec §6.15 — the dial turns one way: down.
+      const from = DIFFICULTY_ORDER.indexOf(state.difficulty);
+      const to = DIFFICULTY_ORDER.indexOf(action.difficulty);
+      if (to < 0 || to >= from) {
+        if (to > from) logEvent(state, 'The marsh does not get harder by asking. Only by staying.');
+        return;
+      }
+      state.difficulty = action.difficulty;
+      logEvent(state, 'The world eases its grip a little. Nobody will mention it again.');
+      return;
+    }
+
+    case 'hireShearer': {
+      // Spec §6.16 — the last chore, sold. Same pattern as the carter (§6.11).
+      if (state.shearer.hired) {
+        logEvent(state, 'The shearing lad already comes at dawn.');
+        return;
+      }
+      state.shearer.hired = true;
+      logEvent(
+        state,
+        `A neighbour’s lad will shear at dawn for ${SHEARER_WAGE} coin a day. He is quick, and he does not count.`,
+      );
+      return;
+    }
+
+    case 'dismissShearer': {
+      if (!state.shearer.hired) return;
+      state.shearer.hired = false;
+      logEvent(state, 'The shearing lad is paid off. The dawn clip is yours again.');
+      return;
+    }
+
+    case 'buySheep': {
+      // Spec §6.16 — growth without farming: purchase, capped by the pasture.
+      const room = FLOCK_CAP - state.flockSize - state.sheepArriving;
+      const qty = Math.min(action.qty, room, Math.floor(state.coin / SHEEP_PRICE_BUY));
+      if (qty <= 0) {
+        logEvent(
+          state,
+          room <= 0
+            ? 'Walland’s pasture holds what it holds. No grass, no sheep.'
+            : `A sheep runs ${SHEEP_PRICE_BUY} coin at Ryne, and the till is short.`,
+        );
+        return;
+      }
+      state.coin -= qty * SHEEP_PRICE_BUY;
+      state.sheepArriving += qty;
+      logEvent(
+        state,
+        `${qty} sheep bought at Ryne for ${qty * SHEEP_PRICE_BUY} coin. The drover brings them by dawn.`,
+      );
+      return;
+    }
+
+    case 'sellSheep': {
+      const qty = Math.min(action.qty, state.flockSize);
+      if (qty <= 0) return;
+      state.flockSize -= qty;
+      // The wool on their backs goes with them; the alibi thins with the flock.
+      state.fleeceReady = Math.min(state.fleeceReady, state.flockSize * FLEECE_PER_HEAD_PER_DAY);
+      state.ledger.declaredYield = Math.min(state.ledger.declaredYield, state.flockSize);
+      state.coin += creditProceeds(state, qty * SHEEP_PRICE_SELL);
+      logEvent(
+        state,
+        `${qty} sheep sold to the drover for ${qty * SHEEP_PRICE_SELL} coin. The agent would have valued them higher.`,
+      );
+      return;
+    }
+
+    case 'startResearch': {
+      // Spec §6.14 — one bench, one project. Coin is nominal; the meters are
+      // the price. Marsh and Leiden wait on their unlocks (M5b/M5c).
+      if (state.research.active) {
+        logEvent(state, 'The bench holds one project at a time.');
+        return;
+      }
+      if (action.tree === 'marsh') {
+        logEvent(state, 'No wight is bound. The marsh does not teach the unbound.');
+        return;
+      }
+      if (action.tree === 'leiden') {
+        logEvent(state, 'No philosopher under your roof. His kind arrive by sea, uninvited.');
+        return;
+      }
+      const tier = state.research.completed[action.tree];
+      const costs = RESEARCH_COST[action.tree];
+      if (tier >= costs.length) {
+        logEvent(state, 'The trade has taught you all it knows, for now.');
+        return;
+      }
+      const cost = costs[tier];
+      if (state.coin < cost) {
+        logEvent(state, `The work wants ${cost} coin up front, and the till is short.`);
+        return;
+      }
+      state.coin -= cost;
+      state.research.active = {
+        tree: action.tree,
+        doneTick: state.tick + RESEARCH_DAYS[action.tree][tier] * TICKS_PER_DAY,
+      };
+      logEvent(
+        state,
+        `The wheelwright takes ${cost} coin and your cart, and asks no questions about the floor.`,
+      );
+      return;
+    }
+
     case 'resolveRaid': {
       resolveRaid(state, action.calls);
       return;
@@ -614,6 +801,56 @@ function growWoolAtDawn(state: GameState): void {
   // The books accrue (§6.10): what grew, and what the page admits grew.
   state.ledger.grownToDate += grown;
   state.ledger.declaredToDate += Math.min(state.ledger.declaredYield, grown);
+}
+
+/** Spec §6.16 — bought sheep come up the drove road overnight and join at dawn. */
+function sheepArriveAtDawn(state: GameState): void {
+  if (!isDawn(state.tick) || state.sheepArriving <= 0) return;
+  state.flockSize += state.sheepArriving;
+  logEvent(state, `The drover delivers ${state.sheepArriving} sheep. The flock stands at ${state.flockSize}.`);
+  state.sheepArriving = 0;
+}
+
+/**
+ * Spec §6.16 — the hired shearer: wage at dawn with the wool, then the clip
+ * goes into the barn as far as the walls allow. Unpaid, he walks the same
+ * morning, like the carter (§6.11), and shearing is the player's chore again.
+ */
+function shearerAtDawn(state: GameState): void {
+  if (!isDawn(state.tick) || !state.shearer.hired) return;
+  if (state.coin < SHEARER_WAGE) {
+    state.shearer.hired = false;
+    logEvent(state, 'No wage, no shearer: the lad walks off, and the wool stays on the sheep.');
+    return;
+  }
+  state.coin -= SHEARER_WAGE;
+  if (state.fleeceReady <= 0) return;
+  state.stores.farm = state.stores.farm ?? {};
+  const room = FARM_STORE_CAPACITY - cargoCount(state.stores.farm);
+  const qty = Math.min(state.fleeceReady, room);
+  if (qty <= 0) {
+    logEvent(state, 'The lad finds the barn full to the rafters. The wool stays on the sheep.');
+    return;
+  }
+  state.fleeceReady -= qty;
+  addToStore(state.stores.farm, 'fleece', qty);
+  logEvent(state, `The lad shears ${qty} fleece into the barn before breakfast.`);
+}
+
+/** Spec §6.14 — the bench: a project completes the tick its time is served. */
+function researchProgress(state: GameState): void {
+  const active = state.research.active;
+  if (!active || state.tick < active.doneTick) return;
+  state.research.completed[active.tree] += 1;
+  state.research.active = null;
+  if (active.tree === 'trade' && state.research.completed.trade === 1) {
+    logEvent(
+      state,
+      'The carts come back with hollow floors. Four tubs ride under the boards now, and the road reads quieter.',
+    );
+  } else {
+    logEvent(state, 'The bench clears: the work is done.');
+  }
 }
 
 /** Spec §6.11 — wages at dawn, with the wool. Unpaid men walk the same morning. */
@@ -762,7 +999,7 @@ function dutchmanTide(state: GameState): void {
 function markRentDue(state: GameState): void {
   if (state.tick >= state.rentDueTick && !state.rentPending) {
     state.rentPending = true;
-    logEvent(state, `Rent day. The agent is at the door, and he wants his ${RENT_AMOUNT} coin.`);
+    logEvent(state, `Rent day. The agent is at the door, and he wants his ${rentAmount(state)} coin.`);
   }
 }
 
@@ -770,25 +1007,45 @@ function markRentDue(state: GameState): void {
 function payRent(state: GameState): void {
   if (!state.rentPending) return;
 
-  const paid = Math.min(state.coin, RENT_AMOUNT);
+  const due = rentAmount(state); // §6.15: the dial scales the rent
+  const paid = Math.min(state.coin, due);
   state.coin -= paid;
   state.rentPaid += paid;
-  const shortfall = RENT_AMOUNT - paid;
+  const shortfall = due - paid;
 
   if (shortfall <= 0) {
-    logEvent(state, `Rent paid: ${RENT_AMOUNT} coin. The agent tips his hat exactly one inch.`);
+    logEvent(state, `Rent paid: ${due} coin. The agent tips his hat exactly one inch.`);
   } else {
     const seized = Math.min(state.flockSize, Math.ceil(shortfall / SHEEP_VALUE));
-    state.flockSize -= seized;
-    logEvent(
-      state,
-      `Short by ${shortfall} coin. The agent's men drive off ${seized} sheep. Distraint, he calls it.`,
-    );
-    if (state.flockSize <= 0) {
-      state.lost = true;
-      state.rentPending = false;
-      logEvent(state, 'The tenancy is forfeit. The Gault keeps no one who cannot pay.');
-      return;
+    // Spec §6.15 — the parish vouches: a distraint that would end the tenancy
+    // is covered by the neighbours instead, if they still think well of you.
+    // Kindness is insurance, spendable once a fortnight, priced in Standing.
+    if (
+      seized >= state.flockSize &&
+      state.standing >= PARISH_VOUCH_STANDING &&
+      state.tick >= state.vouchCooldownUntil
+    ) {
+      loseStanding(state, PARISH_VOUCH_COST);
+      state.vouches += 1;
+      state.vouchCooldownUntil = state.tick + PARISH_VOUCH_COOLDOWN_DAYS * TICKS_PER_DAY;
+      state.lastCrisisTick = state.tick; // an existential event, weathered (§6.15)
+      logEvent(
+        state,
+        'The parish makes up the rent before the agent reaches the fold. A debt no book records — but the marsh keeps accounts.',
+      );
+    } else {
+      state.flockSize -= seized;
+      state.lastCrisisTick = state.tick;
+      logEvent(
+        state,
+        `Short by ${shortfall} coin. The agent's men drive off ${seized} sheep. Distraint, he calls it.`,
+      );
+      if (state.flockSize <= 0) {
+        state.lost = true;
+        state.rentPending = false;
+        logEvent(state, 'The tenancy is forfeit. The Gault keeps no one who cannot pay.');
+        return;
+      }
     }
   }
   state.rentPending = false;
@@ -842,6 +1099,9 @@ export function tick(state: GameState, actions: Action[]): GameState {
 
   next.tick += 1;
   growWoolAtDawn(next);
+  sheepArriveAtDawn(next); // after the clip: they arrive shorn of the morning
+  shearerAtDawn(next);
+  researchProgress(next);
   payCartersAtDawn(next);
   payGarrisonsAtDawn(next);
   recoverStandingAtDawn(next);

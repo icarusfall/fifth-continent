@@ -4,7 +4,10 @@
 
 import {
   COVER_CAPACITY,
+  DIFFICULTY,
   DITCH_HEAT,
+  FALSE_BOTTOM_COVER,
+  FALSE_BOTTOM_EXPOSURE_MULT,
   FORT_VISIBILITY,
   FORT_VISIBILITY_HEAT,
   INFORMER_COVER,
@@ -56,8 +59,10 @@ export function coverOf(state: GameState, nodeId: NodeId): number {
 
 // ---- Heat plumbing ----
 
-/** Every heat event lands regional; most also stain the nearest node (§6.6). */
+/** Every heat event lands regional; most also stain the nearest node (§6.6).
+ *  §6.15: the dial scales heat *gained* here, at the one funnel — never decay. */
 export function addHeat(state: GameState, amount: number, stainNode?: NodeId): void {
+  amount *= DIFFICULTY[state.difficulty].heatMult;
   if (amount <= 0) return;
   state.heat.regional += amount;
   if (stainNode) {
@@ -66,11 +71,18 @@ export function addHeat(state: GameState, amount: number, stainNode?: NodeId): v
   }
 }
 
+/** Spec §6.14 — trade tier 1: every cart rides on a hollow floor. */
+export function hasFalseBottom(state: GameState): boolean {
+  return state.research.completed.trade >= 1;
+}
+
 /** Route heat for one tick of laden movement (§6.2, weather and tech = 1, 0). */
 export function accrueRouteHeat(state: GameState, cart: Cart, edge: MapEdge): void {
   const illicit = illicitCount(cart.cargo);
   if (illicit <= 0 || cart.location.kind !== 'edge') return;
-  const amount = ((illicit * edge.exposure) / edge.latency) * timeOfDayMod(state.tick);
+  // §6.14: a false-bottomed cart reads quieter on the road (tech mult of §6.2).
+  const techMult = hasFalseBottom(state) ? FALSE_BOTTOM_EXPOSURE_MULT : 1;
+  const amount = ((illicit * edge.exposure) / edge.latency) * timeOfDayMod(state.tick) * techMult;
   // The stain falls on whichever end of the road the cart is nearer.
   const nearer =
     cart.location.progress * 2 < edge.latency ? cart.location.from : cart.location.to;
@@ -114,7 +126,7 @@ export function accrueMarketTattle(state: GameState, good: Good, qty: number): v
 
 /** Tubs carry no name: regional heat only, no stain (§6.10). */
 export function accrueDitchHeat(state: GameState, units: number): void {
-  state.heat.regional += units * DITCH_HEAT;
+  state.heat.regional += units * DITCH_HEAT * DIFFICULTY[state.difficulty].heatMult;
 }
 
 // ---- Dawn bookkeeping ----
@@ -331,11 +343,14 @@ export function officerTick(state: GameState): void {
   };
 }
 
-/** Carts sharing his road are stopped and searched: cart cover is 0 (§6.10). */
+/** Carts sharing his road are stopped and searched: cart cover is 0 (§6.10) —
+ *  unless the floor is hollow (§6.14): the road-stop misses what rides under
+ *  the boards. A cart searched at leisure in a yard still shows everything. */
 function stopCartsOnEdge(state: GameState, edge: MapEdge): void {
+  const hidden = hasFalseBottom(state) ? FALSE_BOTTOM_COVER : 0;
   for (const cart of state.carts) {
     if (cart.location.kind !== 'edge' || cart.location.edgeId !== edge.id) continue;
-    const found = illicitCount(cart.cargo);
+    const found = Math.max(0, illicitCount(cart.cargo) - hidden);
     if (found <= 0) continue; // honest wool is waved on, silently
     seizeFrom(cart.cargo, found);
     addHeat(state, found * SEIZURE_HEAT, cart.location.to);
