@@ -1,4 +1,5 @@
-import { RENT_AMOUNT, TICKS_PER_HOUR } from '../sim/balance';
+import { DIFFICULTY_ORDER, TICKS_PER_HOUR } from '../sim/balance';
+import { rentAmount } from '../sim/tick';
 import {
   clockOf,
   dayPhaseOf,
@@ -8,11 +9,35 @@ import {
   ticksUntilTideTurn,
 } from '../sim/time';
 import type { GameState } from '../sim/types';
+import { useGameStore } from '../state/store';
 import { DYKE, HEAT_RED, LIMEWASH, REVENUE_BLUE, ROOF, SEA } from './palette';
 
 import { spanOf } from './format';
 
 const PHASE_GLYPH = { day: '☀', dusk: '🌗', night: '☾' } as const;
+
+/** §6.15 — the dial reads quietly and turns one way: down. */
+function DifficultyNote({ state }: { state: GameState }) {
+  const enqueue = useGameStore((s) => s.enqueue);
+  const idx = DIFFICULTY_ORDER.indexOf(state.difficulty);
+  return (
+    <span className="hud-note">
+      {state.difficulty}
+      {idx > 0 && (
+        <>
+          {' · '}
+          <button
+            className="hud-inline"
+            title="Ease the world's grip one notch. The marsh never gets harder by asking."
+            onClick={() => enqueue({ type: 'setDifficulty', difficulty: DIFFICULTY_ORDER[idx - 1] })}
+          >
+            ease off
+          </button>
+        </>
+      )}
+    </span>
+  );
+}
 
 export function Hud({ state }: { state: GameState }) {
   const clock = clockOf(state.tick);
@@ -22,6 +47,7 @@ export function Hud({ state }: { state: GameState }) {
   const flooded = isFlooded(state.tick);
   const hh = String(clock.hour).padStart(2, '0');
   const mm = String(clock.minute).padStart(2, '0');
+  const rent = rentAmount(state);
 
   return (
     <div className="hud">
@@ -58,17 +84,27 @@ export function Hud({ state }: { state: GameState }) {
           className="hud-coin"
           style={{
             color:
-              state.coin < RENT_AMOUNT && state.rentDueTick - state.tick < 24 * TICKS_PER_HOUR
+              state.coin < rent && state.rentDueTick - state.tick < 24 * TICKS_PER_HOUR
                 ? ROOF
                 : undefined,
           }}
         >
-          {RENT_AMOUNT}
+          {rent}
         </span>
         <span className="hud-note">
           due day {clockOf(state.rentDueTick).day}, dawn
-          {state.coin < RENT_AMOUNT ? ` · short ${RENT_AMOUNT - state.coin}` : ' · covered'}
+          {state.coin < rent ? ` · short ${rent - state.coin}` : ' · covered'}
         </span>
+        {state.dutchmanBook > 0 && (
+          <span
+            className="hud-note"
+            style={{ color: ROOF }}
+            title="The Dutchman's book: he takes half of every sale until it clears."
+          >
+            his book: {state.dutchmanBook}
+          </span>
+        )}
+        <DifficultyNote state={state} />
       </div>
 
       <div className="hud-block">

@@ -15,11 +15,18 @@ import {
   CUT_SUGAR_COST,
   DUTCHMAN_PRICE,
   FARM_STORE_CAPACITY,
+  FLOCK_CAP,
   FORT_COST,
   LEIDEN_PRICE_MULT,
   MAX_CARTS,
   MAX_FORT_TIER,
+  RESEARCH_COST,
+  RESEARCH_DAYS,
   RYNE_PRICE,
+  SHEARER_UNLOCK_SHEARS,
+  SHEARER_WAGE,
+  SHEEP_PRICE_BUY,
+  SHEEP_PRICE_SELL,
   WOOL_PRICE_DOMESTIC,
 } from '../sim/balance';
 import {
@@ -590,7 +597,7 @@ function OfficerMenu({ state }: { state: GameState }) {
 }
 
 function ForfeitOverlay() {
-  const reset = useGameStore((s) => s.reset);
+  const requestNewGame = useGameStore((s) => s.requestNewGame);
   return (
     <div className="forfeit">
       <div className="forfeit-card">
@@ -599,7 +606,7 @@ function ForfeitOverlay() {
           The agent's men drove off the last of the flock at dawn. The Gault keeps no one who
           cannot pay.
         </p>
-        <button onClick={reset}>Begin again</button>
+        <button onClick={requestNewGame}>Begin again</button>
       </div>
     </div>
   );
@@ -667,6 +674,111 @@ function FortifyRow({ state, nodeId }: { state: GameState; nodeId: NodeId }) {
   );
 }
 
+/**
+ * Spec §6.16 — the shearing lad: offered once the chore is felt (six hand
+ * shears, or a carter already on the reins). The last chore, sold.
+ */
+function ShearerRow({ state }: { state: GameState }) {
+  const enqueue = useEnqueue();
+  const offered =
+    state.shearer.hired ||
+    state.shearer.handShears >= SHEARER_UNLOCK_SHEARS ||
+    state.carts.some((c) => c.carter !== null);
+  if (!offered) return null;
+  return (
+    <div className="menu-buttons">
+      {state.shearer.hired ? (
+        <button
+          title="The dawn clip becomes your chore again."
+          onClick={() => enqueue({ type: 'dismissShearer' })}
+        >
+          Dismiss the shearing lad
+        </button>
+      ) : (
+        <button
+          title="He shears the flock into the barn at dawn, and he does not count."
+          onClick={() => enqueue({ type: 'hireShearer' })}
+        >
+          Hire the shearing lad · {SHEARER_WAGE} coin a day
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Spec §6.16 — the flock market: purchase and sale, never husbandry. */
+function FlockMarketRow({ state }: { state: GameState }) {
+  const enqueue = useEnqueue();
+  const room = FLOCK_CAP - state.flockSize - state.sheepArriving;
+  return (
+    <>
+      <p className="flavour">
+        The pasture holds {FLOCK_CAP}. More sheep, more wool, more alibi — and Ryne buys only so
+        much honest fleece.
+      </p>
+      <div className="menu-buttons">
+        <button
+          disabled={room <= 0 || state.coin < SHEEP_PRICE_BUY}
+          title={
+            room <= 0
+              ? 'No grass, no sheep. Walland holds what it holds.'
+              : state.coin < SHEEP_PRICE_BUY
+                ? `${SHEEP_PRICE_BUY} coin, and the till is short.`
+                : 'The drover brings them up the drove road by dawn.'
+          }
+          onClick={() => enqueue({ type: 'buySheep', qty: 1 })}
+        >
+          Buy a sheep · {SHEEP_PRICE_BUY} coin
+        </button>
+        <button
+          disabled={state.flockSize <= 1}
+          title="The market pays cash, and pays worse than the agent values them."
+          onClick={() => enqueue({ type: 'sellSheep', qty: 1 })}
+        >
+          Sell a sheep · {SHEEP_PRICE_SELL} coin
+        </button>
+      </div>
+    </>
+  );
+}
+
+/** Spec §6.14 — the bench: one project at a time; trade tier 1 in M5a. */
+function BenchRow({ state }: { state: GameState }) {
+  const enqueue = useEnqueue();
+  const r = state.research;
+  if (r.completed.trade >= 1) {
+    return (
+      <p className="flavour">
+        The carts ride on hollow floors — the road reads quieter, and the road-stops miss what
+        is under the boards.
+      </p>
+    );
+  }
+  if (r.active) {
+    const days = Math.max(1, Math.ceil((r.active.doneTick - state.tick) / (24 * 6)));
+    return (
+      <p className="flavour">
+        The wheelwright has the carts in his yard. Done in about {days} day{days === 1 ? '' : 's'}.
+      </p>
+    );
+  }
+  return (
+    <div className="menu-buttons">
+      <button
+        disabled={state.coin < RESEARCH_COST.trade[0]}
+        title={
+          state.coin < RESEARCH_COST.trade[0]
+            ? `${RESEARCH_COST.trade[0]} coin up front, and the till is short.`
+            : 'Hollow floors under every cart: quieter roads, and road-stops miss four tubs.'
+        }
+        onClick={() => enqueue({ type: 'startResearch', tree: 'trade' })}
+      >
+        Fit false bottoms · {RESEARCH_COST.trade[0]} coin · {RESEARCH_DAYS.trade[0]} days
+      </button>
+    </div>
+  );
+}
+
 function FarmMenu({
   state,
   flooded,
@@ -694,7 +806,9 @@ function FarmMenu({
     <>
       <h4>Walland Farm</h4>
       <p className="flavour">
-        {state.flockSize} sheep · {state.fleeceReady} wool on their backs · barn {stored}/
+        {state.flockSize} sheep
+        {state.sheepArriving > 0 ? ` (+${state.sheepArriving} on the drove road)` : ''} ·{' '}
+        {state.fleeceReady} wool on their backs · barn {stored}/
         {FARM_STORE_CAPACITY}: {storeSummary(barn, 'empty')}
       </p>
 
@@ -764,6 +878,11 @@ function FarmMenu({
 
       {/* Fortification appears once you have something worth guarding (§10). */}
       {state.dutchman.unlocked && <FortifyRow state={state} nodeId="farm" />}
+
+      {/* §6.16 — the hired dawn, and the flock as a stock you trade. */}
+      <ShearerRow state={state} />
+      {state.dutchman.unlocked && <FlockMarketRow state={state} />}
+      {state.dutchman.unlocked && <BenchRow state={state} />}
 
       {state.dutchman.unlocked && (
         <>

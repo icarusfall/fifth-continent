@@ -8,7 +8,9 @@ import {
   CART_CAPACITY,
   CART_COST,
   MAX_CARTS,
-  RENT_AMOUNT,
+  RESEARCH_COST,
+  SHEARER_UNLOCK_SHEARS,
+  SHEARER_WAGE,
   SHEEP_VALUE,
   TICKS_PER_DAY,
 } from '../sim/balance';
@@ -16,16 +18,18 @@ import { simulateBattle } from '../sim/combat';
 import type { BattleSetup, Call, CombatLog, ScheduledCall } from '../sim/combat';
 import { nodeById } from '../sim/map';
 import { raidBattleSetup } from '../sim/raid';
-import { initialState, tick } from '../sim/tick';
-import type { Action, ActionLog, GameState, NodeId } from '../sim/types';
+import { initialState, rentAmount, tick } from '../sim/tick';
+import type { Action, ActionLog, Difficulty, GameState, NodeId } from '../sim/types';
 
+// v11: M5a adds difficulty, mercy (dutchmanBook, vouches), the shearer, the
+//      flock market, and the research bench to GameState (§6.14–6.16).
 // v10: M4c-2 adds contrabandSold, the Hawksmere record, and the raid (§6.13).
 // v9: rent is now player-settled (rentPending) for the event card (§6.8/§6.13).
 // v8: M4c adds the garrison, Standing, and the informer to GameState (§6.13).
 // v7: M4b adds per-building fortifications to GameState (spec §6.12).
 // v6: M3 adds Heat, the Revenue, the ledger, and carters to GameState.
 // Older saves are incompatible and are silently abandoned.
-const SAVE_KEY = 'fifth-continent-save-v10';
+const SAVE_KEY = 'fifth-continent-save-v11';
 const AUTOSAVE_EVERY_TICKS = 30;
 const AUTOPAY_KEY = 'fifth-continent-autopay-rent'; // a UI preference, not game state
 
@@ -36,7 +40,7 @@ const AUTOPAY_KEY = 'fifth-continent-autopay-rent'; // a UI preference, not game
  */
 export interface EventCard {
   id: string;
-  kind: 'rent' | 'info' | 'raid';
+  kind: 'rent' | 'info' | 'raid' | 'newGame';
   title: string;
   body: string;
 }
@@ -107,15 +111,38 @@ function raidCard(next: GameState): EventCard {
   };
 }
 
-/** The rent-day card, its warning shaped by what the purse can meet (§6.8). */
+/** The rent-day card, its warning shaped by what the purse can meet (§6.8).
+ *  §6.15: when the purse is short and the Dutchman is known, the card also
+ *  offers his coin — the loan is a button, so mercy is a choice, not a gift. */
 function rentCard(next: GameState): EventCard {
-  const held = Math.min(next.coin, RENT_AMOUNT);
-  const short = RENT_AMOUNT - held;
+  const due = rentAmount(next);
+  const held = Math.min(next.coin, due);
+  const short = due - held;
   const body =
     short <= 0
-      ? `The agent is at the door for his ${RENT_AMOUNT} coin, and the purse holds it.`
-      : `The agent wants ${RENT_AMOUNT} coin; the purse holds ${next.coin}. Short by ${short} — his men will drive off ${Math.ceil(short / SHEEP_VALUE)} sheep for the rest.`;
+      ? `The agent is at the door for his ${due} coin, and the purse holds it.`
+      : `The agent wants ${due} coin; the purse holds ${next.coin}. Short by ${short} — his men will drive off ${Math.ceil(short / SHEEP_VALUE)} sheep for the rest.`;
   return { id: `rent-${next.rentDueTick}`, kind: 'rent', title: 'Rent day', body };
+}
+
+/** Spec §6.15 — the parish vouched: say so, plainly, and what it cost. */
+function vouchCard(next: GameState): EventCard {
+  return {
+    id: `vouch-${next.vouches}`,
+    kind: 'info',
+    title: 'The parish vouches',
+    body: 'The rent could not be met, and the agent came for the whole flock — but the neighbours made it up before he reached the fold. No book records it. The marsh keeps accounts, and thinks a little less of your luck.',
+  };
+}
+
+/** Spec §6.15 — the new-tenancy card: choose how hard the world leans. */
+function newGameCard(): EventCard {
+  return {
+    id: 'new-game',
+    kind: 'newGame',
+    title: 'A new tenancy',
+    body: 'How hard should the marsh press? Gentle eases the rent, the Heat, and the raiders; fair is the game as designed; hard is for those who have smuggled before. You can ease off later — the marsh never gets harder by asking.',
+  };
 }
 
 function loadAutoPay(): boolean {
@@ -203,6 +230,20 @@ const MILESTONES: Milestone[] = [
     title: 'The blue coat',
     body: 'A Riding Officer has taken rooms above the Customs House. He counts your sheep against the books and seizes what your cover cannot hide. Keep the stains moving, and mind the coat on the road.',
   },
+  {
+    key: 'shearer-for-hire',
+    when: (s) =>
+      !s.shearer.hired &&
+      (s.shearer.handShears >= SHEARER_UNLOCK_SHEARS || s.carts.some((c) => c.carter !== null)),
+    title: 'The dawn clip, sold',
+    body: `You have felt the shears enough. A neighbour's lad will clip the flock into the barn at dawn for ${SHEARER_WAGE} coin a day — hire him at the farm, and the wool round runs without you.`,
+  },
+  {
+    key: 'wheelwright-bench',
+    when: (s) => s.dutchman.unlocked && s.coin >= RESEARCH_COST.trade[0],
+    title: 'The wheelwright asks no questions',
+    body: `There is coin enough for quiet improvements now. The wheelwright will fit your carts with hollow floors — ${RESEARCH_COST.trade[0]} coin, a couple of days, and the road-stops miss what rides under the boards. Start the work at the farm.`,
+  },
 ];
 
 /** The first milestone whose moment has come and has not yet been shown. */
@@ -239,6 +280,12 @@ export interface GameStore {
   setSpeed: (ticksPerSecond: number) => void;
   /** Settle the rent from the card and dismiss it. */
   payRent: () => void;
+  /** Take the Dutchman's coin against the rent (§6.15) and dismiss the card. */
+  takeLoan: () => void;
+  /** Ask for a new tenancy: raises the difficulty-choice card (§6.15). */
+  requestNewGame: () => void;
+  /** Begin the new tenancy at the chosen difficulty. */
+  startNewGame: (difficulty: Difficulty) => void;
   /** Begin watching the pending raid (§14) — the card gives way to the battle. */
   startBattle: () => void;
   /** Advance the playback one frame; ends the battle at the last frame. */
@@ -250,7 +297,6 @@ export interface GameStore {
   /** Dismiss an informational card and let the world run on. */
   dismissCard: () => void;
   save: () => void;
-  reset: () => void;
 }
 
 function loadSave(): SaveFile | null {
@@ -275,6 +321,13 @@ function loadSave(): SaveFile | null {
     if (!parsed.state.garrisons || typeof parsed.state.standing !== 'number') return null;
     if (typeof parsed.state.rentPending !== 'boolean') return null;
     if (!parsed.state.hawksmere || typeof parsed.state.contrabandSold !== 'number') return null;
+    if (
+      typeof parsed.state.difficulty !== 'string' ||
+      typeof parsed.state.dutchmanBook !== 'number' ||
+      typeof parsed.state.shearer?.hired !== 'boolean' ||
+      !parsed.state.research?.completed
+    )
+      return null;
     return parsed;
   } catch {
     return null;
@@ -326,11 +379,15 @@ export const useGameStore = create<GameStore>()((set, get) => {
       // Raid beats (§6.13): the muster gathering, then the blow at the wall.
       const musterGathered = !!next.raid && !state.raid;
       const battlePending = !!next.raid?.pendingBattle && !state.raid?.pendingBattle;
+      // Mercy (§6.15): the parish vouched — pause and say so.
+      const justVouched = next.vouches > state.vouches;
 
       if (rentJustDue && !autoPayRent) {
         card = rentCard(next);
       } else if (rentJustDue) {
         nextPending = [{ type: 'payRent' }];
+      } else if (justVouched) {
+        card = vouchCard(next);
       } else if (battlePending) {
         card = raidCard(next);
       } else if (musterGathered) {
@@ -352,6 +409,25 @@ export const useGameStore = create<GameStore>()((set, get) => {
     setSpeed: (ticksPerSecond) => set({ ticksPerSecond }),
 
     payRent: () => set((s) => ({ pending: [...s.pending, { type: 'payRent' }], activeCard: null })),
+
+    takeLoan: () =>
+      set((s) => ({ pending: [...s.pending, { type: 'takeDutchmanLoan' }], activeCard: null })),
+
+    requestNewGame: () => set({ activeCard: newGameCard(), paused: false }),
+
+    startNewGame: (difficulty) => {
+      localStorage.removeItem(SAVE_KEY);
+      clearShown(); // a new tenancy meets its milestones fresh
+      set({
+        state: initialState(DEFAULT_SEED, difficulty),
+        actionLog: {},
+        pending: [],
+        paused: false,
+        activeCard: null,
+        shownCards: {},
+        battle: null,
+      });
+    },
 
     startBattle: () => {
       const s = get().state;
@@ -414,20 +490,6 @@ export const useGameStore = create<GameStore>()((set, get) => {
     save: () => {
       const { state, actionLog } = get();
       writeSave(state, actionLog);
-    },
-
-    reset: () => {
-      localStorage.removeItem(SAVE_KEY);
-      clearShown(); // a new tenancy meets its milestones fresh
-      set({
-        state: initialState(DEFAULT_SEED),
-        actionLog: {},
-        pending: [],
-        paused: false,
-        activeCard: null,
-        shownCards: {},
-        battle: null,
-      });
     },
   };
 });

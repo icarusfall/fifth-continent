@@ -7,7 +7,7 @@ export function SpeedControls() {
   const speed = useGameStore((s) => s.ticksPerSecond);
   const setSpeed = useGameStore((s) => s.setSpeed);
   const save = useGameStore((s) => s.save);
-  const reset = useGameStore((s) => s.reset);
+  const requestNewGame = useGameStore((s) => s.requestNewGame);
 
   // Two-click confirm for New Game — no blocking window.confirm.
   const [armed, setArmed] = useState(false);
@@ -40,7 +40,7 @@ export function SpeedControls() {
         title={armed ? 'Click again to abandon this game' : 'Start over'}
         onClick={() => {
           if (armed) {
-            reset();
+            requestNewGame();
             setArmed(false);
           } else {
             setArmed(true);
