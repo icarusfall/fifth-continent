@@ -163,6 +163,13 @@ export const HAWKSMERE_BASE = 12;
 export const HAWKSMERE_GROWTH = 4;
 export const HAWKSMERE_SCALE = 40; // +1 raider per this many contraband units sold
 
+// The Crown escalates on the *other* meter (§6.13): national Heat. The raider
+// who comes is the worst your doom clock has earned — and Dragoons do not rout.
+export const WATER_GUARD_HEAT = 40;
+export const DRAGOON_HEAT = 80;
+export const WATER_GUARD_BASE = 14;
+export const DRAGOON_BASE = 20;
+
 // ---- M4c: the garrison & Standing (spec §6.13) ----
 // Men posted at a building against the raid to come. Muster is up-front, wages
 // fall at dawn with the carter's (§6.11); a building that cannot pay loses men.

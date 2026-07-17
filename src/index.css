@@ -377,6 +377,104 @@ button.danger {
   cursor: pointer;
 }
 
+/* The battle, watched (spec §14) */
+.battle-card {
+  width: min(520px, 92vw);
+  padding: 24px 28px;
+  border: 1px solid var(--clay);
+  border-radius: 5px;
+  background: rgba(36, 28, 24, 0.98);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.65);
+}
+
+.battle-card h2 {
+  margin: 0 0 4px;
+  font-variant: small-caps;
+  letter-spacing: 0.05em;
+  text-align: center;
+}
+
+.battle-law {
+  margin: 0 0 18px;
+  text-align: center;
+  font-style: italic;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.battle-row {
+  margin-bottom: 14px;
+}
+
+.battle-row-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  margin-bottom: 3px;
+}
+
+.battle-count {
+  font-weight: bold;
+  font-variant-numeric: tabular-nums;
+}
+
+.battle-bar {
+  height: 16px;
+  background: rgba(232, 225, 210, 0.1);
+  border: 1px solid rgba(155, 130, 101, 0.4);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.battle-bar > div {
+  height: 100%;
+  transition: width 140ms linear;
+}
+
+.battle-morale {
+  height: 4px;
+  margin-top: 2px;
+  background: rgba(232, 225, 210, 0.08);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.battle-morale > div {
+  height: 100%;
+  background: var(--marsh);
+  transition: width 140ms linear;
+}
+
+.battle-events {
+  text-align: center;
+  min-height: 20px;
+  margin: 10px 0 16px;
+  font-style: italic;
+  font-size: 13px;
+  color: #c4453a;
+  letter-spacing: 0.02em;
+}
+
+.battle-calls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+
+.battle-calls .calls-left {
+  grid-column: 1 / -1;
+  text-align: center;
+  font-size: 11px;
+  font-style: italic;
+  opacity: 0.7;
+  margin-bottom: 2px;
+}
+
+.battle-calls button {
+  text-align: center;
+  font-size: 12px;
+}
+
 /* Speed controls (header, compact) */
 .speed-controls {
   display: flex;

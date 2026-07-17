@@ -16,13 +16,17 @@ import {
   HAWKSMERE_GROWTH,
   HAWKSMERE_PROVOKE,
   HAWKSMERE_SCALE,
+  DRAGOON_BASE,
+  DRAGOON_HEAT,
   MAX_LOG_EVENTS,
   RAID_INTERVAL_DAYS,
   RAID_MUSTER_LEAD_DAYS,
   TICKS_PER_DAY,
+  WATER_GUARD_BASE,
+  WATER_GUARD_HEAT,
 } from './balance';
 import { simulateBattle } from './combat';
-import type { BattleSetup, CombatLog, ForceSpec, ScheduledCall } from './combat';
+import type { BattleSetup, CombatLog, Faction, ForceSpec, ScheduledCall } from './combat';
 import { nodeById } from './map';
 import { CONTRABAND, illicitCount, loseStanding } from './revenue';
 import type { GameState, NodeId, Store } from './types';
@@ -56,14 +60,23 @@ function raidTarget(state: GameState): NodeId {
   return best;
 }
 
-/** Raid headcount (§6.13): a gentle first, then base + growth + footprint. */
-function raidSize(state: GameState): number {
+/** Who rides today (§6.13): the Crown's worst, once national Heat has earned it,
+ *  else the Company. Dragoons do not rout — the doom spiral made flesh (§11). */
+function raidFaction(state: GameState): Faction {
+  const national = state.heat.national;
+  if (national >= DRAGOON_HEAT) return 'dragoons';
+  if (national >= WATER_GUARD_HEAT) return 'water-guard';
+  return 'hawksmere';
+}
+
+/** Raid headcount (§6.13): the Crown reads its base off the faction; the
+ *  Company opens gentle, then grows with each raid survived and your footprint. */
+function raidSize(state: GameState, faction: Faction): number {
+  const grown = state.hawksmere.raidsSurvived * HAWKSMERE_GROWTH;
+  if (faction === 'dragoons') return DRAGOON_BASE + grown;
+  if (faction === 'water-guard') return WATER_GUARD_BASE + grown;
   if (state.hawksmere.raidsSurvived === 0) return HAWKSMERE_FIRST_RAID;
-  return (
-    HAWKSMERE_BASE +
-    state.hawksmere.raidsSurvived * HAWKSMERE_GROWTH +
-    Math.floor(state.contrabandSold / HAWKSMERE_SCALE)
-  );
+  return HAWKSMERE_BASE + grown + Math.floor(state.contrabandSold / HAWKSMERE_SCALE);
 }
 
 /** The building's defenders as one force: a headcount-blend of militia and crew,
@@ -139,6 +152,13 @@ function applyRaidConsequences(state: GameState, target: NodeId, isFirst: boolea
   applyGarrisonLosses(state, target, log.survivors.defenders);
   const name = nodeById(target, state.farm, state.cuttingHouse).name;
 
+  // Bought off (§14.4): coin changes hands, they ride away, the goods stay.
+  if (log.outcome === 'paid_off') {
+    state.coin = Math.max(0, state.coin - c.payOffCost);
+    logEvent(state, `You buy the Company off at ${name} for ${c.payOffCost} coin. They ride away, this time.`);
+    return;
+  }
+
   if (log.playerWon) {
     logEvent(state, `They break on the wall at ${name} and fall back. ${c.friendlyDead} of yours lie still.`);
     return;
@@ -199,12 +219,15 @@ export function raidTick(state: GameState): void {
   if (!state.raid) {
     if (state.tick >= hw.nextRaidTick - RAID_MUSTER_LEAD) {
       const target = raidTarget(state);
+      const faction = raidFaction(state);
       const battleTick = Math.max(hw.nextRaidTick, state.tick + 1);
-      state.raid = { faction: 'hawksmere', size: raidSize(state), target, battleTick, pendingBattle: false };
+      state.raid = { faction, size: raidSize(state, faction), target, battleTick, pendingBattle: false };
       const days = Math.max(1, Math.round((battleTick - state.tick) / TICKS_PER_DAY));
+      const rider =
+        faction === 'dragoons' ? 'Dragoons form up' : faction === 'water-guard' ? 'the Water Guard lands' : 'a muster gathers on the shingle';
       logEvent(
         state,
-        `A muster gathers on the shingle — the Company rides for ${nodeById(target, state.farm, state.cuttingHouse).name} in ${days} day${days === 1 ? '' : 's'}. Post men, or lose the goods.`,
+        `${rider} — they ride for ${nodeById(target, state.farm, state.cuttingHouse).name} in ${days} day${days === 1 ? '' : 's'}. Post men, or lose the goods.`,
       );
     }
     return;

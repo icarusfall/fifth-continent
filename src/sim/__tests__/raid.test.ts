@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 import {
   FACTION_ALPHA,
   FACTION_BREAKPOINT,
+  DRAGOON_HEAT,
   FIRST_RAID_SEIZE_FRAC,
   HAWKSMERE_FIRST_RAID,
   HAWKSMERE_FIRST_RAID_DELAY_DAYS,
@@ -18,6 +19,7 @@ import {
   STANDING_START,
   STARTING_FLOCK,
   TICKS_PER_DAY,
+  WATER_GUARD_HEAT,
 } from '../balance';
 import { runPolicyGame, smugglerPolicy } from '../policy';
 import { garrisonForce, raidTick, resolveRaid } from '../raid';
@@ -74,6 +76,18 @@ describe('muster and the blow (§6.13)', () => {
     const s = toPendingBattle(primed());
     expect(s.raid!.pendingBattle).toBe(true);
   });
+
+  it('the Crown escalates the raider by national Heat (§6.13)', () => {
+    const muster = (national: number): GameState => {
+      const s = primed((s) => (s.heat.national = national));
+      s.tick = s.hawksmere.nextRaidTick - RAID_MUSTER_LEAD_DAYS * TICKS_PER_DAY;
+      raidTick(s);
+      return s;
+    };
+    expect(muster(0).raid!.faction).toBe('hawksmere'); // a quiet doom clock: the Company
+    expect(muster(WATER_GUARD_HEAT).raid!.faction).toBe('water-guard');
+    expect(muster(DRAGOON_HEAT).raid!.faction).toBe('dragoons'); // and these do not rout
+  });
 });
 
 describe('the blended garrison (§6.13)', () => {
@@ -104,6 +118,20 @@ describe('resolution and consequences (§6.13 / §14.6)', () => {
     expect(s.stores['cutting-house']['brandy-fair']).toBe(12 - Math.floor(12 * FIRST_RAID_SEIZE_FRAC));
     expect(s.hawksmere.nextRaidTick).toBe(s.tick + RAID_INTERVAL_DAYS * TICKS_PER_DAY);
     expect(s.standing).toBe(STANDING_START); // no men posted, none to lose
+  });
+
+  it('paying the Company off costs coin and keeps the goods (§14.4)', () => {
+    const s = toPendingBattle(
+      primed((s) => {
+        s.garrisons['cutting-house'] = { militia: 0, crew: 2 };
+        s.coin = 500;
+      }),
+    );
+    const goodsBefore = s.stores['cutting-house']['brandy-fair'];
+    resolveRaid(s, [{ frame: 0, call: 'payOff' }]);
+    expect(s.coin).toBeLessThan(500); // coin changed hands
+    expect(s.stores['cutting-house']['brandy-fair']).toBe(goodsBefore); // nothing carried off
+    expect(s.log.some((e) => e.text.includes('buy the Company off'))).toBe(true);
   });
 
   it('a strong garrison holds the wall and keeps the goods', () => {

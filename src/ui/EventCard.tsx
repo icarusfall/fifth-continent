@@ -11,7 +11,7 @@ export function EventCard() {
   const payRent = useGameStore((s) => s.payRent);
   const setAutoPayRent = useGameStore((s) => s.setAutoPayRent);
   const dismissCard = useGameStore((s) => s.dismissCard);
-  const resolveRaid = useGameStore((s) => s.resolveRaid);
+  const startBattle = useGameStore((s) => s.startBattle);
 
   if (!card) return null;
 
@@ -36,7 +36,7 @@ export function EventCard() {
             </label>
           </>
         ) : card.kind === 'raid' ? (
-          <button className="event-primary event-danger" onClick={resolveRaid}>
+          <button className="event-primary event-danger" onClick={startBattle}>
             See it through
           </button>
         ) : (

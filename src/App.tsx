@@ -1,4 +1,5 @@
 import { useGameStore } from './state/store';
+import { BattlePlayback } from './ui/BattlePlayback';
 import { EventCard } from './ui/EventCard';
 import { EventLog } from './ui/EventLog';
 import { GameMap } from './ui/GameMap';
@@ -24,6 +25,7 @@ export default function App() {
           <EventLog state={state} />
         </div>
         <EventCard />
+        <BattlePlayback />
       </div>
     </div>
   );

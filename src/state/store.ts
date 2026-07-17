@@ -12,9 +12,12 @@ import {
   SHEEP_VALUE,
   TICKS_PER_DAY,
 } from '../sim/balance';
+import { simulateBattle } from '../sim/combat';
+import type { BattleSetup, Call, CombatLog, ScheduledCall } from '../sim/combat';
 import { nodeById } from '../sim/map';
+import { raidBattleSetup } from '../sim/raid';
 import { initialState, tick } from '../sim/tick';
-import type { Action, ActionLog, GameState } from '../sim/types';
+import type { Action, ActionLog, GameState, NodeId } from '../sim/types';
 
 // v10: M4c-2 adds contrabandSold, the Hawksmere record, and the raid (§6.13).
 // v9: rent is now player-settled (rentPending) for the event card (§6.8/§6.13).
@@ -36,6 +39,44 @@ export interface EventCard {
   kind: 'rent' | 'info' | 'raid';
   title: string;
   body: string;
+}
+
+/** A battle being watched (spec §14). The store re-runs the deterministic sim
+ *  each time a Call is sounded; the frame log plays back at COMBAT_FRAME_MS. */
+export interface BattlePlayback {
+  setup: BattleSetup;
+  log: CombatLog;
+  frame: number;
+  calls: ScheduledCall[];
+  callsLeft: number;
+  target: NodeId;
+  targetName: string;
+}
+
+/** How long each combat frame is shown — a battle runs ~5–7 seconds (§14). */
+export const COMBAT_FRAME_MS = 150;
+/** The three Calls per battle (§14.4). */
+export const MAX_CALLS = 3;
+
+function battleResultCard(b: BattlePlayback): EventCard {
+  const c = b.log.consequences;
+  const retreated = b.calls.some((q) => q.call === 'soundRetreat');
+  let title: string;
+  let body: string;
+  if (b.log.outcome === 'paid_off') {
+    title = 'Bought off';
+    body = `You pay the Company off at ${b.targetName} for ${c.payOffCost} coin. They ride away — this time. The goods stay.`;
+  } else if (b.log.playerWon) {
+    title = 'The wall holds';
+    body = `They break at ${b.targetName} and fall back. ${c.friendlyDead} of your men lie still; the goods are safe.`;
+  } else if (retreated) {
+    title = 'You pull them out';
+    body = `You sound the retreat at ${b.targetName}. The goods are lost, but your people live — only ${c.friendlyDead} did not come home.`;
+  } else {
+    title = 'Overrun';
+    body = `${b.targetName} is taken and the goods carried off. ${c.friendlyDead} of your men are lost, and the parish grieves.`;
+  }
+  return { id: `result-${b.setup.attacker.strength}-${b.frame}`, kind: 'info', title, body };
 }
 
 /** The muster warning (spec §6.13): a Company force is riding for a building. */
@@ -189,6 +230,8 @@ export interface GameStore {
   autoPayRent: boolean;
   /** Milestone cards already shown, so each punchy notice fires only once. */
   shownCards: Shown;
+  /** A raid being watched frame by frame (spec §14). Freezes the world too. */
+  battle: BattlePlayback | null;
 
   enqueue: (action: Action) => void;
   step: () => void;
@@ -196,8 +239,12 @@ export interface GameStore {
   setSpeed: (ticksPerSecond: number) => void;
   /** Settle the rent from the card and dismiss it. */
   payRent: () => void;
-  /** See a pending raid through (§6.13) — resolve the battle and dismiss the card. */
-  resolveRaid: () => void;
+  /** Begin watching the pending raid (§14) — the card gives way to the battle. */
+  startBattle: () => void;
+  /** Advance the playback one frame; ends the battle at the last frame. */
+  advanceBattleFrame: () => void;
+  /** Sound one of the three Calls (§14.4) — re-runs the sim from this frame on. */
+  soundCall: (call: Call) => void;
   /** Remember to pay future rents automatically (dismisses the ask thereafter). */
   setAutoPayRent: (on: boolean) => void;
   /** Dismiss an informational card and let the world run on. */
@@ -257,12 +304,13 @@ export const useGameStore = create<GameStore>()((set, get) => {
     activeCard: null,
     autoPayRent: loadAutoPay(),
     shownCards: saved ? loadShown() : {},
+    battle: null,
 
     enqueue: (action) => set((s) => ({ pending: [...s.pending, action] })),
 
     step: () => {
-      const { state, pending, actionLog, autoPayRent, activeCard, shownCards } = get();
-      if (activeCard) return; // the world is frozen behind a card until it is answered
+      const { state, pending, actionLog, autoPayRent, activeCard, shownCards, battle } = get();
+      if (activeCard || battle) return; // the world is frozen behind a card or a battle
       const nextLog =
         pending.length > 0 ? { ...actionLog, [state.tick]: pending } : actionLog;
       const next = tick(state, pending);
@@ -305,8 +353,52 @@ export const useGameStore = create<GameStore>()((set, get) => {
 
     payRent: () => set((s) => ({ pending: [...s.pending, { type: 'payRent' }], activeCard: null })),
 
-    resolveRaid: () =>
-      set((s) => ({ pending: [...s.pending, { type: 'resolveRaid' }], activeCard: null })),
+    startBattle: () => {
+      const s = get().state;
+      const setup = raidBattleSetup(s);
+      if (!setup || !s.raid) {
+        set({ activeCard: null });
+        return;
+      }
+      set({
+        activeCard: null,
+        battle: {
+          setup,
+          log: simulateBattle(setup),
+          frame: 0,
+          calls: [],
+          callsLeft: MAX_CALLS,
+          target: s.raid.target,
+          targetName: nodeById(s.raid.target, s.farm, s.cuttingHouse).name,
+        },
+      });
+    },
+
+    advanceBattleFrame: () => {
+      const b = get().battle;
+      if (!b) return;
+      if (b.frame >= b.log.frames.length - 1) {
+        // The battle is watched out; settle it (the sim re-runs the same Calls,
+        // so the world agrees with what the player just saw) and show the result.
+        set((state) => ({
+          pending: [...state.pending, { type: 'resolveRaid', calls: b.calls }],
+          battle: null,
+          activeCard: battleResultCard(b),
+        }));
+        return;
+      }
+      set({ battle: { ...b, frame: b.frame + 1 } });
+    },
+
+    soundCall: (call) => {
+      const b = get().battle;
+      if (!b || b.callsLeft <= 0) return;
+      const calls = [...b.calls, { frame: b.frame, call }];
+      const log = simulateBattle({ ...b.setup, calls });
+      set({
+        battle: { ...b, log, calls, callsLeft: b.callsLeft - 1, frame: Math.min(b.frame, log.frames.length - 1) },
+      });
+    },
 
     setAutoPayRent: (on) => {
       try {
@@ -334,6 +426,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
         paused: false,
         activeCard: null,
         shownCards: {},
+        battle: null,
       });
     },
   };
