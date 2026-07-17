@@ -1324,7 +1324,6 @@ function CartsAtNode({ state, nodeId }: { state: GameState; nodeId: NodeId }) {
                           }, and back, until told otherwise`}
                     </button>
                   ))}
-                  <button onClick={() => setHiring(null)}>Think better of it</button>
                 </>
               ) : carterAvailable ? (
                 haulables.map((good) => (
