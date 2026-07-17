@@ -130,7 +130,7 @@ heatFromRoute = unitsMoved × edge.exposure × timeOfDayMod × weatherMod × (1 
 regionalHeat = regionalHeat × 0.97 per day     // decays
 nationalHeat = nationalHeat × 0.995 per day    // barely decays
 ```
-Regional heat spilling over a threshold **promotes** into national heat. National heat never resets. This is the doom clock.
+Regional heat spilling over a threshold **promotes** into national heat. National heat never resets. This is the doom clock. *(From M5, national decay is floored by `nationalHeatFloor` — Publication, §6.14.)*
 
 ### 6.4 Fortification visibility
 ```
@@ -707,6 +707,254 @@ shape once M4c-2 can field a raid.
 
 ---
 
+### 6.14 M5 — the trees: research, Debt, Publication, and the two unlocks
+
+§8 names the trees; this section prices them. The governing decision: **coin is
+nominal everywhere in research — the real price is always a meter.** Trade costs
+only coin, which is why it is safe and weak. Marsh power is cheap to learn and
+accrues Debt every time it is *used*. Leiden's power is cheap to learn and
+raises the national Heat floor every time a tier *completes*. A player who
+reads the coin costs has read nothing.
+
+#### Research — one bench, one project at a time
+
+```
+one active project; coin paid up front, done RESEARCH_DAYS later at dawn
+trade    researched at the farm         — costs coin, only coin
+marsh    researched at the wight-stone  — needs ≥1 bound wight
+leiden   researched at the workshop     — needs Leiden housed
+
+RESEARCH_COST   trade [40]       marsh [30, 70, 140]     leiden [50, 110, 220]
+RESEARCH_DAYS   trade [2]        marsh [2, 3, 4]         leiden [3, 4, 5]
+```
+
+There is **no tree-pick gate**. Exclusivity is economic — coin, cover
+capacity, and meter-headroom are scarce — until M6's alliances close doors for
+real. M4's fortTiers and hides are retroactively the trade tree's
+fortification and concealment lines; the research UI groups them so the three
+trees read as three columns from the first time the panel opens.
+
+#### The wight — coerced, and the player goes looking
+
+The marsh notices being used. After NIGHT_MARSH_UNITS = 40 unit-tiles of goods
+have crossed marsh at night, a **wight-sign** appears on the deep-marsh tile
+nearest the most-used night crossing (event card). Trapping it is a deliberate
+verb:
+
+```
+trap = WIGHT_TRAP_IRON 20 coin (iron & salt) + bait sheep staked overnight
+       bait rises with each binding: 1, 2, 3… sheep — the flock pays
+at dawn the wight is bound (deterministic — no roll)
+each binding: +1 boundWights, the sheep are gone
+signs recur every SIGN_RECURRENCE 8 days while marsh powers see use
+```
+
+#### Debt — the account that never closes
+
+```
+debt never decays                          // its whole identity against Heat
+accrues   per USE of marsh powers (tier table below); later +DYKE_DEBT 15 (§21.1)
+bindings  = boundWights × BINDING_CAPACITY 60
+tribute   at the wight-stone: 1 sheep forgives TRIBUTE_RELIEF 12 debt
+          sheep only — they do not take coin, and never will
+breach    debt > bindings at dawn → collection card + COLLECTION_GRACE_DAYS 3:
+          tribute down, bind another wight, or at the third dawn they collect —
+          one person, taken (carter, garrison man, Leiden himself), permanent,
+          forgiving PERSON_DEBT 40. Repeats while the breach stands.
+          nobody left to take → they take you (loss)
+```
+
+Collection is **not a combat and never fires a battle** — §9: force is useless
+against the wights. No muster, no Calls; the person is simply gone at dawn.
+The flock is now triple-loaded — alibi (§19.2), bait, and appeasement — which
+is the point: the moral reserve currency of the marsh has legs and a bell.
+
+#### Leiden — courted, and you did not choose him
+
+On the LEIDEN_ARRIVAL_RUN = 6th successful landing, one tub holds a
+philosopher (event card — he is cargo, uninsured, and wet). **Housing him**
+needs a building with ≥ LEIDEN_COVER = 4 spare cover capacity; he occupies it
+permanently and it becomes the workshop. Turn him away and he is rowed back
+out; the offer recurs once (run 10), then never. He is a person in the
+collection sense: the wights will happily take him.
+
+#### Publication — the floor that rises
+
+```
+each completed leiden tier: nationalHeatFloor += PUBLICATION_HEAT [6, 10, 16]
+nationalHeat = max(nationalHeat × NATIONAL_HEAT_DECAY, nationalHeatFloor)
+                                            // §6.3 gains a floor; decay
+                                            // can never take you below it
+suppress a letter  costs SUPPRESS_STANDING 15 (he is well liked)
+                   the tier then adds no floor
+after MAX_SUPPRESSIONS 3 he refuses the bench until a letter goes out
+                   (research blocked, not lost)
+```
+
+What suppression eventually costs *him* (§8.3) is M6's business.
+
+#### The tiers M5 ships (capstones wait for the endings)
+
+| Tier | Effect | The price |
+|---|---|---|
+| Trade: False-bottom cart | cart exposure ×0.6, +4 cover on the move | coin only |
+| Marsh 1: Marsh-lantern haulers | night moves exposure ×0.1 | +1 Debt per run |
+| Marsh 2: Wight-fog | a raid Call: raider alpha ×0.5 that battle | +8 Debt per invocation |
+| Marsh 3: Hollow Way | one marsh edge never enters `knownEdges`, exposure 0 | +1 Debt per traversal |
+| Leiden 1: Galvanic fence | garrison alpha ×1.5 at that building | fortificationVisibility +8, Noise + |
+| Leiden 2: Steam-lighter | water hauler, capacity 16, runs all hours | loud: exposure ×1.3 |
+| Leiden 3: Aetheric Telegraph | the intel panel defogs — the true `RevenueModel`, live | the largest floor rise |
+
+The **Bound Guardian** and the **Great Sluice-Engine** are ending machinery —
+M6. Ichor green `#6FBF8F` and Phlogiston orange `#E09B3D` leave §13's reserve
+with their owners.
+
+#### What joins GameState (save bump)
+
+`difficulty` (§6.15), a research record (active project, completed tiers),
+`debt`, `boundWights`, wight-signs, a Leiden record (state, workshop node,
+suppressions), `nationalHeatFloor`, and §6.15's `dutchmanBook` and vouch
+cooldown — all JSON-plain.
+
+#### Build order (stop at each, as ever)
+
+- **M5a — the bench and the soft hand.** Research framework (trade tier as
+  proof), difficulty dial + mercy (§6.15) retrofit over rent/heat/raids, the
+  shearer and the flock market (§6.16). Sim + 200-game distribution test.
+- **M5b — the wight.** Sign, trap, the three marsh tiers, Debt, tribute,
+  collection. Sim + test.
+- **M5c — Leiden.** Arrival, the workshop, Publication and the floor, the
+  three tiers, the telegraph UI.
+
+### 6.15 M5 — difficulty & mercy (a squeeze, not a wall)
+
+Design intent, stated plainly: **this game must be playable by someone who has
+never played an RTS.** Two layers, both deterministic, neither hidden.
+
+**The dial** scales what the world does to you — never what your own economy
+yields. Prices, yields, and capacities are identical at every difficulty, so
+every player learns the same arithmetic; only the adversaries lean harder or
+softer.
+
+```
+difficulty ∈ { gentle, fair, hard }   chosen at new game, in GameState;
+                                      may be LOWERED mid-run (a logged action,
+                                      so replays hold) — never raised
+
+          rentMult   heatMult   raidMult   debtMult   crisisSpacingDays
+gentle    0.75       0.8        0.7        0.75       6
+fair      1.0        1.0        1.0        1.0        4
+hard      1.25       1.2        1.3        1.0        0
+```
+
+`heatMult` scales heat *gained*, never decay. `raidMult` scales Hawksmere's
+muster. **Crisis spacing:** at most one existential event (raid arrival,
+collection, forfeit distraint) may fire per window — later ones queue, they
+do not vanish.
+
+**Mercy** is active at every difficulty, diegetic, visible, and priced —
+never rubber-banding:
+
+1. **The Dutchman's book.** At a rent dawn with coin short and the Dutchman
+   known: event card — he covers the shortfall. `dutchmanBook += shortfall ×
+   DUTCHMAN_VIG 1.25`, repaid as a DUTCHMAN_SLICE 0.5 top-slice of every later
+   sale until clear; one loan outstanding at a time. Refusable — refusal is
+   distraint as before. *(The Dope Wars loan shark, wearing clogs.)*
+2. **The parish vouches.** If distraint would end the tenancy (flock to zero)
+   and standing ≥ PARISH_VOUCH_STANDING 30: the parish covers the shortfall,
+   standing −PARISH_VOUCH_COST 10, once per PARISH_VOUCH_COOLDOWN 12 days.
+   Kindness to the parish is insurance, spendable once.
+3. **No single-dawn deaths.** Every loss in §11 must pass through a carded,
+   dated warning first (officer arrival, collection countdown, forfeit
+   warning). A player who ignores three cards may lose; a player who misread
+   one number must not.
+
+#### Decisions taken (2026-07-17 design pass)
+
+1. **Coin is nominal in research; the meters are the price** (Debt, the Heat
+   floor, Standing).
+2. **Collection is not combat** and never fires a battle.
+3. **Debt is payable only in sheep and people** — never coin.
+4. **Mercy is diegetic and priced**, never hidden; the dial scales
+   adversaries, never the player's yields.
+5. **Difficulty can be lowered mid-game, never raised.**
+6. **Dykes are not M5.** §21.1 lands as its own stop (M5½) between the trees
+   and the alliances — Debt must exist first, and the dig verb deserves its
+   own review.
+
+Opening bids, all of them; the distribution test beats them into shape.
+
+### 6.16 M5a — the shearer and the flock market (the automated alibi)
+
+The design promise: **the lawful bottom of the game can be fully automated,
+Satisfactory-style** — sheep grow wool, the shearer clips it, the carter sells
+it, the rent gets paid, and the player's hands never touch a fleece. But
+automation buys *freedom, not wealth*: the hired farm is an alibi machine, not
+an income machine. §19.2's law stands untouched — no breeding, no feeding, no
+pasture management. The flock changes size only by purchase, sale, distraint,
+bait, and tribute: sheep are a stock you trade, not creatures you husband.
+
+#### The shearer — the last chore, sold
+
+Same pattern as the carter (§6.11): the mechanic arrives only once the chore
+is felt.
+
+```
+unlock        offered after SHEARER_UNLOCK_SHEARS 6 dawns sheared by hand,
+              or as soon as a carter is hired (wheels without hands makes
+              the remaining chore obvious)
+hire          SHEARER_WAGE 1 coin per day, due at dawn with the wool
+behaviour     at dawn he shears: farmStore.fleece += fleeceReady (respecting
+              the store's walls; what will not fit stays on the sheep).
+              That is all he does — dumb as the carter, §6.11
+wages unpaid  he walks off the same morning; shearing is a player verb again
+payroll       another hired mouth — he joins the informer pool with the
+              carter when that system lands (§6.11)
+```
+
+**The designed identity — check it in a test:** 12 sheep × 2 coin of fleece
+= 24/day gross; carter 3 + shearer 1 = 4/day wages; rent is 120/6 = 20/day.
+`24 − 4 = 20`. **The fully hired farm pays the rent to the coin, and not one
+coin more.** Automated lawful play is a treadmill, exactly poised — the wage
+bill converts the wool margin into attention, and attention is spent on
+crime. (On `gentle`, rentMult 0.75 makes the same farm run +30/period in the
+black: the difficulty dial turns the treadmill into a floor for beginners,
+§6.15.)
+
+#### The flock market — growth without farming
+
+```
+buy    SHEEP_PRICE_BUY 15 coin at Ryne; bought sheep join the flock at the
+       next dawn (driven home overnight — no escort chore)
+sell   SHEEP_PRICE_SELL 8 coin at Ryne (the agent's distraint valuation is
+       10, §6.8 — the market pays cash and pays worse)
+cap    FLOCK_CAP 24: Walland's pasture holds what it holds. Drained land
+       raises it (M5½, §21.1 — drainage manufactures pasture, pasture
+       manufactures alibi)
+```
+
+**And the ceiling that keeps wool honest:** `DAILY_DEMAND.fleece` drops
+24 → 16. Ryne wants little more than Walland clips — the marsh has more
+sheep than England has coats. A full flock of 24 clips 24 fleece a day
+against a town that buys 16: the surplus moves only over the gunwale, at the
+Dutchman's 4× — which is **owling**, the original crime of this coast. Growing
+the flock therefore never grows lawful income past the rent line; it grows
+the alibi (§19.2), the tribute buffer (§6.14), the trap bait — and the night
+trade. The Satisfactory loop feeds the crime, not the ledger.
+
+One consequence, accepted with eyes open: Ryne sells sheep and the wights
+take sheep, so Debt is coin-payable at one remove (15 coin → 12 debt, plus
+the drive home). Appeasement having a market price softens Debt in exactly
+the direction §6.15 wants; the wights still take no coin, and never will.
+
+#### What joins GameState
+
+`shearer` (hired flag + unlock progress) and the flock-market actions;
+`FLOCK_CAP`, prices, and the demand change live in `balance.ts`. Builds in
+**M5a** with the bench and the soft hand (§6.14 build order).
+
+---
+
 ## 7. THE REVENUE — A LEARNING ADVERSARY
 
 **Not a random-raid system.** The Revenue maintains its own data structure:
@@ -839,7 +1087,8 @@ disclosure: routes appear only once there is something to move.
 **M2 — The Crime.** Dutchman, the beach, inbound goods, cutting house, quality tiers, bidirectional routing (§6.9). Fixed prices and daily demand caps — §17's market model comes later.
 **M3 — The Revenue.** `RevenueModel`, suspicion inference, the fogged player-facing intel map, cover & leak, first Riding Officer (§6.10). Bought carts and the hired carter on standing orders (§6.11) — automation arrives with the man who stops carts.
 **M4 — Force.** Hawksmere, raid resolution, fortification tiers, the visibility trade-off.
-**M5 — The Trees.** Ichor and Phlogiston, Debt, Publication, the two unlock events.
+**M5 — The Trees.** Ichor and Phlogiston, Debt, Publication, the two unlock events (§6.14). Difficulty dial & mercy (§6.15) and the shearer + flock market (§6.16) land first, in M5a. Sub-stops M5a/M5b/M5c.
+**M5½ — The Dykes.** §21.1's dig verb: channel logistics, chokepoints, drainage cover, dyke Debt. Its own design pass and stop.
 **M6 — Alliances & Endings.**
 
 ---
@@ -1170,6 +1419,9 @@ No breeding minigame. No feeding. No pasture management.
 Your fleece output must plausibly account for your cart movements. **The Revenue counts your sheep.** So a murrain in the flock is not an economic setback — it is a **cover crisis**. Suddenly your carts carry more wool than your sheep can grow, and the arithmetic no longer works.
 
 State: `flockSize`, `fleecePerHead`, `declaredFleece`. That is all.
+
+*(M5a adds purchase, sale, and a pasture cap — §6.16 — which is trade, not
+husbandry: the three prohibitions above stand.)*
 
 ### 19.3 Inventory limits — **KEEP, and make them vicious**
 See §18. Small caps, high Heat, no buffering.

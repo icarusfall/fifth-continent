@@ -6,7 +6,16 @@ A single-player, browser-based god/builder game about smuggling, logistics, and
 the two kinds of magic you can use to hide a crime. Design spec and build brief:
 [the-fifth-continent-spec.md](./the-fifth-continent-spec.md).
 
-## Status: Milestone 3 — The Revenue ✅ (awaiting review)
+## Status: Milestone 4 — Force ✅ (signed off; M5 design pass in spec §6.14–6.15)
+
+**M4 (spec §6.12–6.13, §14):** fortification tiers and the visibility
+trade-off, the garrison and Standing, deterministic Lanchester attrition
+combat with morale and rout, the Hawksmere raid (provoked by your market
+footprint), the Crown's escalation off national Heat, the watchable battle
+with the three Calls, and the event-card system that pauses the world on the
+moments that matter. 171 tests green.
+
+Earlier milestones, still standing as built:
 
 In M2 the crime works; in M3 it costs. Everything recorded since M1 — edge
 exposure, time-of-day, tubs sitting still, the ditch — is finally consumed.
@@ -36,16 +45,18 @@ daily appetite, rent and distraint. The 200-game smuggler bot now meets the
 officer around day 10, loses the odd load to him, and still ends day 20 far
 above the lawful ceiling — crime pays, and now it costs.
 
-Not yet built (by design — see spec §12): bribes, informers, decoys and the
-escalation ladder past one man (M4+), fortifications and §6.1's throughput
-leak (M4), the trees (M5), the moving-price market model (§17).
+Not yet built (by design — see spec §12): the trees, Debt, and Publication
+(M5, spec §6.14), the difficulty dial, mercy systems, shearer and flock
+market (M5a, spec §6.15–6.16),
+dykes (M5½), bribes/informers/decoys, alliances and endings (M6), the
+moving-price market model (§17).
 
 ## Run it
 
 ```bash
 npm install
 npm run dev        # play at http://localhost:5173
-npm test           # 123 tests incl. replay determinism + 3×200 headless games
+npm test           # 171 tests incl. replay determinism + headless game batches
 npm run headless   # play 3 scripted days in Node, no browser
 npm run headless 1740 20 smuggler   # twenty days of the Dutchman's argument
 ```
