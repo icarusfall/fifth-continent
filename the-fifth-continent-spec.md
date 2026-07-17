@@ -453,7 +453,19 @@ dismiss      at will, no severance; the order clears
 The carter is deliberately dumb about everything but the tide: he does not
 watch for the blue coat, he does not wait for night, and he will drive a
 cartload of contraband straight past the Customs House if that is the order
-he was given. Standing orders full of brandy are legal-to-write and stupid-
+he was given.
+
+**The shingle order (added with M5a-3, at the player's request):** a standing
+order may name the shingle. A carter sent there with **fleece** sells it over
+the gunwale whenever the lugger stands off (the Dutchman's price, into his
+per-visit appetite, through the Dutchman's book §6.15) and **waits on the
+beach** when it does not — he minds the tide and the lugger, and nothing
+else. This automates the owling run the §6.16 flock surplus creates, and the
+counterweight is not the road (wool is lawful in itself, §2): it is the
+**books**. Wool the lugger swallows was never sold lawfully; a declaredYield
+left honest now leaves a gap at every inspection (§6.10). Automate the
+owling and the paperwork becomes the job. Goods the Dutchman does not buy
+are unloaded onto the open shingle, as before. Standing orders full of brandy are legal-to-write and stupid-
 to-keep — the player discovers this the way §10 demands: by losing a load.
 Night-only orders, pack-ponies and the rest of §21's stable are deferred to
 their milestones; the hired mouth that can be *turned* joins the informer
@@ -1445,6 +1457,11 @@ The single screen you switch into — and it is **diegetic**, because bookkeepin
 - Discrepancy between Ledger and reality = Heat when inspected.
 
 A management screen that is also a lie you are maintaining. **The Revenue keeps a ledger too. Late game, you can steal it.**
+
+*(M5a-3: the Ledger arrives as a collapsible side panel — the books and
+their ± controls move out of the farm popover, joined by the purse, the
+rent, the Dutchman's book, the day's wage bill, and Standing. The popovers
+stay verbs; the panel is where the lying gets done.)*
 
 ### 20.2 Supply flow visibility
 Goods on the map look like **carts, not belts**. Flows are an **overlay**, toggled.

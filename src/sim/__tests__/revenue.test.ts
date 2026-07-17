@@ -8,6 +8,7 @@ import {
   CART_COST,
   CARTER_WAGE,
   DITCH_HEAT,
+  LEIDEN_PRICE_MULT,
   MARKET_TATTLE,
   MAX_CARTS,
   NATIONAL_HEAT_DECAY,
@@ -24,6 +25,7 @@ import {
   TICKS_PER_HOUR,
   SHEARING_HOUR,
   WOOL_GAP_COEFF,
+  WOOL_PRICE_DOMESTIC,
 } from '../balance';
 import { officerEdgesFor, FARM_SITE } from '../map';
 import { initialState, tick } from '../tick';
@@ -358,5 +360,60 @@ describe('bought carts and the hired carter (spec §6.11)', () => {
     const aboard = s.carts[0].cargo.fleece ?? 0;
     expect(aboard).toBeLessThanOrEqual(CART_CAPACITY);
     expect(aboard).toBeGreaterThan(0);
+  });
+});
+
+describe('the shingle order (spec §6.11, M5a-3)', () => {
+  const NIGHT_FALLING = 120; // day 1 20:00 — night ∩ falling tide (see crime.test)
+
+  /** A carter standing on the shingle with fleece aboard, on a shingle order. */
+  function carterOnBeach(tickAt: number, fleece: number): GameState {
+    const s = initialState(1);
+    s.tick = tickAt;
+    s.dutchman.unlocked = true;
+    s.carts[0].location = { kind: 'node', nodeId: 'shingle' };
+    s.carts[0].cargo = { fleece };
+    s.carts[0].carter = { from: 'farm', to: 'shingle', good: 'fleece' };
+    return s;
+  }
+
+  it('sells fleece over the gunwale when the lugger stands off', () => {
+    let s = carterOnBeach(NIGHT_FALLING, 8);
+    s = tick(s, []); // dutchmanTide marks him present, the carter sells
+    s = tick(s, []);
+    expect(s.carts[0].cargo.fleece ?? 0).toBe(0);
+    expect(s.coin).toBe(8 * WOOL_PRICE_DOMESTIC * LEIDEN_PRICE_MULT);
+    expect(s.log.some((e) => e.text.includes('does not look at the boat'))).toBe(true);
+  });
+
+  it('waits on the beach when the lugger is out — no unloading, no wandering', () => {
+    const noon = 2 * 6 * TICKS_PER_HOUR; // 12:00: no lugger at midday
+    let s = carterOnBeach(noon, 8);
+    s = tick(s, []);
+    s = tick(s, []);
+    expect(s.carts[0].location).toEqual({ kind: 'node', nodeId: 'shingle' });
+    expect(s.carts[0].cargo.fleece).toBe(8); // still aboard, not tipped on the beach
+    expect(s.stores.shingle?.fleece ?? 0).toBe(0);
+  });
+
+  it('rides home for the next load once the gunwale has taken everything', () => {
+    let s = carterOnBeach(NIGHT_FALLING, 4);
+    s = tick(s, []);
+    s = tick(s, []);
+    expect(s.carts[0].cargo.fleece ?? 0).toBe(0);
+    // Off the beach: heading home to `from` for the next load.
+    expect(s.carts[0].location.kind === 'edge' || s.carts[0].location.nodeId !== 'shingle').toBe(
+      true,
+    );
+  });
+
+  it('sale proceeds pass through the Dutchman’s book like any other (§6.15)', () => {
+    let s = carterOnBeach(NIGHT_FALLING, 8);
+    s.dutchmanBook = 100;
+    s = tick(s, []);
+    s = tick(s, []);
+    const proceeds = 8 * WOOL_PRICE_DOMESTIC * LEIDEN_PRICE_MULT; // 64
+    expect(s.coin).toBe(proceeds / 2); // half sliced to the book
+    expect(s.dutchmanBook).toBe(100 - proceeds / 2);
   });
 });

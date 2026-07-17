@@ -4,6 +4,7 @@ import { EventCard } from './ui/EventCard';
 import { EventLog } from './ui/EventLog';
 import { GameMap } from './ui/GameMap';
 import { Hud } from './ui/Hud';
+import { LedgerPanel } from './ui/LedgerPanel';
 import { SpeedControls } from './ui/SpeedControls';
 import { useGameLoop } from './ui/useGameLoop';
 
@@ -24,6 +25,7 @@ export default function App() {
         <div className="log-float">
           <EventLog state={state} />
         </div>
+        <LedgerPanel state={state} />
         <EventCard />
         <BattlePlayback />
       </div>

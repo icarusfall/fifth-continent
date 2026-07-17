@@ -345,14 +345,17 @@ export function GameMap({ state }: { state: GameState }) {
         drawTileHighlight(ctx, t.x, t.y, isPlaceable(t.x, t.y) && s.coin >= CUTTING_HOUSE_COST);
       }
 
-      // Layer 3 helper: keep the popover pinned to its anchor.
+      // Layer 3 helper: keep the popover pinned to its anchor — and always
+      // wholly on screen: clamp by its real measured size, not a guess.
       const pop = popRef.current;
       if (pop) {
         const a = anchorWorld(selectedRef.current, s);
-        if (a) {
+        const card = pop.firstElementChild as HTMLElement | null;
+        if (a && card) {
+          card.style.maxHeight = `${h - 16}px`; // never taller than the map itself
           const p = cam.worldToScreen(a.x, a.y);
-          const left = Math.max(8, Math.min(p.x + 16, w - 268));
-          const top = Math.max(8, Math.min(p.y - 30, h - 120));
+          const left = Math.max(8, Math.min(p.x + 16, w - card.offsetWidth - 8));
+          const top = Math.max(8, Math.min(p.y - 30, h - card.offsetHeight - 8));
           pop.style.transform = `translate(${left}px, ${top}px)`;
         }
       }
@@ -544,7 +547,7 @@ export function GameMap({ state }: { state: GameState }) {
 
       {selected && !placing && (
         <div ref={popRef} className="popover-anchor">
-          <Popover onClose={() => setSelected(null)}>
+          <Popover wide={selected === 'farm'} onClose={() => setSelected(null)}>
             {selected === 'farm' && (
               <FarmMenu state={state} flooded={flooded} onPlace={() => setPlacing(true)} />
             )}
@@ -612,10 +615,29 @@ function ForfeitOverlay() {
   );
 }
 
-function Popover({ onClose, children }: { onClose: () => void; children: ReactNode }) {
+function Popover({
+  onClose,
+  wide,
+  children,
+}: {
+  onClose: () => void;
+  wide?: boolean;
+  children: ReactNode;
+}) {
+  // The map shell zooms on wheel (native listener, §15.2); a wheel over the
+  // popover must scroll the menu instead, so it never reaches the shell.
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const stop = (e: WheelEvent) => e.stopPropagation();
+    el.addEventListener('wheel', stop, { passive: true });
+    return () => el.removeEventListener('wheel', stop);
+  }, []);
   return (
     <div
-      className="popover"
+      ref={ref}
+      className={wide ? 'popover wide' : 'popover'}
       onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
     >
@@ -795,7 +817,6 @@ function FarmMenu({
   const stored = cargoCount(barn);
   const barnRoom = FARM_STORE_CAPACITY - stored;
   const held = cart ? cargoCount(cart.cargo) : 0;
-  const ledger = state.ledger;
   // §10 — the cutting house is offered only once the player holds overproof
   // jenever with no legal buyer: the building is caused by the problem it solves.
   const hasOverproofJenever =
@@ -812,108 +833,92 @@ function FarmMenu({
         {FARM_STORE_CAPACITY}: {storeSummary(barn, 'empty')}
       </p>
 
-      <div className="menu-buttons">
-        <button
-          disabled={state.fleeceReady <= 0}
-          title={state.fleeceReady <= 0 ? 'The wool grows by dawn.' : undefined}
-          onClick={() => enqueue({ type: 'shear' })}
-        >
-          Shear
-        </button>
-        {cartHere &&
-          held < CART_CAPACITY &&
-          (Object.entries(barn) as Array<[Good, number]>)
-            .filter(([, n]) => n > 0)
-            .map(([good]) => (
+      <div className="popover-cols">
+        <div>
+          <h5>the yard</h5>
+          <div className="menu-buttons">
+            <button
+              disabled={state.fleeceReady <= 0}
+              title={state.fleeceReady <= 0 ? 'The wool grows by dawn.' : undefined}
+              onClick={() => enqueue({ type: 'shear' })}
+            >
+              Shear
+            </button>
+            {cartHere &&
+              held < CART_CAPACITY &&
+              (Object.entries(barn) as Array<[Good, number]>)
+                .filter(([, n]) => n > 0)
+                .map(([good]) => (
+                  <button
+                    key={good}
+                    onClick={() =>
+                      enqueue({ type: 'loadCart', cartId: cart!.id, good, qty: CART_CAPACITY })
+                    }
+                  >
+                    Load {cart!.name.toLowerCase()} with {GOOD_LABEL[good]}
+                  </button>
+                ))}
+            {cartHere &&
+              (Object.entries(cart!.cargo) as Array<[Good, number]>)
+                .filter(([, n]) => n > 0)
+                .map(([good, n]) => {
+                  const can = Math.min(n, barnRoom);
+                  return (
+                    <button
+                      key={`unload-${good}`}
+                      disabled={can <= 0}
+                      title={can <= 0 ? 'The barn is full to the rafters.' : undefined}
+                      onClick={() =>
+                        enqueue({ type: 'unloadCart', cartId: cart!.id, good, qty: 99 })
+                      }
+                    >
+                      {can > 0
+                        ? `Unload ${can} ${GOOD_LABEL[good]} into the barn`
+                        : `${GOOD_LABEL[good]} · the barn is full`}
+                    </button>
+                  );
+                })}
+            {hasOverproofJenever && !state.cuttingHouse && (
               <button
-                key={good}
-                onClick={() =>
-                  enqueue({ type: 'loadCart', cartId: cart!.id, good, qty: CART_CAPACITY })
+                disabled={state.coin < CUTTING_HOUSE_COST}
+                title={
+                  state.coin < CUTTING_HOUSE_COST
+                    ? `${CUTTING_HOUSE_COST} coin, paid up front. Nobody out here gives credit.`
+                    : 'Overproof jenever has no legal buyer. Cut it here with water and burnt sugar and it sells in Ryne as brandy.'
                 }
+                onClick={onPlace}
               >
-                Load cart with {GOOD_LABEL[good]}
+                Raise a cutting house · {CUTTING_HOUSE_COST} coin
               </button>
-            ))}
-        {cartHere &&
-          (Object.entries(cart!.cargo) as Array<[Good, number]>)
-            .filter(([, n]) => n > 0)
-            .map(([good, n]) => {
-              const can = Math.min(n, barnRoom);
-              return (
+            )}
+            {state.carts.length < MAX_CARTS &&
+              (state.coin >= CART_COST || state.carts.length > 1) && (
                 <button
-                  key={`unload-${good}`}
-                  disabled={can <= 0}
-                  title={can <= 0 ? 'The barn is full to the rafters.' : undefined}
-                  onClick={() => enqueue({ type: 'unloadCart', cartId: cart!.id, good, qty: 99 })}
+                  disabled={state.coin < CART_COST}
+                  title="Cart, pony, and no questions from the wheelwright."
+                  onClick={() => enqueue({ type: 'buyCart' })}
                 >
-                  {can > 0
-                    ? `Unload ${can} ${GOOD_LABEL[good]} into the barn`
-                    : `${GOOD_LABEL[good]} · the barn is full`}
+                  Buy a cart · {CART_COST} coin
                 </button>
-              );
-            })}
-        {hasOverproofJenever && !state.cuttingHouse && (
-          <button
-            disabled={state.coin < CUTTING_HOUSE_COST}
-            title={
-              state.coin < CUTTING_HOUSE_COST
-                ? `${CUTTING_HOUSE_COST} coin, paid up front. Nobody out here gives credit.`
-                : 'Overproof jenever has no legal buyer. Cut it here with water and burnt sugar and it sells in Ryne as brandy.'
-            }
-            onClick={onPlace}
-          >
-            Raise a cutting house · {CUTTING_HOUSE_COST} coin
-          </button>
-        )}
-        {state.carts.length < MAX_CARTS && (state.coin >= CART_COST || state.carts.length > 1) && (
-          <button
-            disabled={state.coin < CART_COST}
-            title="Cart, pony, and no questions from the wheelwright."
-            onClick={() => enqueue({ type: 'buyCart' })}
-          >
-            Buy a cart · {CART_COST} coin
-          </button>
-        )}
-      </div>
-
-      {/* Fortification appears once you have something worth guarding (§10). */}
-      {state.dutchman.unlocked && <FortifyRow state={state} nodeId="farm" />}
-
-      {/* §6.16 — the hired dawn, and the flock as a stock you trade. */}
-      <ShearerRow state={state} />
-      {state.dutchman.unlocked && <FlockMarketRow state={state} />}
-      {state.dutchman.unlocked && <BenchRow state={state} />}
-
-      {state.dutchman.unlocked && (
-        <>
-          <p className="flavour">
-            The book swears the flock gives <strong>{ledger.declaredYield}</strong> fleece a day
-            (it gives {state.flockSize}). This page: {ledger.declaredToDate} declared ·{' '}
-            {ledger.soldLawfully} sold at Ryne. Declared wool must show; the rest never existed.
-          </p>
-          <div className="menu-buttons ledger-row">
-            <button
-              disabled={ledger.declaredYield <= 0}
-              onClick={() =>
-                enqueue({ type: 'setDeclaredYield', fleecePerDay: ledger.declaredYield - 1 })
-              }
-            >
-              −
-            </button>
-            <button
-              disabled={ledger.declaredYield >= state.flockSize}
-              onClick={() =>
-                enqueue({ type: 'setDeclaredYield', fleecePerDay: ledger.declaredYield + 1 })
-              }
-            >
-              +
-            </button>
+              )}
           </div>
-        </>
-      )}
+        </div>
+
+        <div>
+          <h5>works &amp; men</h5>
+          {/* Fortification appears once you have something worth guarding (§10). */}
+          {state.dutchman.unlocked && <FortifyRow state={state} nodeId="farm" />}
+
+          {/* §6.16 — the hired dawn, and the flock as a stock you trade. */}
+          <ShearerRow state={state} />
+          {state.dutchman.unlocked && <FlockMarketRow state={state} />}
+          {state.dutchman.unlocked && <BenchRow state={state} />}
+        </div>
+      </div>
 
       {cartHere && (
         <>
+          <h5>the roads — {cart!.name.toLowerCase()}</h5>
           {held > 0 && (
             <p className="flavour">
               {cart!.name} stands laden ({held}/{CART_CAPACITY}). Ryne pays{' '}
@@ -934,7 +939,7 @@ function FarmMenu({
                     enqueue({ type: 'dispatchCart', cartId: cart!.id, edgeId: 'low-road' })
                   }
                 >
-                  Send by the low road{' '}
+                  Send {cart!.name.toLowerCase()} by the low road{' '}
                   {flooded
                     ? `· clears in ${spanOf(ticksUntilTideTurn(state.tick))}`
                     : `· floods in ${spanOf(ticksUntilTideTurn(state.tick))}`}
@@ -945,7 +950,8 @@ function FarmMenu({
                     enqueue({ type: 'dispatchCart', cartId: cart!.id, edgeId: 'high-road' })
                   }
                 >
-                  Send by the high road · slow{coatNote(state, 'high-road', 'farm')}
+                  Send {cart!.name.toLowerCase()} by the high road · slow
+                  {coatNote(state, 'high-road', 'farm')}
                 </button>
               </>
             )}
@@ -956,7 +962,8 @@ function FarmMenu({
                   enqueue({ type: 'dispatchCart', cartId: cart!.id, edgeId: 'marsh-track' })
                 }
               >
-                Send over the marsh to the shingle{coatNote(state, 'marsh-track', 'farm')}
+                Send {cart!.name.toLowerCase()} over the marsh to the shingle
+                {coatNote(state, 'marsh-track', 'farm')}
               </button>
             )}
             {state.cuttingHouse && (
@@ -965,7 +972,8 @@ function FarmMenu({
                   enqueue({ type: 'dispatchCart', cartId: cart!.id, edgeId: 'cut-farm-track' })
                 }
               >
-                Send to the cutting house{coatNote(state, 'cut-farm-track', 'farm')}
+                Send {cart!.name.toLowerCase()} to the cutting house
+                {coatNote(state, 'cut-farm-track', 'farm')}
               </button>
             )}
           </div>
@@ -1275,12 +1283,15 @@ function CartsAtNode({ state, nodeId }: { state: GameState; nodeId: NodeId }) {
         return (
           <div key={cart.id}>
             <p className="flavour">
-              {cart.name}: {storeSummary(cart.cargo, 'empty')}
+              <strong>{cart.name}</strong>: {storeSummary(cart.cargo, 'empty')}
               {cart.carter
-                ? ` · a carter on the reins — ${GOOD_LABEL[cart.carter.good]} to ${
+                ? ` · standing order: ${GOOD_LABEL[cart.carter.good]} → ${
                     nodeById(cart.carter.to, state.farm, state.cuttingHouse).name
-                  }, ${CARTER_WAGE} coin a day. He minds the tide and nothing else.`
-                : ''}
+                  }, ${CARTER_WAGE} coin a day. ` +
+                  (cart.carter.to === 'shingle' && cart.carter.good === 'fleece'
+                    ? 'He sells over the gunwale when the lugger stands off, and waits when it does not.'
+                    : 'He minds the tide and nothing else.')
+                : ' · no carter — yours to drive'}
             </p>
             <div className="menu-buttons">
               {cart.carter ? (
@@ -1292,6 +1303,11 @@ function CartsAtNode({ state, nodeId }: { state: GameState; nodeId: NodeId }) {
                   {destinations.map((to) => (
                     <button
                       key={to}
+                      title={
+                        to === 'shingle' && hiring.good === 'fleece'
+                          ? 'He sells over the gunwale whenever the lugger stands off — and the books will not record it (§6.10).'
+                          : undefined
+                      }
                       onClick={() => {
                         enqueue({
                           type: 'hireCarter',
@@ -1301,9 +1317,11 @@ function CartsAtNode({ state, nodeId }: { state: GameState; nodeId: NodeId }) {
                         setHiring(null);
                       }}
                     >
-                      {GOOD_LABEL[hiring.good]} to{' '}
-                      {nodeById(to, state.farm, state.cuttingHouse).name}, and back, until told
-                      otherwise
+                      {to === 'shingle' && hiring.good === 'fleece'
+                        ? `${GOOD_LABEL[hiring.good]} to the shingle — over the gunwale when the lugger comes`
+                        : `${GOOD_LABEL[hiring.good]} to ${
+                            nodeById(to, state.farm, state.cuttingHouse).name
+                          }, and back, until told otherwise`}
                     </button>
                   ))}
                   <button onClick={() => setHiring(null)}>Think better of it</button>

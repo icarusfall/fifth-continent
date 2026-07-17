@@ -101,6 +101,86 @@ header h1 {
   white-space: nowrap;
 }
 
+/* §20.1 — THE LEDGER: the one screen that is not the map. A right-hand
+   drawer with a spine tab; the books, the purse, and the parish. */
+.ledger-panel {
+  position: absolute;
+  top: 12px;
+  right: 0;
+  z-index: 12;
+  display: flex;
+  align-items: flex-start;
+  max-height: calc(100% - 24px);
+}
+
+.ledger-tab {
+  writing-mode: vertical-rl;
+  padding: 10px 4px;
+  font-variant: small-caps;
+  letter-spacing: 0.08em;
+  border-radius: 4px 0 0 4px;
+  border-right: none;
+  background: rgba(36, 28, 24, 0.94);
+  color: var(--limewash);
+}
+
+.ledger-body {
+  width: 260px;
+  background: rgba(36, 28, 24, 0.96);
+  border: 1px solid var(--clay);
+  border-right: none;
+  border-radius: 0 0 0 4px;
+  padding: 10px 14px;
+  overflow-y: auto;
+  max-height: calc(100vh - 120px);
+  font-size: 12px;
+}
+
+.ledger-body h4 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-variant: small-caps;
+  letter-spacing: 0.04em;
+}
+
+.ledger-body h5 {
+  margin: 10px 0 2px;
+  font-size: 11px;
+  font-variant: small-caps;
+  letter-spacing: 0.06em;
+  opacity: 0.7;
+}
+
+.ledger-body p {
+  margin: 3px 0;
+  line-height: 1.45;
+}
+
+.ledger-body section + section {
+  border-top: 1px solid rgba(122, 106, 88, 0.35);
+  margin-top: 8px;
+  padding-top: 2px;
+}
+
+.ledger-hint {
+  font-style: italic;
+  opacity: 0.75;
+}
+
+.ledger-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0;
+}
+
+.ledger-controls span {
+  min-width: 24px;
+  text-align: center;
+  font-size: 15px;
+  font-weight: bold;
+}
+
 /* §6.15 — the ease-off control: a quiet inline verb, not a chrome button. */
 .hud-inline {
   background: none;
@@ -216,6 +296,30 @@ header h1 {
   padding: 10px 12px;
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5);
   z-index: 10;
+  /* A long menu scrolls inside itself rather than running off the map. */
+  max-height: 76vh;
+  overflow-y: auto;
+}
+
+/* The farm's menu earned two columns (M5a-3): verbs left, works & men right. */
+.popover.wide {
+  width: 520px;
+  max-width: calc(100vw - 24px);
+}
+
+.popover-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 16px;
+  align-items: start;
+}
+
+.popover h5 {
+  margin: 8px 0 2px;
+  font-size: 11px;
+  font-variant: small-caps;
+  letter-spacing: 0.06em;
+  opacity: 0.7;
 }
 
 .popover h4 {
@@ -564,6 +668,11 @@ button.danger {
 
   .popover {
     max-width: calc(100vw - 16px);
+  }
+
+  /* Narrow screens fold the farm's two columns back into one. */
+  .popover-cols {
+    grid-template-columns: 1fr;
   }
 
   /* The log must never bury the map: newest lines only, fading out below. */

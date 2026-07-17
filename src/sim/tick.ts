@@ -218,6 +218,22 @@ function creditProceeds(state: GameState, proceeds: number): number {
 }
 
 /**
+ * Fleece over the gunwale (§6.9), shared by the player's verb and the
+ * carter's shingle order (§6.11): the Dutchman's price, into his per-visit
+ * appetite, through his book. Returns units sold; the caller talks.
+ */
+function dutchmanFleeceSale(state: GameState, cart: Cart): number {
+  if (!state.dutchman.present) return 0;
+  const held = cart.cargo.fleece ?? 0;
+  const qty = Math.min(held, state.dutchman.fleeceAppetite);
+  if (qty <= 0) return 0;
+  cart.cargo.fleece = held - qty;
+  state.dutchman.fleeceAppetite -= qty;
+  state.coin += creditProceeds(state, qty * WOOL_PRICE_DOMESTIC * LEIDEN_PRICE_MULT);
+  return qty;
+}
+
+/**
  * The core of a Ryne sale, shared by the player's verb and the hired
  * carter (§6.11): demand cap, coin, the books, and the town's tattle.
  * Returns units sold; the caller does its own talking.
@@ -431,16 +447,11 @@ function applyAction(state: GameState, action: Action): void {
         logEvent(state, 'Shingle and sea-wrack. Nobody is buying wool from the water tonight.');
         return;
       }
-      const held = cart.cargo.fleece ?? 0;
-      const qty = Math.min(held, state.dutchman.fleeceAppetite);
+      const qty = dutchmanFleeceSale(state, cart);
       if (qty <= 0) return;
-      const price = WOOL_PRICE_DOMESTIC * LEIDEN_PRICE_MULT;
-      cart.cargo.fleece = held - qty;
-      state.dutchman.fleeceAppetite -= qty;
-      state.coin += creditProceeds(state, qty * price);
       logEvent(
         state,
-        `${qty} fleece over the gunwale for ${qty * price} coin. Four times the Ryne price, and no questions.`,
+        `${qty} fleece over the gunwale for ${qty * WOOL_PRICE_DOMESTIC * LEIDEN_PRICE_MULT} coin. Four times the Ryne price, and no questions.`,
       );
       return;
     }
@@ -938,6 +949,21 @@ function runCarters(state: GameState): void {
     }
 
     if (at === order.to && (cart.cargo[order.good] ?? 0) > 0) {
+      // The shingle order (§6.11, M5a-3): fleece goes over the gunwale when
+      // the lugger stands off; otherwise he waits on the beach with the load.
+      // He minds the tide and the lugger, and nothing else.
+      if (at === 'shingle' && order.good === 'fleece') {
+        const sold = dutchmanFleeceSale(state, cart);
+        if (sold > 0) {
+          logEvent(
+            state,
+            `The carter passes ${sold} fleece over the gunwale for ${sold * WOOL_PRICE_DOMESTIC * LEIDEN_PRICE_MULT} coin, and does not look at the boat.`,
+          );
+        }
+        if ((cart.cargo.fleece ?? 0) > 0) continue; // waiting on the lugger
+        carterDispatch(state, cart, order.from);
+        continue;
+      }
       const node = nodeById(at, state.farm, state.cuttingHouse);
       if (node.kind === 'market') {
         const sold = marketSale(state, cart, order.good);
