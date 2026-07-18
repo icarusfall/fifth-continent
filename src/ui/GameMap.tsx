@@ -31,6 +31,7 @@ import {
 } from '../sim/balance';
 import {
   SHINGLE,
+  edgeById,
   edgesFor,
   horseLatency,
   isPlaceable,
@@ -980,7 +981,10 @@ function FarmMenu({
         </>
       )}
 
-      <CartsAtNode state={state} nodeId="farm" />
+      {/* The stable roster: every cart answers to the yard, wherever its
+          wheels are — a moving sprite is no place to hang a dismiss button. */}
+      {state.carts.length > 0 && <h5>the stable</h5>}
+      <CartsAtNode state={state} nodeId="farm" stable />
     </>
   );
 }
@@ -1249,12 +1253,30 @@ function CuttingHouseMenu({ state }: { state: GameState }) {
  * Spec §20: click the place, not the pixel. Every cart standing at a node
  * shows its business here — cargo, carter, the hire flow, and the dyke.
  */
-function CartsAtNode({ state, nodeId }: { state: GameState; nodeId: NodeId }) {
+/** Where a cart is, in words — for the stable roster (a moving sprite is no
+ *  place to hang a button, so the farm lists every cart, §20). */
+function cartWhereabouts(state: GameState, cart: Cart): string {
+  if (cart.location.kind === 'node') {
+    return `at ${nodeById(cart.location.nodeId, state.farm, state.cuttingHouse).name}`;
+  }
+  return `on ${edgeById(cart.location.edgeId, state.farm, state.cuttingHouse).name.toLowerCase()}`;
+}
+
+function CartsAtNode({
+  state,
+  nodeId,
+  stable = false,
+}: {
+  state: GameState;
+  nodeId: NodeId;
+  /** The farm is the yard: list every cart, wherever its wheels are. */
+  stable?: boolean;
+}) {
   const enqueue = useEnqueue();
   const [hiring, setHiring] = useState<{ cartId: string; good: Good } | null>(null);
-  const carts = state.carts.filter(
-    (c) => c.location.kind === 'node' && c.location.nodeId === nodeId,
-  );
+  const carts = stable
+    ? state.carts
+    : state.carts.filter((c) => c.location.kind === 'node' && c.location.nodeId === nodeId);
   if (carts.length === 0) return null;
 
   // §6.11 / §10 — a carter is offered only once the manual round is a felt
@@ -1280,10 +1302,12 @@ function CartsAtNode({ state, nodeId }: { state: GameState; nodeId: NodeId }) {
     <>
       {carts.map((cart) => {
         const laden = cargoCount(cart.cargo) > 0;
+        const present = cart.location.kind === 'node' && cart.location.nodeId === nodeId;
         return (
           <div key={cart.id}>
             <p className="flavour">
               <strong>{cart.name}</strong>: {storeSummary(cart.cargo, 'empty')}
+              {!present ? ` · ${cartWhereabouts(state, cart)}` : ''}
               {cart.carter
                 ? ` · standing order: ${GOOD_LABEL[cart.carter.good]} → ${
                     nodeById(cart.carter.to, state.farm, state.cuttingHouse).name
@@ -1295,10 +1319,17 @@ function CartsAtNode({ state, nodeId }: { state: GameState; nodeId: NodeId }) {
             </p>
             <div className="menu-buttons">
               {cart.carter ? (
-                <button onClick={() => enqueue({ type: 'dismissCarter', cartId: cart.id })}>
+                <button
+                  title={
+                    present
+                      ? undefined
+                      : 'Word reaches him on the road: the order ends where he stands.'
+                  }
+                  onClick={() => enqueue({ type: 'dismissCarter', cartId: cart.id })}
+                >
                   Dismiss the carter
                 </button>
-              ) : hiring?.cartId === cart.id ? (
+              ) : !present ? null : hiring?.cartId === cart.id ? (
                 <>
                   {destinations.map((to) => (
                     <button
@@ -1335,7 +1366,7 @@ function CartsAtNode({ state, nodeId }: { state: GameState; nodeId: NodeId }) {
                   </button>
                 ))
               ) : null}
-              {laden && !cart.carter && (
+              {laden && !cart.carter && present && (
                 <button onClick={() => enqueue({ type: 'ditchCargo', cartId: cart.id })}>
                   Tip {cart.name.toLowerCase()}&rsquo;s load into a dyke · nothing comes back
                 </button>
