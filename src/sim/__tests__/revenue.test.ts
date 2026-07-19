@@ -17,6 +17,7 @@ import {
   PROMOTION_THRESHOLD,
   REGIONAL_HEAT_DECAY,
   RYNE_PRICE,
+  SEARCH_HEAT_RELIEF,
   SEIZURE_HEAT,
   STARTING_FLOCK,
   STORAGE_HEAT_COEFF,
@@ -199,13 +200,17 @@ describe('the Riding Officer (spec §6.10)', () => {
     expect(s.heat.regional).toBeGreaterThanOrEqual(6 * SEIZURE_HEAT);
   });
 
-  it('a clean search cools the trail by half', () => {
+  it('a clean search cools the trail — node suspicion and regional Heat both', () => {
     const s0 = officerBoundFor('shingle', (s) => {
       s.revenue.suspicion.shingle = 10;
+      s.heat.regional = 40; // he has come; going straight should pay
     });
     const s = runTicks(s0, 60); // the shingle is a long, sour ride
     expect(s.log.some((e) => e.text.includes('honest clutter'))).toBe(true);
     expect(s.revenue.suspicion.shingle).toBeLessThan(6); // halved, then daily decay
+    // The ×0.8 relief undercuts what dawn decay (×0.97) alone could reach in
+    // this span, so hitting the relief ceiling proves the clean-search cut.
+    expect(s.heat.regional).toBeLessThanOrEqual(40 * SEARCH_HEAT_RELIEF);
   });
 
   it('stops a cart sharing his road and takes the contraband, not the wool', () => {
@@ -283,7 +288,9 @@ describe('the books (spec §6.10 / §19.2)', () => {
       },
       [],
     );
-    expect(again.heat.regional).toBeCloseTo(after.heat.regional, 5);
+    // No new gap is priced (the page is fresh); the only change to Heat is the
+    // clean-search relief now cooling the regional meter (×SEARCH_HEAT_RELIEF).
+    expect(again.heat.regional).toBeCloseTo(after.heat.regional * SEARCH_HEAT_RELIEF, 5);
   });
 
   it('declaredYield clamps to the flock that exists', () => {

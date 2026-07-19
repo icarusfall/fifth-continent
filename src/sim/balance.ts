@@ -122,6 +122,7 @@ export const OFFICER_ARRIVAL_HEAT = 30; // first dawn regional at or above this,
 export const PATROL_THRESHOLD = 4; // max suspicion below this, he rides his beat
 export const SEIZURE_HEAT = 1.5; // regional heat per unit seized
 export const SEARCH_RELIEF = 0.5; // × suspicion at a node searched clean
+export const SEARCH_HEAT_RELIEF = 0.8; // × regional heat when a search finds you clean — going straight pays
 export const HORSE_TICKS_PER_TILE_ROAD = 0.18; // faster than any cart
 export const HORSE_TICKS_PER_TILE_MARSH = 0.45; // the marsh fights horses
 

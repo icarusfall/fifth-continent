@@ -392,8 +392,13 @@ stop       if he and a cart share an edge on the same tick, the cart is
            stopped and searched: contraband aboard is seized (cover 0)
 search     at his target node: found = max(0, illicitStored - coverCapacity);
            seized, plus heat.regional += found × SEIZURE_HEAT (1.5);
-           a clean search instead cools the trail:
+           a clean search always cools that node's trail:
            suspicion[node] ×= SEARCH_RELIEF (0.5)
+           and, so going straight visibly pays (M5a-4, playtest), it also
+           knocks the parish's regional Heat down — but only when you have
+           genuinely gone straight, nothing illicit in any store or cart
+           (a smuggler whose tubs are merely on the road earns nothing):
+           if illicitAnywhere == 0: heat.regional ×= SEARCH_HEAT_RELIEF (0.8)
            one inspection a day, then home to the Customs House
 decay      suspicion[node] ×= 0.99 at dawn — he keeps notes
 ```

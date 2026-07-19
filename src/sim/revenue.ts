@@ -22,6 +22,7 @@ import {
   PROMOTION_THRESHOLD,
   REGIONAL_HEAT_DECAY,
   SEARCH_RELIEF,
+  SEARCH_HEAT_RELIEF,
   SEIZURE_HEAT,
   STORAGE_HEAT_COEFF,
   SUSPICION_DECAY,
@@ -46,6 +47,15 @@ export const CONTRABAND: readonly Good[] = [
 
 export function illicitCount(store: Store): number {
   return CONTRABAND.reduce((sum, g) => sum + (store[g] ?? 0), 0);
+}
+
+/** Contraband held anywhere — every store and every cart. Zero means the
+ *  player has genuinely gone straight, not merely stashed the tubs elsewhere. */
+export function illicitAnywhere(state: GameState): number {
+  let n = 0;
+  for (const k of Object.keys(state.stores)) n += illicitCount(state.stores[k]);
+  for (const c of state.carts) n += illicitCount(c.cargo);
+  return n;
 }
 
 /**
@@ -251,8 +261,20 @@ function searchNode(state: GameState, nodeId: NodeId): void {
   const name = nodeById(nodeId, state.farm, state.cuttingHouse).name;
 
   if (found <= 0) {
+    // A clean search always eases the node's own suspicion. But the parish's
+    // regional Heat only falls when you have genuinely gone straight — nothing
+    // illicit anywhere (§6.10). A smuggler whose tubs are merely on the road
+    // earns no forgiveness; lie low and clear the lot, and the meter drops
+    // faster than dawn decay alone.
     state.revenue.suspicion[nodeId] = (state.revenue.suspicion[nodeId] ?? 0) * SEARCH_RELIEF;
-    logEvent(state, `The officer turns over ${name} and finds honest clutter. The trail cools.`);
+    const wentStraight = illicitAnywhere(state) <= 0;
+    if (wentStraight) state.heat.regional *= SEARCH_HEAT_RELIEF;
+    logEvent(
+      state,
+      wentStraight
+        ? `The officer turns over ${name} and finds honest clutter. The parish's suspicion of you eases.`
+        : `The officer turns over ${name} and finds honest clutter. The trail cools.`,
+    );
     return;
   }
 
