@@ -594,15 +594,12 @@ function applyAction(state: GameState, action: Action): void {
 
     case 'buyRound': {
       // Spec §6.9 (M5a-4) — asking on the quay: coin loosens the next rumour
-      // in a fixed chain, once a day, from a quay that knows your face.
+      // in a fixed chain, once a day. It is you who walks into the alehouse,
+      // not a cart — no wagon need stand in Ryne, hired carter or no.
       if (state.dutchman.unlocked || state.rumoursHeard >= RUMOUR_TRUST.length) {
         logEvent(state, 'The quay has nothing left to teach you.');
         return;
       }
-      const here = state.carts.some(
-        (c) => !c.carter && c.location.kind === 'node' && c.location.nodeId === 'ryne',
-      );
-      if (!here) return; // a hired man will not ask around for you
       const day = Math.floor(state.tick / TICKS_PER_DAY);
       if (day <= state.lastRoundDay) {
         logEvent(state, 'The alehouse has had your coin once today. Tomorrow is another thirst.');

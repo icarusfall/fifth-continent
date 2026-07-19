@@ -41,18 +41,20 @@ describe('asking on the quay (spec §6.9, M5a-4)', () => {
     expect(s.coin).toBe(50 - 2 * ROUND_COST);
   });
 
-  it('no cart of yours on the quay, no round', () => {
+  it('you stand the round yourself: no cart on the quay is needed', () => {
     const s0 = quayState(RUMOUR_TRUST[0]);
     s0.carts[0].location = { kind: 'node', nodeId: 'farm' };
     const s = tick(s0, [{ type: 'buyRound' }]);
-    expect(s.rumoursHeard).toBe(0);
+    expect(s.rumoursHeard).toBe(1);
+    expect(s.coin).toBe(50 - ROUND_COST);
   });
 
-  it('a hired man will not ask around for you', () => {
+  it('a hired carter does not stop you drinking: the round still stands', () => {
     const s0 = quayState(RUMOUR_TRUST[0]);
     s0.carts[0].carter = { from: 'farm', to: 'ryne', good: 'fleece' };
     const s = tick(s0, [{ type: 'buyRound' }]);
-    expect(s.rumoursHeard).toBe(0);
+    expect(s.rumoursHeard).toBe(1);
+    expect(s.coin).toBe(50 - ROUND_COST);
   });
 
   it('an empty till buys no rounds', () => {

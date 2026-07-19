@@ -1059,7 +1059,7 @@ function RyneMenu({ state, flooded }: { state: GameState; flooded: boolean }) {
           anyone would know about that.
         </p>
       )}
-      {cartHere && !state.dutchman.unlocked && (
+      {!state.dutchman.unlocked && (
         <div className="menu-buttons">
           <button
             disabled={quayHint !== null}

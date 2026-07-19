@@ -221,13 +221,15 @@ argument (§10 rung 3: the arithmetic, the beach, the hour); the later
 "light on the water" card still marks his first actual visit.
 
 **Asking on the quay (M5a-4, playtest).** The six days before the first
-rent held nothing but the wool round; now they hold a thread to pull. At
-Ryne, with a cart of your own standing on the quay — a hired man will not
-ask around for you — you may stand a round in the alehouse:
+rent held nothing but the wool round; now they hold a thread to pull. In
+Ryne's alehouse — the room where the parish talks — you may stand a round.
+It is you who walks in, not the cart: whether a wagon of yours happens to
+be on the quay (or whether a hired carter is doing the carting) has no
+bearing on whether the landlord will take your coin.
 
 ```
-buyRound      ROUND_COST = 2 coin, once per day, only at Ryne with an
-              idle cart of yours standing there; refused outright once
+buyRound      ROUND_COST = 2 coin, once per day; needs no cart in Ryne —
+              you stand the round yourself; refused outright once
               the Dutchman is unlocked (nothing left to learn)
 trust         the quay talks to farmers it knows: rumour n+1 is loosened
               only once soldLawfully ≥ RUMOUR_TRUST[n] = [8, 16, 24]
