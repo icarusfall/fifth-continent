@@ -62,6 +62,7 @@ import { getTerrainCanvas } from './paint';
 import {
   drawCart,
   drawCarterRoute,
+  drawCoinMote,
   drawCustoms,
   drawCuttingHouse,
   drawFarm,
@@ -76,6 +77,7 @@ import {
   drawSheep,
   drawShingle,
   drawTileHighlight,
+  drawWoolMote,
 } from './sprites';
 
 type Selection =
@@ -211,6 +213,30 @@ function carterRouteEdges(state: GameState): Set<EdgeId> {
   return served;
 }
 
+/**
+ * §20 (M5 hub polish, playtest) — feedback motes: wool blossoms when the
+ * clip lands in the barn, a guinea turns in the light where a sale is
+ * struck. UI decoration only: the sim knows nothing of them, they are
+ * never saved, and Math.random() here breaks no replay.
+ */
+interface Mote {
+  kind: 'wool' | 'coin';
+  x: number;
+  y: number;
+  /** performance.now() at which this mote begins (staggered for a flurry). */
+  born: number;
+  /** Phase offset for the wool mote's petal sway. */
+  sway: number;
+}
+
+const WOOL_MOTE_MS = 1700;
+const COIN_MOTE_MS = 1300;
+const RYNE_CENTRE = { x: 28, y: 21 };
+
+function moteLife(m: Mote): number {
+  return m.kind === 'wool' ? WOOL_MOTE_MS : COIN_MOTE_MS;
+}
+
 function routesVisible(state: GameState): boolean {
   const cart = state.carts[0];
   return (
@@ -277,6 +303,9 @@ export function GameMap({ state }: { state: GameState }) {
   const showGossipRef = useRef(false);
   showGossipRef.current = showGossip;
   const hoverTileRef = useRef<{ x: number; y: number } | null>(null);
+  // Feedback motes (§20): spawned by state deltas below, drawn by the loop.
+  const motesRef = useRef<Mote[]>([]);
+  const prevFxRef = useRef<GameState | null>(null);
   // Live touch points, for two-finger pinch. One pointer pans; two pinch.
   const pointersRef = useRef(new Map<number, { x: number; y: number }>());
 
@@ -417,6 +446,16 @@ export function GameMap({ state }: { state: GameState }) {
         drawOfficer(ctx, op.x, op.y, s.revenue.officer.location.kind === 'edge' ? op.angle : 0);
       }
 
+      // Feedback motes (§20), on top of the world they comment on.
+      const nowMs = performance.now();
+      motesRef.current = motesRef.current.filter((m) => nowMs - m.born < moteLife(m));
+      for (const m of motesRef.current) {
+        if (nowMs < m.born) continue; // staggered: not yet loosed
+        const mt = (nowMs - m.born) / moteLife(m);
+        if (m.kind === 'wool') drawWoolMote(ctx, m.x, m.y, mt, m.sway);
+        else drawCoinMote(ctx, m.x, m.y, mt);
+      }
+
       // Placement mode: the hovered tile answers before the coin is spent.
       if (placingRef.current && hoverTileRef.current) {
         const t = hoverTileRef.current;
@@ -443,6 +482,55 @@ export function GameMap({ state }: { state: GameState }) {
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
   }, []);
+
+  // ---- Feedback motes (§20): watch the tick-to-tick deltas and spawn ----
+  useEffect(() => {
+    const prev = prevFxRef.current;
+    prevFxRef.current = state;
+    if (!prev || state.tick < prev.tick) {
+      motesRef.current = []; // fresh mount or a new tenancy: no stale petals
+      return;
+    }
+    if (state.tick === prev.tick) return; // same-moment churn: nothing happened
+    const now = performance.now();
+    const spawn = (kind: Mote['kind'], at: { x: number; y: number }, n: number) => {
+      for (let i = 0; i < n; i++) {
+        motesRef.current.push({
+          kind,
+          x: at.x + Math.random() * 26 - 13,
+          y: at.y - 6 + Math.random() * 10,
+          born: now + i * 110,
+          sway: Math.random() * Math.PI * 2,
+        });
+      }
+    };
+
+    // Wool landing in the barn — the shear, the shearer, any hand at all.
+    const woolIn = (state.stores.farm?.fleece ?? 0) - (prev.stores.farm?.fleece ?? 0);
+    if (woolIn > 0) spawn('wool', tileCenter(state.farm), Math.min(woolIn, 8));
+
+    // A sale into the town's appetite (§6.9) — any good, any seller…
+    let sold = 0;
+    let contrabandByDemand = 0;
+    for (const [g, before] of Object.entries(prev.demandRemaining) as Array<[Good, number]>) {
+      const drop = (before ?? 0) - (state.demandRemaining[g] ?? 0);
+      if (drop > 0) {
+        sold += drop;
+        if (CONTRABAND.includes(g)) contrabandByDemand += drop;
+      }
+    }
+    // …plus the fence's back door (§6.17): contraband moved past what the
+    // day's appetite explains is his doing.
+    const fenced = state.contrabandSold - prev.contrabandSold - contrabandByDemand;
+    const atRyne = sold + Math.max(0, fenced);
+    if (atRyne > 0) spawn('coin', tileCenter(RYNE_CENTRE), Math.min(atRyne, 6));
+
+    // The gunwale (§6.9): wool the lugger swallowed while he stood off.
+    if (prev.dutchman.present && state.dutchman.present) {
+      const owled = prev.dutchman.fleeceAppetite - state.dutchman.fleeceAppetite;
+      if (owled > 0) spawn('coin', tileCenter(SHINGLE), Math.min(owled, 6));
+    }
+  }, [state]);
 
   // ---- Input ----
   useEffect(() => {

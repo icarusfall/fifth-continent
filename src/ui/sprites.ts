@@ -313,6 +313,67 @@ export function drawCarterRoute(
   trace();
 }
 
+// ---- Feedback motes (§20, M5 hub polish) --------------------------------
+// Little world-anchored particles: wool blossoming off the shears, a coin
+// catching the light where a sale lands. Pure decoration — the sim knows
+// nothing of them. `t` runs 0..1 over a mote's life.
+
+/** A tuft of fleece lifts, sways, and falls away like a petal. */
+export function drawWoolMote(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  t: number,
+  sway: number,
+): void {
+  const rise = Math.sin((Math.min(t, 0.35) / 0.35) * (Math.PI / 2)) * 12;
+  const fall = t > 0.35 ? (t - 0.35) * 34 : 0;
+  const px = x + Math.sin(sway + t * 5) * 6 * t;
+  const py = y - rise + fall;
+  const a = t < 0.15 ? t / 0.15 : 1 - (t - 0.15) / 0.85;
+  ctx.globalAlpha = a * 0.95;
+  ctx.fillStyle = '#F2EDE2';
+  ctx.beginPath();
+  ctx.arc(px, py, 3.8, 0, Math.PI * 2);
+  ctx.arc(px - 3, py + 1.4, 2.8, 0, Math.PI * 2);
+  ctx.arc(px + 3, py + 1.7, 2.9, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = a * 0.3;
+  ctx.fillStyle = '#B9B2A4';
+  ctx.beginPath();
+  ctx.arc(px + 1.2, py + 2.5, 2.3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
+/** A guinea turns in the light where the coin changed hands — no dollar
+ *  signs on this coast. */
+export function drawCoinMote(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  t: number,
+): void {
+  const py = y - t * 19;
+  const a = t < 0.15 ? t / 0.15 : 1 - (t - 0.15) / 0.85;
+  // The coin spins as it rises: its face squashes and opens again.
+  const face = Math.abs(Math.sin(t * Math.PI * 2.5)) * 0.6 + 0.4;
+  ctx.globalAlpha = a;
+  ctx.fillStyle = '#D8B764';
+  ctx.beginPath();
+  ctx.ellipse(x, py, 3.4 * face, 3.4, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#8F7430';
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+  ctx.globalAlpha = a * 0.8;
+  ctx.fillStyle = '#F6E7B2';
+  ctx.beginPath();
+  ctx.ellipse(x - 1 * face, py - 1.1, 1 * face, 1, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
 export function drawLabel(ctx: CanvasRenderingContext2D, text: string, x: number, y: number): void {
   ctx.font = `600 9px Georgia, serif`;
   ctx.textAlign = 'center';

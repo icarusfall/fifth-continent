@@ -1805,6 +1805,13 @@ rides — from → to → backTo → from, walked with tide-blind latencies so t
 ribbon holds still — glows with a soft translucent white line over the
 road. Overlay A's seed: what you are actually doing, visible at a glance.)*
 
+*(Feedback motes, same pass, playtest: wool blossoms off the shears and
+falls away like petals when the clip lands in the barn; a guinea turns in
+the light — no dollar signs on this coast — wherever a sale is struck, at
+Ryne's stalls, the fence's back door, or over the gunwale. So an automated
+farm still visibly* works. *UI-only particles; the sim knows nothing of
+them.)*
+
 **The killer feature, and it must be one keystroke:**
 - Overlay A: what you are actually doing.
 - Overlay B: what the Revenue thinks you are doing.
