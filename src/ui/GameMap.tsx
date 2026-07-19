@@ -13,10 +13,15 @@ import {
   CARTER_WAGE,
   CUTS,
   CUTTING_HOUSE_COST,
+  CUTTING_HOUSE_STORE_CAPACITY,
   CUT_SUGAR_COST,
+  DAILY_DEMAND,
   DUTCHMAN_PRICE,
   FARM_STORE_CAPACITY,
+  FENCE_PRICE_MULT,
   FLOCK_CAP,
+  SMOUCH_COST,
+  SMOUCH_YIELD,
   FORT_COST,
   LEIDEN_PRICE_MULT,
   MAX_CARTS,
@@ -43,7 +48,7 @@ import {
   officerEdgesFor,
 } from '../sim/map';
 import { dayPhaseOf, isFlooded, ticksUntilTideTurn } from '../sim/time';
-import { fortVisibility } from '../sim/revenue';
+import { CONTRABAND, fortVisibility } from '../sim/revenue';
 import { GOOD_LABEL, spanOf, storeSummary } from './format';
 import type { Action, Cart, CutDepth, EdgeId, GameState, Good, NodeId } from '../sim/types';
 import { useGameStore } from '../state/store';
@@ -904,6 +909,7 @@ function FarmMenu({
         {state.fleeceReady} wool on their backs · barn {stored}/
         {FARM_STORE_CAPACITY}: {storeSummary(barn, 'empty')}
       </p>
+      <StoreFill count={stored} cap={FARM_STORE_CAPACITY} />
 
       <div className="popover-cols">
         <div>
@@ -985,6 +991,14 @@ function RyneMenu({ state }: { state: GameState }) {
         Wool fetches {WOOL_PRICE_DOMESTIC} coin the fleece here, and every buyer on the quay knows
         it cannot lawfully leave the country.
       </p>
+      <p className="flavour">
+        The town will still take today —{' '}
+        {(Object.keys(DAILY_DEMAND) as Good[])
+          .filter((g) => DAILY_DEMAND[g] > 0)
+          .map((g) => `${GOOD_LABEL[g]} ${state.demandRemaining[g] ?? 0}/${DAILY_DEMAND[g]}`)
+          .join(' · ')}
+        . Sell past the day's appetite and the rest waits exposed — unless a fence takes it.
+      </p>
       {!state.dutchman.unlocked && (
         <p className="flavour">
           Across the water they pay {WOOL_PRICE_DOMESTIC * LEIDEN_PRICE_MULT} the fleece. Not that
@@ -1057,16 +1071,47 @@ function ShingleMenu({ state, onPlace }: { state: GameState; onPlace: () => void
   );
 }
 
+/**
+ * §6.17 / §20 — a store's fill against its walls, made visible: the bar reddens
+ * as goods silt toward the cap, so the §18 squeeze is felt before it deadlocks.
+ */
+function StoreFill({ count, cap }: { count: number; cap: number }) {
+  const pct = Math.min(1, cap > 0 ? count / cap : 0);
+  const hue = Math.round(120 * (1 - pct)); // green (roomy) → red (full)
+  return (
+    <div
+      title={`${count} of ${cap} — ${cap - count} units of room`}
+      style={{
+        height: 6,
+        background: 'rgba(0,0,0,0.35)',
+        borderRadius: 3,
+        overflow: 'hidden',
+        margin: '1px 0 7px',
+      }}
+    >
+      <div style={{ width: `${pct * 100}%`, height: '100%', background: `hsl(${hue} 55% 45%)` }} />
+    </div>
+  );
+}
+
 function CuttingHouseMenu({ state }: { state: GameState }) {
   const enqueue = useEnqueue();
   const store = state.stores['cutting-house'] ?? {};
+  const stored = cargoCount(store);
+  const room = CUTTING_HOUSE_STORE_CAPACITY - stored;
   const tubs = store.jenever ?? 0;
   const cuttable = Math.min(tubs, Math.floor(state.coin / CUT_SUGAR_COST));
+  const chests = store.tea ?? 0;
+  // Smouching nets one unit a chest (two out, one in), so room caps it directly.
+  const smouchable = Math.min(chests, Math.floor(state.coin / SMOUCH_COST), Math.max(0, room));
 
   return (
     <>
       <h4>The Cutting House</h4>
-      <p className="flavour">In store: {storeSummary(store, 'bare shelves')}.</p>
+      <p className="flavour">
+        In store {stored}/{CUTTING_HOUSE_STORE_CAPACITY}: {storeSummary(store, 'bare shelves')}.
+      </p>
+      <StoreFill count={stored} cap={CUTTING_HOUSE_STORE_CAPACITY} />
 
       <div className="menu-buttons">
         {tubs > 0 &&
@@ -1078,7 +1123,9 @@ function CuttingHouseMenu({ state }: { state: GameState }) {
                 disabled={cuttable <= 0}
                 title={
                   cuttable <= 0
-                    ? 'Burnt sugar costs coin, and the till is empty.'
+                    ? room <= 0
+                      ? 'The store is full — move the brandy on before cutting more.'
+                      : 'Burnt sugar costs coin, and the till is empty.'
                     : `Sugar: ${cuttable * CUT_SUGAR_COST} coin.`
                 }
                 onClick={() => enqueue({ type: 'cut', depth, tubs: 99 })}
@@ -1088,6 +1135,22 @@ function CuttingHouseMenu({ state }: { state: GameState }) {
               </button>
             );
           })}
+        {chests > 0 && (
+          <button
+            disabled={smouchable <= 0}
+            title={
+              smouchable <= 0
+                ? room <= 0
+                  ? 'The store is full — move the leaf on before smouching more.'
+                  : 'Ash and sloe cost coin, and the till is empty.'
+                : `Ash & sloe: ${smouchable * SMOUCH_COST} coin. Bulk sells cheap, but sells.`
+            }
+            onClick={() => enqueue({ type: 'smouch', chests: 99 })}
+          >
+            Smouch · {smouchable} chests → {smouchable * SMOUCH_YIELD} {GOOD_LABEL['bulked-tea']} (
+            {RYNE_PRICE['bulked-tea']} coin ea)
+          </button>
+        )}
       </div>
 
       <FortifyRow state={state} nodeId="cutting-house" />
@@ -1178,6 +1241,20 @@ function cargoButtons(
               : `${GOOD_LABEL[good]} · Ryne is sated until dawn`}
           </button>,
         );
+        // §6.17 — the fence: dump the whole load at a haircut, uncapped, so a
+        // laden cart need not sit in town waiting for the officer.
+        if (CONTRABAND.includes(good) && RYNE_PRICE[good] > 0) {
+          const fencePrice = Math.round(RYNE_PRICE[good] * FENCE_PRICE_MULT);
+          btns.push(
+            <button
+              key={`fence-${good}`}
+              title="The fence takes the whole load at once — no waiting, no appetite to fill — but pays a fraction of the stall price."
+              onClick={() => enqueue({ type: 'sellToFence', cartId: cart.id, good })}
+            >
+              Fence {n} {GOOD_LABEL[good]} · {n * fencePrice} coin
+            </button>,
+          );
+        }
       }
       break;
     }

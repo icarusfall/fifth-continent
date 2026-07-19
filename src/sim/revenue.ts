@@ -39,6 +39,7 @@ import type { Cart, GameEvent, GameState, Good, MapEdge, NodeId, Store } from '.
 export const CONTRABAND: readonly Good[] = [
   'jenever',
   'tea',
+  'bulked-tea',
   'lace',
   'brandy-rough',
   'brandy-fair',

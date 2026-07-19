@@ -322,9 +322,10 @@ chose over a worse one.
 
 **What M2 does not do** (each deferred with the system that gives it meaning):
 no Heat consumed (M3); no Standing, so quality only prices goods (buyer damage
-comes with buyers who remember); no smouching — tea sells as-is, bulking
-enters with the market model; no fulling/packing — the Dutchman takes raw
-fleece, outbound refining enters with §17.
+comes with buyers who remember); no smouching *yet* — tea sells as-is
+(bulking is brought forward to M5's cutting-house hub, §6.17, rather than
+waiting for the market model as first planned); no fulling/packing — the
+Dutchman takes raw fleece, outbound refining still enters with §17/Leiden.
 
 The arithmetic, against §6.8's squeeze: 12 fleece a day is 24 coin at Ryne or
 96 at the shingle. A full cart of 8 tubs costs 80 + 16 sugar and cuts standard
@@ -489,9 +490,12 @@ at `from`    load `good` to capacity from the store; if the store is empty
              he waits (a carter shuttles loads, not air)
 roads        between nodes joined by two edges he takes the faster one that
              is open at departure — he knows the tide like everyone born here
-at `to`      market → sell into remaining demand; otherwise unload into the
-             store (respecting its walls, §6.9); what cannot be sold or
-             unloaded rides home with him
+at `to`      market → sell into the day's remaining demand; otherwise unload
+             into the store (respecting its walls, §6.9). What cannot be sold
+             at a market he no longer sloshes home: he waits for the appetite
+             to refresh (M5, §6.17 — exposed, and it costs) up to
+             CARTER_MARKET_PATIENCE_DAYS = 2, then carries the remainder home.
+             What cannot be unloaded rides home with him
 back (M5a-4) the order may carry an optional fourth field:
              order = { from, to, good, back? }
              after the sale or the unload at `to` he loads `back` to
@@ -515,6 +519,53 @@ The carter is deliberately dumb about everything but the tide: he does not
 watch for the blue coat, he does not wait for night, and he will drive a
 cartload of contraband straight past the Customs House if that is the order
 he was given.
+
+**The origin, the products, and the sated market (M5, §6.17).** Three changes
+make the hired carter as expressive as the sim always allowed, and give a
+saturated market teeth:
+
+- *Pick the origin.* The hire picker chooses `from` as its first step
+  (defaulting to where the cart stands), so any loop among the known nodes —
+  cutting house → Ryne, Ryne → shingle — is a standing order, not just
+  farm-and-back. The sim accepted any `from`/`to` from the start (§5); only
+  the picker was farm-shaped.
+- *Name a product not yet made.* A standing order may haul a good the building
+  *produces*, not only what sits in its store this instant — the cutting house
+  always offers the three brandy tiers and bulked-tea, exactly as the farm
+  always offers fleece. Without this, "run brandy to Ryne" could not be written
+  until brandy already existed, and the picker steered the player to the dead
+  order of hauling unsellable overproof jenever instead.
+- *Wait, exposed, at a sated market.* A carter who cannot sell his whole load
+  into the day's appetite waits for it to refresh rather than sloshing the
+  surplus home and back — but a laden cart in town has no cover and is seized
+  whole if the officer inspects there (§6.10), so waiting is a gamble the
+  player enters by over-supplying. He waits up to `CARTER_MARKET_PATIENCE_DAYS`,
+  then carries the remainder home to cover rather than bleed Heat forever. The
+  escape hatch is the fence (§6.17): the player's verb, never the carter's.
+
+**The backhaul's destination, and the relay deadlock (M5, §6.17).** The
+backhaul (M5a-4, above) has until now landed at `from` — home. But an owling
+relay built that way routes contraband *through* the farm it should never
+touch: fleece out to the shingle, jenever home to the barn, a second cart on to
+the cutting house. When the flock's wool fills the barn (§18 — and it will), the
+returning jenever finds no room to land, jams the cart mid-order, and starves
+the second cart. It is a deadlock the player falls into naturally (playtest,
+2026-07). The fix is one optional field, not a route-builder:
+
+```
+order = { from, to, good, back?, backTo? }
+backTo   where the backhaul is dropped (default: from). Delivered on the way
+         home — from → to → backTo → from — so a single cart runs the whole
+         owling loop and contraband never enters the wool barn:
+         "fleece to the shingle, home with jenever, dropped at the cutting house"
+```
+
+This collapses the two-cart relay into one, keeps the farm barn purely lawful,
+and lands the jenever where it is cut (§6.17's store, cap 32). True many-stop
+routes are deliberately *not* built: one extra delivery node covers the relay
+the marsh actually asks for, and the order stays one sentence long (§5, and
+§6.11's emergent-relay principle). The ditch (§6.9) remains the manual escape
+from any jam the player has already entered.
 
 **The shingle order (added with M5a-3, at the player's request):** a standing
 order may name the shingle. A carter sent there with **fleece** sells it over
@@ -1031,11 +1082,158 @@ take sheep, so Debt is coin-payable at one remove (15 coin → 12 debt, plus
 the drive home). Appeasement having a market price softens Debt in exactly
 the direction §6.15 wants; the wights still take no coin, and never will.
 
+#### The spotlight — the flock as an early choice (M5, playtest)
+
+The flock market is live from the start, but nothing frames *growing* the
+flock as a decision — least of all against the carter's wage, the other early
+call on coin that pulls the opposite way (loading efficiency vs. supply). So a
+one-time card is raised the first dawn on or after day `FLOCK_SPOTLIGHT_DAY = 4`
+— before the first rent (day six), about when the carter comes into view —
+naming the fork and pointing at Buy a Sheep. It changes no rule; it makes an
+existing lever legible at the moment it first matters. Seen-latch in
+localStorage like the other milestone cards (§6.9), cleared on reset.
+
 #### What joins GameState
 
 `shearer` (hired flag + unlock progress) and the flock-market actions;
 `FLOCK_CAP`, prices, and the demand change live in `balance.ts`. Builds in
 **M5a** with the bench and the soft hand (§6.14 build order).
+
+---
+
+### 6.17 M5 — the cutting house as a working hub (a pre-wight economy pass)
+
+Taken before M5b (the wight) at the player's steer: the farm's alibi loop is
+finished (§6.16), so now the *crime* half earns the same depth. The cutting
+house stops being a place you visit to press a button and becomes a building
+that **stores, staffs, and refines two trades at once**. Nothing here touches
+the wight, Debt, or Leiden — it is the hub the marsh magic will later be run
+through.
+
+#### The store — dispersal, not more room
+
+The barn's 24-unit cap (§6.9 / §18) is load-bearing scarcity and does not move.
+What moves is *where* you may put things.
+
+```
+CUTTING_HOUSE_STORE_CAPACITY = 32   its own store, larger than the barn's 24
+cover                               COVER_CAPACITY['cutting-house'] = 6 already
+                                    (§6.10) — more than the farm's 4: the house
+                                    was built to hide the trade
+```
+
+The cutting house already holds goods and already hides more of them than the
+farm; M5 merely *names* this as storage and surfaces it (§20). The point is not
+extra room — it is **dispersal**. The officer searches one node a dawn and
+seizes what that node's cover cannot hide (§6.10); goods split across the farm
+and the cutting house lose less to any one search than the same stock heaped in
+one place. Splitting your goods is the smuggler's oldest habit, and the sim
+already rewards it: a second covered store is a place the search does not reach
+today, bought against a place that can be stained tomorrow. (A cart parked at
+Ryne is the opposite of this — no cover at all, and the town is exactly where
+the officer goes: §6.11.)
+
+**The early trigger.** The cutting house is offered the first time the barn
+hits its cap, in storage framing ("the wool is backing up — you need a second
+floor"), *in addition to* the existing overproof-jenever trigger (§6.9). Same
+building, two reasons to raise it, whichever bites first — so the storage
+squeeze can summon it before the crime does. Playtest, 2026-07.
+
+#### The refiner — the house that runs itself
+
+The cutting house's verbs — cut, and now smouch — automate on the shearer's
+pattern (§6.16): one hired hand, at dawn, works the whole house.
+
+```
+unlock       offered after REFINER_UNLOCK = 6 acts of processing by hand
+             (cuts and smouches together), or once a carter is hired
+hire         REFINER_WAGE = 2 coin/day, due at dawn with the wool — dearer than
+             the shearer's 1: this hand knows what the work is, and what it is
+standing     the player sets his instruction; he holds to it:
+  cut        a depth (gentle / standard / deep, §6.9) — at dawn he cuts all
+             jenever in the house at that depth
+  smouch     a toggle — at dawn he smouches all tea in the house (below)
+behaviour    dumb as the shearer: he refines what is there to the standing
+             instruction and does nothing else — no selling, no hauling, no
+             watching the road
+wages unpaid he walks off the same morning; refining is a player verb again
+payroll      another hired mouth for the informer pool (§6.11)
+```
+
+Automating the crime's *production* is a sharper act than automating the wool:
+the shearer clips an alibi, the refiner manufactures contraband while you
+sleep. That is the point — the hub is where "run the tubs yourself" stops being
+mandatory and becomes a choice with a wage attached.
+
+#### Smouching — the second market for tea
+
+§4's promise, brought forward from §17: tea has two buyers at Ryne, not one.
+
+```
+smouch       1 tea + SMOUCH_COST = 1 coin (ash & sloe leaves, dyed) →
+             SMOUCH_YIELD = 2 bulked-tea. Volume doubles; quality falls
+raw tea      to the discerning: RYNE_PRICE.tea = 7, demand 8/day
+bulked-tea   to the undiscerning: price ~4, demand ~16/day — a fatter, cheaper
+             channel the fine market never touches (opening bids; tuned in the
+             distribution test, §13)
+```
+
+The design is the *choice*, not the arithmetic: when your inbound tea outruns
+Ryne's taste for the real thing, smouch the surplus and move bulk into the
+market the discerning buyer will not enter. It is the inbound twin of the cut —
+adulteration for margin — and it is what makes the refiner a *refinery* rather
+than a one-button automation. `bulked-tea` is a new good and a new store key;
+it is contraband, like the brandy it keeps company with.
+
+*Deviation from §4, noted and deliberate:* §4 says every refining stage is
+another building to cover. Smouching instead **shares the cutting house** — one
+covered building running two crimes is a cleaner decision than two roofs to
+hide, and the whole point of this pass is to make that one building a hub.
+
+#### The fence — the way out of a sated market
+
+Ryne's daily appetite is a wall (§6.9): sell into it and the town is done until
+dawn. A carter left holding the surplus **waits, exposed** (§6.11) — a laden
+cart in town heats the parish every tick and is seized whole if the officer
+inspects Ryne (§6.10). The fence is the priced way not to run that risk.
+
+```
+sellToFence   a back-door buyer at Ryne, uncapped by the daily appetite, pays
+              FENCE_PRICE_MULT = 0.6 of the town price for any contraband —
+              brandy, bulked or raw tea, lace
+manual only   the fence is the player's verb, never the carter's: automation
+              may not fence its way out of the risk it was sent into. You see
+              the stuck load and dump it cheap, or drive it home yourself, or
+              leave it to the officer
+```
+
+Over-supply becomes a decision made every run rather than a silent ceiling:
+wait exposed for full price, dump to the fence at a 40% haircut and roll home
+clean, or run the hot leg yourself and be gone before the blue coat. The
+confiscation risk is real (§6.11); the fence is how you buy out of it, with
+margin — the game's only honest currency.
+
+#### What joins GameState (save bump)
+
+`refiner` (hired flag, standing cut depth, smouch toggle, unlock progress);
+`bulked-tea` as a store key (no schema change — a new `Good`). The cutting
+house's larger cap and the fence read from `balance.ts`; the flock-spotlight
+card's seen-latch is localStorage like its siblings (§6.16), not state. Save
+key → **v13**. All JSON-plain.
+
+#### Build order (stop at each, as ever)
+
+- **the goods and the verbs** — `bulked-tea`, the manual smouch, the
+  cutting-house store cap + surfaced readout (§20), the fence, and Ryne's
+  remaining-appetite made visible in the sell/hire UI. Sim + unit tests.
+- **the automation and the wheels** — the refiner; the carter's origin pick,
+  its products-haulable list, its `backTo` drop node, and the
+  wait-exposed-at-a-sated-market behaviour with its patience cap (§6.11). The
+  day-4 flock spotlight (§6.16). Sim + tests.
+- **the distribution pass** — 200 seeded games confirming dispersal and
+  smouching do not defuse §18's barn-silt pressure, and the hub still cannot
+  out-earn the intended ceiling without the lawful leg carrying its weight
+  (the M5a-4 relay learning, §18).
 
 ---
 
@@ -1509,6 +1707,13 @@ husbandry: the three prohibitions above stand.)*
 
 ### 19.3 Inventory limits — **KEEP, and make them vicious**
 See §18. Small caps, high Heat, no buffering.
+
+*(M5, §6.17: a second covered store — the cutting house — is **dispersal, not
+relief**. The caps stay small; splitting stock across two hidden stores loses
+less to any one search but stains two nodes instead of one, and each still
+bleeds Heat over its own cover. A laden cart parked at an uncovered market is
+the anti-pattern this whole rule warns against — evidence, in the open, where
+the officer looks.)*
 
 ---
 

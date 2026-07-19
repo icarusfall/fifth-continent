@@ -16,6 +16,7 @@ export type Good =
   | 'fleece'
   | 'jenever'
   | 'tea'
+  | 'bulked-tea'
   | 'lace'
   | 'brandy-rough'
   | 'brandy-fair'
@@ -273,6 +274,8 @@ export type Action =
   | { type: 'buyFromDutchman'; cartId: CartId; good: Good; qty: number }
   | { type: 'placeCuttingHouse'; x: number; y: number }
   | { type: 'cut'; depth: CutDepth; tubs: number }
+  | { type: 'smouch'; chests: number }
+  | { type: 'sellToFence'; cartId: CartId; good: Good }
   | { type: 'buyCart' }
   | { type: 'sellCart'; cartId: CartId }
   | { type: 'buyRound' }

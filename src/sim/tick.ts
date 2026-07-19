@@ -25,10 +25,14 @@ import {
   SHEEP_PRICE_BUY,
   SHEEP_PRICE_SELL,
   FARM_STORE_CAPACITY,
+  CUTTING_HOUSE_STORE_CAPACITY,
   CREW_MUSTER,
   CREW_WAGE,
   CUTTING_HOUSE_COST,
   CUT_SUGAR_COST,
+  SMOUCH_COST,
+  SMOUCH_YIELD,
+  FENCE_PRICE_MULT,
   DAILY_DEMAND,
   FORT_COST,
   GARRISON_BASE,
@@ -57,6 +61,7 @@ import {
 } from './balance';
 import { FARM_SITE, edgeById, edgesFor, firstHop, isPlaceable, nodeById, otherEnd } from './map';
 import {
+  CONTRABAND,
   accrueDitchHeat,
   accrueMarketTattle,
   accrueRouteHeat,
@@ -182,6 +187,22 @@ function addToStore(store: Store, good: keyof Store, qty: number): void {
 
 function cargoCount(cargo: Store): number {
   return Object.values(cargo).reduce((a, b) => a + (b ?? 0), 0);
+}
+
+/**
+ * Store walls by node (spec §6.9 / §6.17): the barn and the cutting house have
+ * finite room — the cutting house larger, a purpose-built store. Markets and
+ * beaches are open ground with no walls.
+ */
+function storeCapacityOf(nodeId: NodeId): number {
+  if (nodeId === 'farm') return FARM_STORE_CAPACITY;
+  if (nodeId === 'cutting-house') return CUTTING_HOUSE_STORE_CAPACITY;
+  return Number.MAX_SAFE_INTEGER;
+}
+
+/** Room left in a node's store (spec §6.17). */
+function storeRoom(state: GameState, nodeId: NodeId): number {
+  return storeCapacityOf(nodeId) - cargoCount(state.stores[nodeId] ?? {});
 }
 
 function logEvent(state: GameState, text: string): void {
@@ -349,11 +370,9 @@ function applyAction(state: GameState, action: Action): void {
       }
       const held = cart.cargo[action.good] ?? 0;
       const nodeId = cart.location.nodeId;
-      // Only the barn has walls (spec §6.9); other stores stay open ground for now.
-      const room =
-        nodeId === 'farm'
-          ? FARM_STORE_CAPACITY - cargoCount(state.stores[nodeId] ?? {})
-          : Number.MAX_SAFE_INTEGER;
+      // The barn and the cutting house have walls (spec §6.9 / §6.17); markets
+      // and beaches are open ground.
+      const room = storeRoom(state, nodeId);
       const qty = Math.min(action.qty, held, room);
       if (qty <= 0) {
         if (held > 0 && room <= 0) {
@@ -444,6 +463,36 @@ function applyAction(state: GameState, action: Action): void {
       return;
     }
 
+    case 'sellToFence': {
+      // §6.17 — the back-door buyer: takes surplus contraband whole, uncapped by
+      // the day's appetite, at a haircut. The priced way out of a sated market,
+      // so a laden cart need not sit in town waiting to be seized (§6.10/§6.11).
+      const cart = findCart(state, action.cartId);
+      if (!cart || underOrders(state, cart)) return;
+      if (cart.location.kind !== 'node') return;
+      const node = nodeById(cart.location.nodeId, state.farm, state.cuttingHouse);
+      if (node.kind !== 'market') {
+        logEvent(state, `No fence at ${node.name}.`);
+        return;
+      }
+      if (!CONTRABAND.includes(action.good) || RYNE_PRICE[action.good] <= 0) {
+        logEvent(state, 'The fence deals in contraband, not honest goods.');
+        return;
+      }
+      const held = cart.cargo[action.good] ?? 0;
+      if (held <= 0) return;
+      const price = Math.round(RYNE_PRICE[action.good] * FENCE_PRICE_MULT);
+      cart.cargo[action.good] = 0; // he takes the lot
+      const proceeds = held * price;
+      state.coin += creditProceeds(state, proceeds);
+      accrueMarketTattle(state, action.good, held);
+      logEvent(
+        state,
+        `The fence takes all ${held} ${action.good} for ${proceeds} coin — a fraction of the town price, and no waiting.`,
+      );
+      return;
+    }
+
     case 'sellToDutchman': {
       const cart = findCart(state, action.cartId);
       if (!cart || underOrders(state, cart)) return;
@@ -509,17 +558,24 @@ function applyAction(state: GameState, action: Action): void {
       if (!state.cuttingHouse) return;
       const store = state.stores['cutting-house'] ?? {};
       const cut = CUTS[action.depth];
+      // Cutting grows the store (a tub in, yield out): it must fit the walls
+      // (§6.17). Each tub nets (yield − 1) beyond the jenever it consumes.
+      const room = storeRoom(state, 'cutting-house');
+      const maxByRoom = Math.floor(Math.max(0, room) / (cut.yield - 1));
       const tubs = Math.min(
         action.tubs,
         store.jenever ?? 0,
         Math.floor(state.coin / CUT_SUGAR_COST),
+        maxByRoom,
       );
       if (tubs <= 0) {
         logEvent(
           state,
           (store.jenever ?? 0) <= 0
             ? 'No tubs at the cutting house. The Dutchman sells them.'
-            : 'Burnt sugar costs coin, and the till is empty.',
+            : room <= 0
+              ? 'The cutting house store is full; move the brandy on before cutting more.'
+              : 'Burnt sugar costs coin, and the till is empty.',
         );
         return;
       }
@@ -530,6 +586,41 @@ function applyAction(state: GameState, action: Action): void {
       logEvent(
         state,
         `Cut ${tubs} tub${tubs === 1 ? '' : 's'} ${action.depth}: ${tubs * cut.yield} of ${cut.brandy} for the town.`,
+      );
+      return;
+    }
+
+    case 'smouch': {
+      // §6.17 — the inbound twin of the cut: ash and sloe stretch the bohea to
+      // twice the volume at a lower grade, feeding the cheap second market.
+      if (!state.cuttingHouse) return;
+      const store = state.stores['cutting-house'] ?? {};
+      const room = storeRoom(state, 'cutting-house');
+      const maxByRoom = Math.floor(Math.max(0, room) / (SMOUCH_YIELD - 1));
+      const chests = Math.min(
+        action.chests,
+        store.tea ?? 0,
+        Math.floor(state.coin / SMOUCH_COST),
+        maxByRoom,
+      );
+      if (chests <= 0) {
+        logEvent(
+          state,
+          (store.tea ?? 0) <= 0
+            ? 'No bohea at the cutting house to smouch.'
+            : room <= 0
+              ? 'The cutting house store is full; move the leaf on before smouching more.'
+              : 'Ash and sloe cost coin, and the till is empty.',
+        );
+        return;
+      }
+      store.tea = (store.tea ?? 0) - chests;
+      state.coin -= chests * SMOUCH_COST;
+      addToStore(store, 'bulked-tea', chests * SMOUCH_YIELD);
+      state.stores['cutting-house'] = store;
+      logEvent(
+        state,
+        `Smouched ${chests} chest${chests === 1 ? '' : 's'}: ${chests * SMOUCH_YIELD} of bulked tea, ash and sloe and all.`,
       );
       return;
     }
@@ -1058,10 +1149,7 @@ function carterBackload(state: GameState, cart: Cart, order: CarterOrder): void 
 function carterUnloadForeign(state: GameState, cart: Cart, outbound: Good, at: NodeId): void {
   for (const [good, held] of Object.entries(cart.cargo) as Array<[Good, number]>) {
     if (good === outbound || held <= 0) continue;
-    const roomHere =
-      at === 'farm'
-        ? FARM_STORE_CAPACITY - cargoCount(state.stores[at] ?? {})
-        : Number.MAX_SAFE_INTEGER;
+    const roomHere = storeRoom(state, at);
     const qty = Math.min(held, Math.max(0, roomHere));
     if (qty <= 0) continue;
     cart.cargo[good] = held - qty;
@@ -1123,10 +1211,7 @@ function runCarters(state: GameState): void {
         } else {
           // Unload into the store, respecting the barn's walls (§6.9).
           const held = cart.cargo[order.good] ?? 0;
-          const roomHere =
-            at === 'farm'
-              ? FARM_STORE_CAPACITY - cargoCount(state.stores[at] ?? {})
-              : Number.MAX_SAFE_INTEGER;
+          const roomHere = storeRoom(state, at);
           const qty = Math.min(held, Math.max(0, roomHere));
           if (qty > 0) {
             cart.cargo[order.good] = held - qty;

@@ -34,6 +34,10 @@ export const CART_CAPACITY = 8; // fleece per run; 12 sheep/day forces a second 
 
 // ---- The barn (spec §6.9 / §18: storage is scarce — the cap arrives before the Heat) ----
 export const FARM_STORE_CAPACITY = 24; // units, all goods together — one lugger-load of wool
+// §6.17: the cutting house is a purpose-built store, larger than the barn and
+// better hidden (cover 6 > 4). Splitting stock across the two is dispersal, not
+// relief — the officer searches one node a dawn, so spread goods lose less.
+export const CUTTING_HOUSE_STORE_CAPACITY = 32;
 
 // ---- Roads (spec §6.7: latency = max(1, round(pathTileLength × ticksPerTile))) ----
 export const LOW_ROAD_TICKS_PER_TILE = 0.26; // flat and direct, when the sea allows
@@ -68,6 +72,10 @@ export const DUTCHMAN_PRICE: Partial<Record<Good, number>> = {
 // ---- The cutting house (spec §6.9) ----
 export const CUTTING_HOUSE_COST = 60; // coin, sited on open marsh
 export const CUT_SUGAR_COST = 2; // coin per tub — water and burnt sugar
+// §6.17 — smouching: the inbound twin of the cut. Ash & sloe leaves stretch the
+// bohea to twice the volume at a lower grade, opening the cheap second market.
+export const SMOUCH_COST = 1; // coin per chest of tea — ash, sloe leaves, dye
+export const SMOUCH_YIELD = 2; // chests of bulked-tea per chest of raw
 /** Depth of cut: volume against tier. The player's hand on the till. */
 export const CUTS: Record<CutDepth, { yield: number; brandy: Good }> = {
   gentle: { yield: 2, brandy: 'brandy-gent' },
@@ -77,12 +85,17 @@ export const CUTS: Record<CutDepth, { yield: number; brandy: Good }> = {
 
 // ---- The Ryne market: fixed prices, daily appetite (spec §6.9) ----
 // §17's moving prices wait for their milestone. Jenever price 0 = no legal buyer.
+// §6.17 — the fence: a back-door buyer at Ryne, uncapped by the daily appetite,
+// who takes surplus contraband off your hands at a haircut. The priced way out
+// of a sated market, so a laden cart need not sit in town waiting to be seized.
+export const FENCE_PRICE_MULT = 0.6;
 export const BRANDY_BASE_PRICE = 6;
 export const QUALITY_MULT = { rough: 0.6, fair: 1.0, gent: 1.8 } as const; // §17.3
 export const RYNE_PRICE: Record<Good, number> = {
   fleece: WOOL_PRICE_DOMESTIC,
   jenever: 0,
   tea: 7,
+  'bulked-tea': 4, // §6.17: the undiscerning buyer pays less for the stretched leaf
   lace: 24,
   'brandy-rough': Math.round(BRANDY_BASE_PRICE * QUALITY_MULT.rough),
   'brandy-fair': Math.round(BRANDY_BASE_PRICE * QUALITY_MULT.fair),
@@ -95,6 +108,7 @@ export const DAILY_DEMAND: Record<Good, number> = {
   fleece: 16,
   jenever: 0,
   tea: 8,
+  'bulked-tea': 16, // §6.17: a fatter, cheaper channel than the fine leaf's 8
   lace: 2,
   'brandy-rough': 10,
   'brandy-fair': 6,

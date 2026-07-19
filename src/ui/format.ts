@@ -14,6 +14,7 @@ export const GOOD_LABEL: Record<Good, string> = {
   fleece: 'fleece',
   jenever: 'tubs of jenever',
   tea: 'bohea tea',
+  'bulked-tea': 'bulked tea',
   lace: 'lace',
   'brandy-rough': 'rough brandy',
   'brandy-fair': 'fair brandy',
