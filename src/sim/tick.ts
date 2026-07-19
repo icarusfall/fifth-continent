@@ -692,19 +692,21 @@ function applyAction(state: GameState, action: Action): void {
     case 'hireCarter': {
       const cart = findCart(state, action.cartId);
       if (!cart) return;
-      if (cart.carter) {
-        logEvent(state, `${cart.name} already has a man on the reins.`);
-        return;
-      }
       const { from, to } = action.order;
       const nodesKnown = ['farm', 'ryne', 'shingle', ...(state.cuttingHouse ? ['cutting-house'] : [])];
       if (from === to || !nodesKnown.includes(from) || !nodesKnown.includes(to)) return;
+      // A man already on the reins takes new orders in place — no need to pay
+      // him off and hire afresh just to redirect the round (spec §6.11).
+      const reorder = !!cart.carter;
       cart.carter = { ...action.order };
+      const route = `${nodeById(from, state.farm, state.cuttingHouse).name} to ${
+        nodeById(to, state.farm, state.cuttingHouse).name
+      }${action.order.back ? `, home with ${action.order.back}` : ''}`;
       logEvent(
         state,
-        `A carter takes ${cart.name}: ${nodeById(from, state.farm, state.cuttingHouse).name} to ${
-          nodeById(to, state.farm, state.cuttingHouse).name
-        }${action.order.back ? `, home with ${action.order.back}` : ''}, ${CARTER_WAGE} coin a day. He does not ask what is in the load.`,
+        reorder
+          ? `New orders for ${cart.name}: ${route}. The same man keeps the reins.`
+          : `A carter takes ${cart.name}: ${route}, ${CARTER_WAGE} coin a day. He does not ask what is in the load.`,
       );
       return;
     }

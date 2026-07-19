@@ -339,3 +339,27 @@ describe('the wheelwright buys back (spec §6.11: sellCart)', () => {
     expect(ids).toContain('cart-2');
   });
 });
+
+describe('the carter takes new orders in place (spec §6.11)', () => {
+  it('re-hiring redirects the same man — no paying off and rehiring', () => {
+    let s = tick(initialState(1), [
+      { type: 'hireCarter', cartId: 'cart-1', order: { from: 'farm', to: 'ryne', good: 'fleece' } },
+    ]);
+    expect(s.carts[0].carter).toEqual({ from: 'farm', to: 'ryne', good: 'fleece' });
+    // Redirect without dismissing first: the order is overwritten in place.
+    s = tick(s, [
+      {
+        type: 'hireCarter',
+        cartId: 'cart-1',
+        order: { from: 'farm', to: 'shingle', good: 'fleece', back: 'jenever' },
+      },
+    ]);
+    expect(s.carts[0].carter).toEqual({
+      from: 'farm',
+      to: 'shingle',
+      good: 'fleece',
+      back: 'jenever',
+    });
+    expect(s.carts).toHaveLength(1);
+  });
+});

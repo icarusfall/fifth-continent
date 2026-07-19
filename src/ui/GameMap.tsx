@@ -1379,20 +1379,30 @@ function CartsAtNode({
   const close = useContext(CloseCtx);
   const flooded = isFlooded(state.tick);
   // The picker walks a sentence (§6.11): good → destination → the back leg.
-  const [hiring, setHiring] = useState<{ cartId: string; good: Good; to?: NodeId } | null>(null);
+  // The order picker walks a sentence (§6.11): good → destination → back leg.
+  // `from` is the node the order loads at — the menu's node for a fresh hire,
+  // or the carter's existing base when re-ordering a man already on the reins.
+  const [hiring, setHiring] = useState<{
+    cartId: string;
+    from: NodeId;
+    good?: Good;
+    to?: NodeId;
+  } | null>(null);
   const carts = stable
     ? state.carts
     : state.carts.filter((c) => c.location.kind === 'node' && c.location.nodeId === nodeId);
   if (carts.length === 0) return null;
 
-  const hire = (cartId: string, to: NodeId, good: Good, back?: Good) => {
+  const hire = (cartId: string, from: NodeId, to: NodeId, good: Good, back?: Good) => {
     enqueue({
       type: 'hireCarter',
       cartId,
-      order: { from: nodeId, to, good, ...(back ? { back } : {}) },
+      order: { from, to, good, ...(back ? { back } : {}) },
     });
     setHiring(null);
-    // A hired cart is directed: if that was the last one, the visit is over (§20).
+    // A directed cart is dealt with: if that was the last undirected one, the
+    // visit is over (§20). Re-orders never empty the yard (the cart was
+    // already crewed), so they leave the menu open.
     if (undirectedCartsAt(state, nodeId, cartId) === 0) close();
   };
 
@@ -1402,23 +1412,25 @@ function CartsAtNode({
   const carterAvailable =
     state.dutchman.unlocked || (state.ledger.soldLawfully >= CARTER_UNLOCK_FLEECE);
 
-  // A standing order runs from where the cart stands (spec §6.11).
-  const haulables = Array.from(
-    new Set([
-      ...(Object.entries(state.stores[nodeId] ?? {}) as Array<[Good, number]>)
-        .filter(([, n]) => n > 0)
-        .map(([g]) => g),
-      ...(nodeId === 'farm' ? (['fleece'] as Good[]) : []),
-    ]),
-  );
-  // The shingle is named only once the Dutchman is (§6.11) — no menu speaks
-  // of the trade before the coast has.
-  const destinations = (['farm', 'ryne', 'shingle', 'cutting-house'] as NodeId[]).filter(
-    (n) =>
-      n !== nodeId &&
-      (n !== 'cutting-house' || state.cuttingHouse) &&
-      (n !== 'shingle' || state.dutchman.unlocked),
-  );
+  // A standing order loads from a node: what it can haul, and where to. The
+  // shingle is named only once the Dutchman is (§6.11) — no menu speaks of
+  // the trade before the coast has.
+  const haulablesFrom = (from: NodeId): Good[] =>
+    Array.from(
+      new Set([
+        ...(Object.entries(state.stores[from] ?? {}) as Array<[Good, number]>)
+          .filter(([, n]) => n > 0)
+          .map(([g]) => g),
+        ...(from === 'farm' ? (['fleece'] as Good[]) : []),
+      ]),
+    );
+  const destinationsFrom = (from: NodeId): NodeId[] =>
+    (['farm', 'ryne', 'shingle', 'cutting-house'] as NodeId[]).filter(
+      (n) =>
+        n !== from &&
+        (n !== 'cutting-house' || state.cuttingHouse) &&
+        (n !== 'shingle' || state.dutchman.unlocked),
+    );
 
   return (
     <>
@@ -1449,68 +1461,93 @@ function CartsAtNode({
             <div className="menu-buttons">
               {drivable && cargoButtons(nodeId, state, cart, enqueue)}
               {drivable && roadButtons(nodeId, state, cart, send, flooded)}
-              {cart.carter ? (
-                <button
-                  title={
-                    present
-                      ? undefined
-                      : 'Word reaches him on the road: the order ends where he stands.'
-                  }
-                  onClick={() => enqueue({ type: 'dismissCarter', cartId: cart.id })}
-                >
-                  Dismiss the carter
-                </button>
-              ) : !present ? null : hiring?.cartId === cart.id && hiring.to === undefined ? (
-                <>
-                  {destinations.map((to) => (
-                    <button
-                      key={to}
-                      title={
-                        to === 'shingle' && hiring.good === 'fleece'
-                          ? 'He sells over the gunwale whenever the lugger stands off — and the books will not record it (§6.10).'
-                          : undefined
-                      }
-                      onClick={() => {
-                        // Destinations with something worth fetching ask one
-                        // more question (§6.11: the back leg); the rest hire.
-                        if (backOptionsFor(to).length > 0) setHiring({ ...hiring, to });
-                        else hire(cart.id, to, hiring.good);
-                      }}
-                    >
-                      {to === 'shingle' && hiring.good === 'fleece'
-                        ? `${GOOD_LABEL[hiring.good]} to the shingle — over the gunwale when the lugger comes`
-                        : `${GOOD_LABEL[hiring.good]} to ${
-                            nodeById(to, state.farm, state.cuttingHouse).name
-                          }`}
+              {hiring?.cartId === cart.id ? (
+                hiring.good === undefined ? (
+                  // Re-order (§6.11): choose the new load first. The current
+                  // load is always offered, so the picker never dead-ends.
+                  <>
+                    {Array.from(
+                      new Set([
+                        ...haulablesFrom(hiring.from),
+                        ...(cart.carter ? [cart.carter.good] : []),
+                      ]),
+                    ).map((good) => (
+                      <button key={good} onClick={() => setHiring({ ...hiring, good })}>
+                        Have him haul {GOOD_LABEL[good]}
+                      </button>
+                    ))}
+                    <button onClick={() => setHiring(null)}>Never mind — leave the order</button>
+                  </>
+                ) : hiring.to === undefined ? (
+                  <>
+                    {destinationsFrom(hiring.from).map((to) => (
+                      <button
+                        key={to}
+                        title={
+                          to === 'shingle' && hiring.good === 'fleece'
+                            ? 'He sells over the gunwale whenever the lugger stands off — and the books will not record it (§6.10).'
+                            : undefined
+                        }
+                        onClick={() => {
+                          // Destinations with something worth fetching ask one
+                          // more question (§6.11: the back leg); the rest hire.
+                          if (backOptionsFor(to).length > 0) setHiring({ ...hiring, to });
+                          else hire(cart.id, hiring.from, to, hiring.good!);
+                        }}
+                      >
+                        {to === 'shingle' && hiring.good === 'fleece'
+                          ? `${GOOD_LABEL[hiring.good]} to the shingle — over the gunwale when the lugger comes`
+                          : `${GOOD_LABEL[hiring.good!]} to ${
+                              nodeById(to, state.farm, state.cuttingHouse).name
+                            }`}
+                      </button>
+                    ))}
+                  </>
+                ) : (
+                  <>
+                    <button onClick={() => hire(cart.id, hiring.from, hiring.to!, hiring.good!)}>
+                      …and home empty-handed, until told otherwise
                     </button>
-                  ))}
-                </>
-              ) : hiring?.cartId === cart.id && hiring.to !== undefined ? (
+                    {backOptionsFor(hiring.to).map((g) => (
+                      <button
+                        key={g}
+                        title={
+                          hiring.to === 'shingle'
+                            ? 'He buys with the coin in the till, to the cart’s room. No credit, and no keeping back the rent.'
+                            : undefined
+                        }
+                        onClick={() => hire(cart.id, hiring.from, hiring.to!, hiring.good!, g)}
+                      >
+                        {hiring.to === 'shingle'
+                          ? `…and home with ${GOOD_LABEL[g]}, bought off the lugger with the till’s coin`
+                          : `…and home with ${GOOD_LABEL[g]}, when the store holds any`}
+                      </button>
+                    ))}
+                  </>
+                )
+              ) : cart.carter ? (
                 <>
-                  <button onClick={() => hire(cart.id, hiring.to!, hiring.good)}>
-                    …and home empty-handed, until told otherwise
+                  <button
+                    onClick={() => setHiring({ cartId: cart.id, from: cart.carter!.from })}
+                  >
+                    Change standing order
                   </button>
-                  {backOptionsFor(hiring.to).map((g) => (
-                    <button
-                      key={g}
-                      title={
-                        hiring.to === 'shingle'
-                          ? 'He buys with the coin in the till, to the cart’s room. No credit, and no keeping back the rent.'
-                          : undefined
-                      }
-                      onClick={() => hire(cart.id, hiring.to!, hiring.good, g)}
-                    >
-                      {hiring.to === 'shingle'
-                        ? `…and home with ${GOOD_LABEL[g]}, bought off the lugger with the till’s coin`
-                        : `…and home with ${GOOD_LABEL[g]}, when the store holds any`}
-                    </button>
-                  ))}
+                  <button
+                    title={
+                      present
+                        ? undefined
+                        : 'Word reaches him on the road: the order ends where he stands.'
+                    }
+                    onClick={() => enqueue({ type: 'dismissCarter', cartId: cart.id })}
+                  >
+                    Dismiss the carter
+                  </button>
                 </>
-              ) : carterAvailable ? (
-                haulables.map((good) => (
+              ) : !present ? null : carterAvailable ? (
+                haulablesFrom(nodeId).map((good) => (
                   <button
                     key={good}
-                    onClick={() => setHiring({ cartId: cart.id, good })}
+                    onClick={() => setHiring({ cartId: cart.id, from: nodeId, good })}
                   >
                     Hire a carter to haul {GOOD_LABEL[good]} · {CARTER_WAGE} coin a day
                   </button>

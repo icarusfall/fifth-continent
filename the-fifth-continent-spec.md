@@ -499,6 +499,11 @@ at `from`    anything aboard that is not the outbound good is unloaded
              cannot fit stays aboard and eats the cart's room)
 wages        unpaid at dawn → he walks off the same morning; the cart stands
              where he left it, order cleared
+re-order     hireCarter on a cart that already has a man overwrites the
+   (M5a-4)   order in place — same carter, new round — so redirecting a
+             standing order costs no paying-off-and-rehiring dance (the UI
+             "Change standing order" button re-opens the picker from the
+             carter's existing `from`; he adopts the new order next tick)
 dismiss      at will, no severance; the order clears
 ```
 The carter is deliberately dumb about everything but the tide: he does not
