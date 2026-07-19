@@ -19,7 +19,7 @@ import { simulateBattle } from '../sim/combat';
 import type { BattleSetup, Call, CombatLog, ScheduledCall } from '../sim/combat';
 import { nodeById } from '../sim/map';
 import { raidBattleSetup } from '../sim/raid';
-import { initialState, rentAmount, tick } from '../sim/tick';
+import { initialState, QUAY_RUMOURS, rentAmount, tick } from '../sim/tick';
 import type { Action, ActionLog, Difficulty, GameState, NodeId } from '../sim/types';
 
 // v11: M5a adds difficulty, mercy (dutchmanBook, vouches), the shearer, the
@@ -45,6 +45,9 @@ export interface EventCard {
   kind: 'rent' | 'info' | 'raid' | 'newGame';
   title: string;
   body: string;
+  /** Optional scene-setting line shown above the body (e.g. the alehouse's
+   *  local colour, §6.9). Pure decoration — never touches the sim or the save. */
+  flavour?: string;
 }
 
 /** A battle being watched (spec §14). The store re-runs the deterministic sim
@@ -134,6 +137,36 @@ function vouchCard(next: GameState): EventCard {
     kind: 'info',
     title: 'The parish vouches',
     body: 'The rent could not be met, and the agent came for the whole flock — but the neighbours made it up before he reached the fold. No book records it. The marsh keeps accounts, and thinks a little less of your luck.',
+  };
+}
+
+// §6.9 (M5a-4) — the alehouse's local colour: a random vignette per round,
+// pure decoration above the rumour. It never touches the sim or the save, so
+// Math.random() here breaks no replay (activeCard is UI-only, house rule 1).
+const QUAY_COLOUR: readonly string[] = [
+  'Woodsmoke and wet wool, and the low churn of the taproom. You set coin on the bar and the landlord fills the room’s cups without being asked twice.',
+  'A fiddle scrapes in the corner, badly, and nobody minds. The round goes round, and the talk loosens with it.',
+  'Rain ticks on the shutters. Half the parish is in here drying out, and coin buys you a seat among them.',
+  'The tallow smokes and the low beams sweat. Faces you half-know nod as the drink comes round on your purse.',
+  'Someone’s dog sleeps under the settle. The pots are refilled, the bar warms to you, and a man leans in closer than he did an hour ago.',
+  'A revenue man’s empty chair sits by the fire — he drinks here too, they say, when he isn’t counting. Tonight the coin is yours and the talk is easy.',
+  'The tide-clock over the bar creeps toward the ebb. You buy the round, and the room decides you are the sort of farmer worth talking to.',
+  'Salt marsh on every boot, and the fug of a dozen pipes. Your coin crosses the bar and a chair is drawn out for you.',
+  'The landlord’s girl carries the pots two-handed. The round empties fast, and a low voice finds your ear over the noise.',
+  'A gale worries the sign outside. In here it is warm, and a stood round is the oldest key on this coast to a man’s tongue.',
+];
+
+/** §6.9 (M5a-4) — the round you stood: the rumour you paid for, dressed in a
+ *  little random alehouse colour. The rumour is already in the notebook; this
+ *  is the moment. Not shown for the last rumour — the shingle card takes it. */
+function roundCard(next: GameState): EventCard {
+  const colour = QUAY_COLOUR[Math.floor(Math.random() * QUAY_COLOUR.length)];
+  return {
+    id: `round-${next.rumoursHeard}`,
+    kind: 'info',
+    title: 'A round in the alehouse',
+    flavour: colour,
+    body: QUAY_RUMOURS[next.rumoursHeard - 1] ?? '',
   };
 }
 
@@ -400,6 +433,10 @@ export const useGameStore = create<GameStore>()((set, get) => {
       const battlePending = !!next.raid?.pendingBattle && !state.raid?.pendingBattle;
       // Mercy (§6.15): the parish vouched — pause and say so.
       const justVouched = next.vouches > state.vouches;
+      // §6.9 (M5a-4): a round was stood and a rumour heard. The last rumour
+      // unlocks the Dutchman, and its own milestone card owns that moment —
+      // so the round card yields to it (the !unlocked guard below).
+      const roundStood = next.lastRoundDay > state.lastRoundDay;
 
       if (rentJustDue && !autoPayRent) {
         card = rentCard(next);
@@ -411,6 +448,8 @@ export const useGameStore = create<GameStore>()((set, get) => {
         card = raidCard(next);
       } else if (musterGathered) {
         card = musterCard(next);
+      } else if (roundStood && !next.dutchman.unlocked) {
+        card = roundCard(next);
       } else {
         const m = detectMilestone(next, shownCards);
         if (m) {

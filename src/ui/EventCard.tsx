@@ -35,6 +35,7 @@ export function EventCard() {
     <div className="event-scrim">
       <div className="event-card">
         <h2>{card.title}</h2>
+        {card.flavour && <p className="event-flavour">{card.flavour}</p>}
         <p>{card.body}</p>
 
         {card.kind === 'rent' ? (

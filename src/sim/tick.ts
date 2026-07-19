@@ -991,7 +991,7 @@ function recoverStandingAtDawn(state: GameState): void {
 
 /** Spec §6.9 (M5a-4) — the quay's rumour chain, fixed and three long:
  *  the price, the crime, the hour. Index = rumours already heard. */
-const QUAY_RUMOURS: readonly string[] = [
+export const QUAY_RUMOURS: readonly string[] = [
   'The round goes down and a wool-buyer talks: across the water they pay four times the Ryne price for fleece. He says it the way a man names a woman he cannot afford.',
   'A second round, an older man, quieter: wool leaves this coast at night, from open beaches, by the ton. Owling, they call it — the oldest crime on this marsh, and the best paid.',
   'The landlord himself brings the third round. A Dutch lugger stands off the shingle north-east of Walland — after dark, on a falling tide, showing no lights. He has told you nothing, and you have heard nothing.',
