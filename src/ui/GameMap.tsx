@@ -479,6 +479,24 @@ export function GameMap({ state }: { state: GameState }) {
     setSelected(sel);
   }
 
+  // §20 — the location dock: open a place's menu without hunting for its pixel
+  // on the map (a real help on a phone), and glide the map to it. Only the
+  // places the map itself shows are listed — the coast and the cutting house
+  // join as they enter the world.
+  function selectPlace(sel: Selection) {
+    if (sel === 'farm') farmVisitedRef.current = true;
+    const w = anchorWorld(sel, stateRef.current);
+    if (w) camRef.current!.focusOn(w.x, w.y);
+    setSelected(sel);
+  }
+  const places: Array<{ sel: Selection; label: string }> = [
+    { sel: 'farm', label: 'Walland Farm' },
+    { sel: 'ryne', label: 'Ryne' },
+    { sel: 'customs', label: 'Customs House' },
+  ];
+  if (state.dutchman.unlocked) places.push({ sel: 'shingle', label: 'The Shingle' });
+  if (state.cuttingHouse) places.push({ sel: 'cutting-house', label: 'Cutting House' });
+
   return (
     <div
       ref={shellRef}
@@ -577,6 +595,30 @@ export function GameMap({ state }: { state: GameState }) {
         >
           {showGossip ? 'gossip · on' : 'gossip'}
         </button>
+      )}
+
+      {!placing && !state.lost && (
+        // Stop pointer events reaching the shell: otherwise its pointerdown
+        // captures the pointer and steals the button's click (and would start
+        // a camera pan). onClick stop keeps the map's hit-test from firing too.
+        <nav
+          className="location-dock"
+          aria-label="Places"
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          {places.map((pl) => (
+            <button
+              key={pl.sel as string}
+              className={selected === pl.sel ? 'on' : undefined}
+              onClick={(e) => {
+                e.stopPropagation();
+                selectPlace(pl.sel);
+              }}
+            >
+              {pl.label}
+            </button>
+          ))}
+        </nav>
       )}
 
       {selected && !placing && (

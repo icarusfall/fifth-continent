@@ -237,6 +237,42 @@ header h1 {
   color: #e0a49b;
 }
 
+/* §20 — the location dock: a column of place names in the left gutter, so a
+   place's menu is one tap away without hunting for its pixel on the map. */
+.location-dock {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  z-index: 9;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.location-dock button {
+  background: rgba(36, 28, 24, 0.88);
+  border: 1px solid var(--clay);
+  border-radius: 4px;
+  color: #cbbfa8;
+  font-size: 13px;
+  font-variant: small-caps;
+  letter-spacing: 0.03em;
+  padding: 6px 12px;
+}
+
+.location-dock button:hover:not(:disabled) {
+  background: rgba(36, 28, 24, 0.88);
+  border-color: var(--limewash);
+  color: var(--limewash);
+}
+
+.location-dock button.on {
+  background: var(--limewash);
+  border-color: var(--limewash);
+  color: #241c18;
+}
+
 /* The ledger's two-button stepper sits inline, not stacked. */
 .ledger-row {
   flex-direction: row;

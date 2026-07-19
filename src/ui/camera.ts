@@ -41,6 +41,19 @@ export class CameraController {
     }
   }
 
+  /**
+   * Ease the camera so a world point comes to rest at the viewport centre, at
+   * a comfortable inspection zoom — never zooming *out* from where the player
+   * already is. Used by the location dock (spec §20): click the name, and the
+   * map glides to the place. It moves only the target; ease() does the gliding.
+   */
+  focusOn(wx: number, wy: number): void {
+    const z = Math.min(ZOOM_MAX, Math.max(this.tzoom, this.fitZoom * 1.7));
+    this.tzoom = z;
+    this.tx = wx - this.vw / (2 * z);
+    this.ty = wy - this.vh / (2 * z);
+  }
+
   /** Advance the easing one frame. */
   ease(): void {
     this.x += (this.tx - this.x) * EASE_PAN;

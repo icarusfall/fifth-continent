@@ -1511,6 +1511,20 @@ the node's popover: a cart in the farmyard is part of the farm's menu (its
 cargo, its carter, its dyke), never a separate sprite to hunt for. Only a
 cart on the road — where there is no place to click — answers for itself.
 
+**Every cart answers on its own row (M5a-4, playtest).** A node's popover
+lists each cart standing there as a self-contained row — its cargo, its
+carter or "yours to drive", and its own load / sell / send / hire controls.
+There is no single "the cart at this node" any more, so a second cart at the
+same node (buy one and both sit in the yard) is loaded and sent as freely as
+the first — no cart hides behind another.
+
+**The location dock (M5a-4, playtest).** The left gutter carries a column of
+place names — the same places the map shows, and only those (the coast and
+the cutting house join as they enter the world). Clicking one opens that
+place's popover and eases the map to centre on it. The map is still the
+truth; the dock just means you need not hunt a small sprite to reach a
+place's menu — a real help on a phone.
+
 **The menu closes when the yard empties (M5a-4, playtest).** A node's
 popover closes itself after a dispatch or a hire that leaves no undirected
 cart standing there — sending the last cart off is how a visit ends. Every
