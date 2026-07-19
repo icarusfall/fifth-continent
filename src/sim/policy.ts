@@ -11,6 +11,7 @@
 
 import {
   CART_CAPACITY,
+  CART_COST,
   CUTTING_HOUSE_COST,
   DUTCHMAN_PRICE,
   LEIDEN_PRICE_MULT,
@@ -216,6 +217,81 @@ export function delegatorPolicy(state: GameState): Action[] {
     });
   }
   if (state.fleeceReady > 0) actions.push({ type: 'shear' });
+  return actions;
+}
+
+/**
+ * relayPolicy: the backhaul lived in miniature (§6.11, M5a-4). Lawful
+ * delegation until the first rent unlocks the lugger; then the standing
+ * order flips to the shingle with a tea backhaul. While the yard holds one
+ * cart, its man alternates jobs — owl, then flush the tea to Ryne when a
+ * cart-load has banked. Once crime's proceeds clear the rent reserve a
+ * second cart is bought and hired onto the tea run, and the first stays on
+ * the beach for good: the relay meets at the barn, exactly as designed.
+ */
+export function relayPolicy(state: GameState): Action[] {
+  const actions: Action[] = [];
+  const [first, second, third] = state.carts;
+  if (!first) return actions;
+  if (state.fleeceReady > 0) actions.push({ type: 'shear' });
+
+  if (!state.dutchman.unlocked) {
+    if (!first.carter) {
+      actions.push({
+        type: 'hireCarter',
+        cartId: first.id,
+        order: { from: 'farm', to: 'ryne', good: 'fleece' },
+      });
+    }
+    return actions;
+  }
+
+  // The owling begins: the books drop to the plausible floor (§6.10).
+  const floor = Math.floor(state.flockSize * PLAUSIBLE_YIELD_MIN);
+  if (state.ledger.declaredYield > floor) {
+    actions.push({ type: 'setDeclaredYield', fleecePerDay: floor });
+  }
+
+  // Crime's proceeds buy the wheels, always keeping the rent in reserve.
+  if (state.carts.length < 3 && state.coin >= CART_COST + RENT_AMOUNT) {
+    actions.push({ type: 'buyCart' });
+  }
+  // Cart-2: the lawful alibi — the surplus clip to Ryne keeps the barn
+  // draining and the books fed (without it the tea can never land: the
+  // 4-fleece/day surplus silts the barn shut).
+  if (second && !second.carter) {
+    actions.push({
+      type: 'hireCarter',
+      cartId: second.id,
+      order: { from: 'farm', to: 'ryne', good: 'fleece' },
+    });
+  }
+  // Cart-3: the tea run, once the yard is full.
+  if (third && !third.carter) {
+    actions.push({
+      type: 'hireCarter',
+      cartId: third.id,
+      order: { from: 'farm', to: 'ryne', good: 'tea' },
+    });
+  }
+
+  // Cart-1's job: owl with a tea backhaul — flushing its own tea to Ryne
+  // whenever a cart-load has gathered (banked or still aboard) and no
+  // dedicated tea cart exists yet.
+  const teaBanked = (state.stores.farm?.tea ?? 0) + (first.cargo.tea ?? 0);
+  const wantFlush = !third && teaBanked >= CART_CAPACITY;
+  const onFlush = first.carter?.to === 'ryne' && first.carter.good === 'tea';
+  const onOwl = first.carter?.to === 'shingle';
+  if (wantFlush ? !onFlush : !onOwl) {
+    if (first.carter) actions.push({ type: 'dismissCarter', cartId: first.id });
+    actions.push({
+      type: 'hireCarter',
+      cartId: first.id,
+      order: wantFlush
+        ? { from: 'farm', to: 'ryne', good: 'tea' }
+        : { from: 'farm', to: 'shingle', good: 'fleece', back: 'tea' },
+    });
+  }
   return actions;
 }
 

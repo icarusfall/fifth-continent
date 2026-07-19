@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   CART_CAPACITY,
+  CART_COST,
+  CART_RESALE,
   FARM_STORE_CAPACITY,
   SHEARING_HOUR,
   STARTING_FLOCK,
@@ -280,5 +282,60 @@ describe('the tide and the low road', () => {
     const floodEnd = findTide(s.tick, false);
     s = runTicks(s, floodEnd - s.tick + LOW_ROAD_LATENCY);
     expect(s.carts[0].location).toEqual({ kind: 'node', nodeId: 'ryne' });
+  });
+});
+
+describe('the wheelwright buys back (spec §6.11: sellCart)', () => {
+  function withCoin(coin: number): GameState {
+    const s = initialState(1);
+    s.coin = coin;
+    return s;
+  }
+
+  it('a bought cart sells back at a small loss', () => {
+    let s = tick(withCoin(200), [{ type: 'buyCart' }]);
+    expect(s.carts).toHaveLength(2);
+    s = tick(s, [{ type: 'sellCart', cartId: 'cart-2' }]);
+    expect(s.carts).toHaveLength(1);
+    expect(s.coin).toBe(200 - CART_COST + CART_RESALE); // the loss is the lesson
+  });
+
+  it('never the last cart', () => {
+    const s = tick(withCoin(200), [{ type: 'sellCart', cartId: 'cart-1' }]);
+    expect(s.carts).toHaveLength(1);
+    expect(s.coin).toBe(200);
+  });
+
+  it('not while laden, and not with a man on the reins', () => {
+    let s = tick(withCoin(200), [{ type: 'buyCart' }]);
+    s = tick(s, [{ type: 'shear' }]);
+    s = tick(s, [{ type: 'loadCart', cartId: 'cart-2', good: 'fleece', qty: 2 }]);
+    s = tick(s, [{ type: 'sellCart', cartId: 'cart-2' }]);
+    expect(s.carts).toHaveLength(2);
+
+    s = tick(s, [{ type: 'unloadCart', cartId: 'cart-2', good: 'fleece', qty: 99 }]);
+    s = tick(s, [
+      { type: 'hireCarter', cartId: 'cart-2', order: { from: 'farm', to: 'ryne', good: 'fleece' } },
+    ]);
+    s = tick(s, [{ type: 'sellCart', cartId: 'cart-2' }]);
+    expect(s.carts).toHaveLength(2);
+  });
+
+  it('only in the farmyard', () => {
+    let s = tick(withCoin(200), [{ type: 'buyCart' }]);
+    s = tick(s, [{ type: 'dispatchCart', cartId: 'cart-2', edgeId: 'high-road' }]);
+    s = tick(s, [{ type: 'sellCart', cartId: 'cart-2' }]);
+    expect(s.carts).toHaveLength(2);
+  });
+
+  it('a sold cart frees its stall: ids are never duplicated', () => {
+    let s = tick(withCoin(500), [{ type: 'buyCart' }]);
+    s = tick(s, [{ type: 'buyCart' }]);
+    expect(s.carts.map((c) => c.id)).toEqual(['cart-1', 'cart-2', 'cart-3']);
+    s = tick(s, [{ type: 'sellCart', cartId: 'cart-2' }]);
+    s = tick(s, [{ type: 'buyCart' }]);
+    const ids = s.carts.map((c) => c.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids).toContain('cart-2');
   });
 });

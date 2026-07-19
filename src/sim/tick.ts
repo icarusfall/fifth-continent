@@ -6,6 +6,9 @@
 import {
   CART_CAPACITY,
   CART_COST,
+  CART_RESALE,
+  ROUND_COST,
+  RUMOUR_TRUST,
   CARTER_WAGE,
   CUTS,
   DIFFICULTY,
@@ -68,6 +71,7 @@ import { clockOf, dayPhaseOf, isFlooded, tideIsRising } from './time';
 import type {
   Action,
   Cart,
+  CarterOrder,
   Difficulty,
   GameState,
   Garrison,
@@ -96,6 +100,8 @@ export function initialState(seed: number, difficulty: Difficulty = 'fair'): Gam
     lastCrisisTick: 0,
     sheepArriving: 0,
     shearer: { hired: false, handShears: 0 },
+    rumoursHeard: 0,
+    lastRoundDay: -1,
     research: { active: null, completed: { trade: 0, marsh: 0, leiden: 0 } },
     flockSize: STARTING_FLOCK,
     // The flock takes the tenancy already in wool (spec §6.7): the very first
@@ -538,9 +544,14 @@ function applyAction(state: GameState, action: Action): void {
         return;
       }
       state.coin -= CART_COST;
-      const ordinal = ['The Cart', 'The Second Cart', 'The Third Cart'][state.carts.length];
+      // The smallest free stall: a sold cart's id and name may be reissued,
+      // but never while a cart still answers to them.
+      const stall = Array.from({ length: MAX_CARTS }, (_, i) => i + 1).find(
+        (n) => !state.carts.some((c) => c.id === `cart-${n}`),
+      )!;
+      const ordinal = ['The Cart', 'The Second Cart', 'The Third Cart'][stall - 1];
       state.carts.push({
-        id: `cart-${state.carts.length + 1}`,
+        id: `cart-${stall}`,
         name: ordinal,
         capacity: CART_CAPACITY,
         cargo: {},
@@ -548,6 +559,75 @@ function applyAction(state: GameState, action: Action): void {
         carter: null,
       });
       logEvent(state, `${ordinal} stands in the yard, pony and all. ${CART_COST} coin.`);
+      return;
+    }
+
+    case 'sellCart': {
+      // Spec §6.11 — the wheelwright buys back at a small loss: only an empty,
+      // carterless cart standing in the farmyard, and never the last one.
+      const cart = findCart(state, action.cartId);
+      if (!cart) return;
+      if (state.carts.length <= 1) {
+        logEvent(state, 'Sell the only cart and the wool walks to Ryne on its own feet. No.');
+        return;
+      }
+      if (cart.carter) {
+        logEvent(state, `A man is on the reins of ${cart.name}. Dismiss him first.`);
+        return;
+      }
+      if (cargoCount(cart.cargo) > 0) {
+        logEvent(state, `${cart.name} stands laden. The wheelwright buys wood, not cargo.`);
+        return;
+      }
+      if (cart.location.kind !== 'node' || cart.location.nodeId !== 'farm') {
+        logEvent(state, 'The wheelwright buys in the farmyard, not wherever a cart happens to stand.');
+        return;
+      }
+      state.carts = state.carts.filter((c) => c.id !== cart.id);
+      state.coin += CART_RESALE;
+      logEvent(
+        state,
+        `${cart.name} goes back to the wheelwright, pony and all. ${CART_RESALE} coin — he buys dearer than he forgets, and cheaper than he sells.`,
+      );
+      return;
+    }
+
+    case 'buyRound': {
+      // Spec §6.9 (M5a-4) — asking on the quay: coin loosens the next rumour
+      // in a fixed chain, once a day, from a quay that knows your face.
+      if (state.dutchman.unlocked || state.rumoursHeard >= RUMOUR_TRUST.length) {
+        logEvent(state, 'The quay has nothing left to teach you.');
+        return;
+      }
+      const here = state.carts.some(
+        (c) => !c.carter && c.location.kind === 'node' && c.location.nodeId === 'ryne',
+      );
+      if (!here) return; // a hired man will not ask around for you
+      const day = Math.floor(state.tick / TICKS_PER_DAY);
+      if (day <= state.lastRoundDay) {
+        logEvent(state, 'The alehouse has had your coin once today. Tomorrow is another thirst.');
+        return;
+      }
+      if (state.coin < ROUND_COST) {
+        logEvent(state, `A round for the quay is ${ROUND_COST} coin, and the till is short.`);
+        return;
+      }
+      if (state.ledger.soldLawfully < RUMOUR_TRUST[state.rumoursHeard]) {
+        logEvent(
+          state,
+          'Your coin stays on the bar. The quay talks to farmers it knows — sell more wool at Ryne first.',
+        );
+        return;
+      }
+      state.coin -= ROUND_COST;
+      state.lastRoundDay = day;
+      logEvent(state, QUAY_RUMOURS[state.rumoursHeard]);
+      state.rumoursHeard += 1;
+      if (state.rumoursHeard >= RUMOUR_TRUST.length) {
+        // The chain's end is the same unlock the first rent grants unasked
+        // (§6.9) — earned early, and announced by its own card.
+        state.dutchman.unlocked = true;
+      }
       return;
     }
 
@@ -627,7 +707,7 @@ function applyAction(state: GameState, action: Action): void {
         state,
         `A carter takes ${cart.name}: ${nodeById(from, state.farm, state.cuttingHouse).name} to ${
           nodeById(to, state.farm, state.cuttingHouse).name
-        }, ${CARTER_WAGE} coin a day. He does not ask what is in the load.`,
+        }${action.order.back ? `, home with ${action.order.back}` : ''}, ${CARTER_WAGE} coin a day. He does not ask what is in the load.`,
       );
       return;
     }
@@ -912,6 +992,14 @@ function recoverStandingAtDawn(state: GameState): void {
   }
 }
 
+/** Spec §6.9 (M5a-4) — the quay's rumour chain, fixed and three long:
+ *  the price, the crime, the hour. Index = rumours already heard. */
+const QUAY_RUMOURS: readonly string[] = [
+  'The round goes down and a wool-buyer talks: across the water they pay four times the Ryne price for fleece. He says it the way a man names a woman he cannot afford.',
+  'A second round, an older man, quieter: wool leaves this coast at night, from open beaches, by the ton. Owling, they call it — the oldest crime on this marsh, and the best paid.',
+  'The landlord himself brings the third round. A Dutch lugger stands off the shingle north-east of Walland — after dark, on a falling tide, showing no lights. He has told you nothing, and you have heard nothing.',
+];
+
 // ---- The hired carter (spec §6.11) ----
 // Tide-smart and coat-blind: he takes the faster road that is open at
 // departure, and he will drive contraband straight past the Customs House
@@ -927,6 +1015,66 @@ function carterDispatch(state: GameState, cart: Cart, target: NodeId): void {
   cart.location = { kind: 'edge', edgeId: hop.id, from, to: otherEnd(hop, from), progress: 0 };
 }
 
+/**
+ * Spec §6.11 (M5a-4) — the back leg: before turning for home the carter
+ * loads the order's `back` good, from the node's store or over the gunwale
+ * at the Dutchman's prices with the coin in the till. His hold, the cart's
+ * room, and the purse are the caps; no credit.
+ */
+function carterBackload(state: GameState, cart: Cart, order: CarterOrder): void {
+  const back = order.back;
+  if (!back || cart.location.kind !== 'node') return;
+  const at = cart.location.nodeId;
+  const room = cart.capacity - cargoCount(cart.cargo);
+  if (room <= 0) return;
+  if (at === 'shingle') {
+    if (!state.dutchman.present) return; // no lugger, no market — he turns home
+    const price = DUTCHMAN_PRICE[back];
+    const stocked = state.dutchman.hold[back] ?? 0;
+    if (price === undefined || stocked <= 0) return;
+    const qty = Math.min(stocked, room, Math.floor(state.coin / price));
+    if (qty <= 0) return;
+    state.dutchman.hold[back] = stocked - qty;
+    state.coin -= qty * price;
+    addToStore(cart.cargo, back, qty);
+    logEvent(
+      state,
+      `The carter takes ${qty} ${back} off the lugger for ${qty * price} coin of the till's money, and asks nothing.`,
+    );
+    return;
+  }
+  const store = state.stores[at];
+  const available = store?.[back] ?? 0;
+  const qty = Math.min(available, room);
+  if (qty <= 0) return;
+  store![back] = available - qty;
+  addToStore(cart.cargo, back, qty);
+}
+
+/**
+ * Spec §6.11 (M5a-4) — home again: everything aboard that is not the
+ * outbound good is unloaded into the store, respecting its walls. What
+ * cannot fit stays aboard and eats the cart's room.
+ */
+function carterUnloadForeign(state: GameState, cart: Cart, outbound: Good, at: NodeId): void {
+  for (const [good, held] of Object.entries(cart.cargo) as Array<[Good, number]>) {
+    if (good === outbound || held <= 0) continue;
+    const roomHere =
+      at === 'farm'
+        ? FARM_STORE_CAPACITY - cargoCount(state.stores[at] ?? {})
+        : Number.MAX_SAFE_INTEGER;
+    const qty = Math.min(held, Math.max(0, roomHere));
+    if (qty <= 0) continue;
+    cart.cargo[good] = held - qty;
+    state.stores[at] = state.stores[at] ?? {};
+    addToStore(state.stores[at], good, qty);
+    logEvent(
+      state,
+      `The carter unloads ${qty} ${good} at ${nodeById(at, state.farm, state.cuttingHouse).name}.`,
+    );
+  }
+}
+
 function runCarters(state: GameState): void {
   for (const cart of state.carts) {
     const order = cart.carter;
@@ -934,6 +1082,9 @@ function runCarters(state: GameState): void {
     const at = cart.location.nodeId;
 
     if (at === order.from) {
+      // The back leg lands first (§6.11, M5a-4): everything aboard that is
+      // not the outbound good goes into the store, respecting its walls.
+      carterUnloadForeign(state, cart, order.good, at);
       const store = state.stores[at];
       const available = store?.[order.good] ?? 0;
       const room = cart.capacity - cargoCount(cart.cargo);
@@ -960,33 +1111,34 @@ function runCarters(state: GameState): void {
           );
         }
         if ((cart.cargo.fleece ?? 0) > 0) continue; // waiting on the lugger
-        carterDispatch(state, cart, order.from);
-        continue;
-      }
-      const node = nodeById(at, state.farm, state.cuttingHouse);
-      if (node.kind === 'market') {
-        const sold = marketSale(state, cart, order.good);
-        if (sold > 0) {
-          logEvent(
-            state,
-            `The carter sells ${sold} ${order.good} at ${node.name} for ${sold * RYNE_PRICE[order.good]} coin.`,
-          );
-        }
       } else {
-        // Unload into the store, respecting the barn's walls (§6.9).
-        const held = cart.cargo[order.good] ?? 0;
-        const roomHere =
-          at === 'farm'
-            ? FARM_STORE_CAPACITY - cargoCount(state.stores[at] ?? {})
-            : Number.MAX_SAFE_INTEGER;
-        const qty = Math.min(held, Math.max(0, roomHere));
-        if (qty > 0) {
-          cart.cargo[order.good] = held - qty;
-          state.stores[at] = state.stores[at] ?? {};
-          addToStore(state.stores[at], order.good, qty);
+        const node = nodeById(at, state.farm, state.cuttingHouse);
+        if (node.kind === 'market') {
+          const sold = marketSale(state, cart, order.good);
+          if (sold > 0) {
+            logEvent(
+              state,
+              `The carter sells ${sold} ${order.good} at ${node.name} for ${sold * RYNE_PRICE[order.good]} coin.`,
+            );
+          }
+        } else {
+          // Unload into the store, respecting the barn's walls (§6.9).
+          const held = cart.cargo[order.good] ?? 0;
+          const roomHere =
+            at === 'farm'
+              ? FARM_STORE_CAPACITY - cargoCount(state.stores[at] ?? {})
+              : Number.MAX_SAFE_INTEGER;
+          const qty = Math.min(held, Math.max(0, roomHere));
+          if (qty > 0) {
+            cart.cargo[order.good] = held - qty;
+            state.stores[at] = state.stores[at] ?? {};
+            addToStore(state.stores[at], order.good, qty);
+          }
         }
       }
-      // What cannot be sold or unloaded rides home with him.
+      // The back leg (§6.11, M5a-4), then home. What cannot be sold or
+      // unloaded rides with him either way.
+      carterBackload(state, cart, order);
       carterDispatch(state, cart, order.from);
       continue;
     }

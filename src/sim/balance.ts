@@ -131,6 +131,7 @@ export const WOOL_GAP_COEFF = 1.0; // regional heat per fleece adrift at inspect
 
 // ---- M3: wheels (spec §6.11) ----
 export const CART_COST = 50; // coin, cart and pony, bought at the farm
+export const CART_RESALE = 40; // the wheelwright buys back at a small loss (§6.11)
 export const MAX_CARTS = 3; // the yard holds three
 export const CARTER_WAGE = 3; // coin per carter, due at dawn with the wool
 /**
@@ -140,6 +141,13 @@ export const CARTER_WAGE = 3; // coin per carter, due at dawn with the wool
  * to reset the tally before this; see revenue.ts.)
  */
 export const CARTER_UNLOCK_FLEECE = 2 * CART_CAPACITY;
+
+// ---- M5a-4: asking on the quay (spec §6.9) ----
+export const ROUND_COST = 2; // coin, a round for the alehouse, once a day
+/** Lawful fleece sold at Ryne before the quay loosens rumour n — about one
+ *  cart-load per rumour. Length = the chain; the last rumour unlocks the
+ *  Dutchman early (the first rent remains the unasked floor). */
+export const RUMOUR_TRUST: readonly number[] = [8, 16, 24];
 
 // ---- Rent (spec §6.8: the first squeeze) ----
 export const RENT_AMOUNT = 120; // coin, per period

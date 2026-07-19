@@ -9,6 +9,7 @@ import {
   CART_COST,
   MAX_CARTS,
   RESEARCH_COST,
+  RUMOUR_TRUST,
   SHEARER_UNLOCK_SHEARS,
   SHEARER_WAGE,
   SHEEP_VALUE,
@@ -29,7 +30,8 @@ import type { Action, ActionLog, Difficulty, GameState, NodeId } from '../sim/ty
 // v7: M4b adds per-building fortifications to GameState (spec §6.12).
 // v6: M3 adds Heat, the Revenue, the ledger, and carters to GameState.
 // Older saves are incompatible and are silently abandoned.
-const SAVE_KEY = 'fifth-continent-save-v11';
+// v12: rumoursHeard/lastRoundDay joined GameState (§6.9 M5a-4).
+const SAVE_KEY = 'fifth-continent-save-v12';
 const AUTOSAVE_EVERY_TICKS = 30;
 const AUTOPAY_KEY = 'fifth-continent-autopay-rent'; // a UI preference, not game state
 
@@ -200,6 +202,23 @@ interface Milestone {
 
 // Order is priority when several come true at once — the pause sequences them.
 const MILESTONES: Milestone[] = [
+  {
+    // §6.9 (M5a-4) — the unlock was earned on the quay: the rumour chain
+    // ran its length before the first rent forced the matter.
+    key: 'shingle-open-asked',
+    when: (s) => s.dutchman.unlocked && s.rumoursHeard >= RUMOUR_TRUST.length,
+    title: 'The landlord names the hour',
+    body: 'You stood the rounds and the quay repaid you: a Dutch lugger stands off the shingle north-east of your farm — after dark, on a falling tide, no lights — and pays four times for wool. The beach is on your map now. And the rent is still coming.',
+  },
+  {
+    // §6.9 — the way out opens the moment the first rent is collected; a
+    // silent unlock reads as a bug. This card makes the argument; the
+    // "light on the water" card below still marks his first actual visit.
+    key: 'shingle-open',
+    when: (s) => s.dutchman.unlocked && s.rumoursHeard < RUMOUR_TRUST.length,
+    title: 'Word on the marsh',
+    body: 'The agent has been and gone, and the whole parish felt it. Word follows you home from Ryne: across the water they pay four times for wool, and on the shingle north-east of your farm — after dark, on a falling tide — nobody counts what crosses the marsh. The beach is on your map now.',
+  },
   {
     key: 'dutchman-offshore',
     when: (s) => s.dutchman.present,

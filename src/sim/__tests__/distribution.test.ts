@@ -17,7 +17,7 @@ import {
   TICKS_PER_DAY,
   WOOL_PRICE_DOMESTIC,
 } from '../balance';
-import { delegatorPolicy, runPolicyGame, smugglerPolicy } from '../policy';
+import { delegatorPolicy, relayPolicy, runPolicyGame, smugglerPolicy } from '../policy';
 
 const GAMES = 200;
 const DAYS = 14; // two rent dues fall inside this window
@@ -144,6 +144,40 @@ describe(`${GAMES} seeded games, ${DAYS} days each — the delegator (spec §6.1
       expect(s.coin).toBeLessThanOrEqual(
         totalFleece * WOOL_PRICE_DOMESTIC - s.rentPaid - CARTER_WAGE,
       );
+
+      coins.push(s.coin);
+    }
+
+    expect(new Set(coins).size).toBe(1); // deterministic, like everything here
+  });
+});
+
+describe(`${GAMES} seeded games, 20 days — the relay (spec §6.11, M5a-4)`, () => {
+  const RELAY_DAYS = 20; // three rents, and time for the backhaul to compound
+
+  it('the backhaul funds the wheels and the relay meets at the barn', { timeout: 120_000 }, () => {
+    const coins: number[] = [];
+
+    for (let seed = 1; seed <= GAMES; seed++) {
+      const s = runPolicyGame(seed, TICKS_PER_DAY * RELAY_DAYS, relayPolicy);
+
+      expect(s.lost).toBe(false);
+      expect(s.flockSize).toBe(STARTING_FLOCK); // every rent met in full
+      expect(s.rentPaid).toBe(3 * RENT_AMOUNT);
+
+      // Crime's proceeds bought the yard full, and every cart is crewed:
+      // owl-with-backhaul, lawful alibi, tea run.
+      expect(s.carts).toHaveLength(3);
+      for (const cart of s.carts) expect(cart.carter).not.toBeNull();
+
+      // The backhauled tea reached Ryne — the relay closed its loop.
+      expect(s.contrabandSold).toBeGreaterThan(0);
+
+      // And it out-earns the lawful ceiling by a distance (§6.9's whole point).
+      const lawfulCeiling =
+        STARTING_FLOCK * FLEECE_PER_HEAD_PER_DAY * (RELAY_DAYS + 1) * WOOL_PRICE_DOMESTIC -
+        3 * RENT_AMOUNT;
+      expect(s.coin).toBeGreaterThan(lawfulCeiling);
 
       coins.push(s.coin);
     }

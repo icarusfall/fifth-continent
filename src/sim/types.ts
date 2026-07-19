@@ -88,11 +88,14 @@ export type CartLocation =
       progress: number;
     };
 
-/** A hired carter's standing order (spec §6.11): shuttle `good` from → to. */
+/** A hired carter's standing order (spec §6.11): shuttle `good` from → to.
+ *  `back` (M5a-4) is the optional return leg: loaded at `to` from the store,
+ *  or bought over the gunwale with the till's coin, and unloaded at `from`. */
 export interface CarterOrder {
   from: NodeId;
   to: NodeId;
   good: Good;
+  back?: Good;
 }
 
 export interface Cart {
@@ -178,6 +181,10 @@ export interface GameState {
   sheepArriving: number;
   /** Spec §6.16 — the hired shearer, and the hand-shears that earn his offer. */
   shearer: { hired: boolean; handShears: number };
+  /** Spec §6.9 (M5a-4) — rumours heard on the quay, 0..RUMOUR_TRUST.length. */
+  rumoursHeard: number;
+  /** Day index of the last round stood in the alehouse (−1 = never). */
+  lastRoundDay: number;
   /** Spec §6.14 — the research bench. */
   research: Research;
   /** Wool on the sheep's backs, grown at dawn, collected by the shear action. */
@@ -267,6 +274,8 @@ export type Action =
   | { type: 'placeCuttingHouse'; x: number; y: number }
   | { type: 'cut'; depth: CutDepth; tubs: number }
   | { type: 'buyCart' }
+  | { type: 'sellCart'; cartId: CartId }
+  | { type: 'buyRound' }
   | { type: 'fortifyBuilding'; nodeId: NodeId }
   | { type: 'raiseGarrison'; nodeId: NodeId; kind: GarrisonKind }
   | { type: 'dismissGarrison'; nodeId: NodeId; kind: GarrisonKind }

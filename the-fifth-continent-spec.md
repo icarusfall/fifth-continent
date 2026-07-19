@@ -214,6 +214,37 @@ unlocked    once the first rent has been collected (§6.8) — the grind must be
             to hurt but early enough not to bore
 present(t)  = unlocked && night(t) && tideFalling(t)
 ```
+The flip of `unlocked` is announced by an event card (M5a-4, playtest): the
+shingle's options appear on the map the moment the first rent is collected,
+and a silent unlock reads as a bug, not an invitation. The card carries the
+argument (§10 rung 3: the arithmetic, the beach, the hour); the later
+"light on the water" card still marks his first actual visit.
+
+**Asking on the quay (M5a-4, playtest).** The six days before the first
+rent held nothing but the wool round; now they hold a thread to pull. At
+Ryne, with a cart of your own standing on the quay — a hired man will not
+ask around for you — you may stand a round in the alehouse:
+
+```
+buyRound      ROUND_COST = 2 coin, once per day, only at Ryne with an
+              idle cart of yours standing there; refused outright once
+              the Dutchman is unlocked (nothing left to learn)
+trust         the quay talks to farmers it knows: rumour n+1 is loosened
+              only once soldLawfully ≥ RUMOUR_TRUST[n] = [8, 16, 24]
+              (about one lawful cart-load per rumour); short of that the
+              coin stays on the bar — refused, not drunk
+the chain     fixed and deterministic, three long: (1) the price across
+              the water, (2) owling — the coast's crime gets its name,
+              (3) the shingle and the hour — night, falling tide
+rumour 3      sets dutchman.unlocked early, and fires its own card
+```
+
+The first rent still unlocks him unasked (above): the inciting incident
+stays emergent for the passive player (§2, §10) — the curious one earns
+the same moment a few days early and pays for it in rent-coin drunk on
+the quay. The alehouse is deliberately the room where the parish talks:
+the informer and intelligence threads of M4+/M5 will grow from this bar.
+
 Because the tide period is deliberately not a divisor of the day (§6.7 M1),
 the night∩falling-tide window walks around the clock: some nights it is long,
 some nights it never opens. The existing tide gauge already forecasts it — a
@@ -436,6 +467,14 @@ the moment the officer starts stopping carts (§6.10).
 ```
 buyCart      CART_COST = 50 coin, at the farm; the new cart is named and
              starts in the yard. MAX_CARTS = 3 — the yard holds three.
+             Not offered until the first rent has fallen due (§10): before
+             the squeeze is felt, 50 coin looks like a toy and is actually
+             the rent. Pointless before a bigger flock or a second market
+             exists to feed it — playtest, 2026-07.
+sellCart     CART_RESALE = 40 coin — the wheelwright buys back cart and
+             pony at a small loss. Only an empty cart with no carter,
+             standing in the farmyard, and never the last one. The undo
+             for a cart bought in optimism.
 hireCarter   a carter takes a cart and a standing order:
              order = { from: node, to: node, good }
              CARTER_WAGE = 3 coin per day, due at dawn with the wool
@@ -446,6 +485,16 @@ roads        between nodes joined by two edges he takes the faster one that
 at `to`      market → sell into remaining demand; otherwise unload into the
              store (respecting its walls, §6.9); what cannot be sold or
              unloaded rides home with him
+back (M5a-4) the order may carry an optional fourth field:
+             order = { from, to, good, back? }
+             after the sale or the unload at `to` he loads `back` to
+             capacity — from the node's store, or over the gunwale at the
+             Dutchman's prices with the coin in the till (his hold, the
+             cart's room, and the purse are the caps; no credit) — and
+             comes home laden
+at `from`    anything aboard that is not the outbound good is unloaded
+             into the store before he loads (respecting its walls; what
+             cannot fit stays aboard and eats the cart's room)
 wages        unpaid at dawn → he walks off the same morning; the cart stands
              where he left it, order cleared
 dismiss      at will, no severance; the order clears
@@ -465,8 +514,19 @@ counterweight is not the road (wool is lawful in itself, §2): it is the
 **books**. Wool the lugger swallows was never sold lawfully; a declaredYield
 left honest now leaves a gap at every inspection (§6.10). Automate the
 owling and the paperwork becomes the job. Goods the Dutchman does not buy
-are unloaded onto the open shingle, as before. Standing orders full of brandy are legal-to-write and stupid-
+are unloaded onto the open shingle, as before. The shingle appears as a
+standing-order destination only once the Dutchman is unlocked — no menu
+names the trade before the coast has (§10). Standing orders full of brandy are legal-to-write and stupid-
 to-keep — the player discovers this the way §10 demands: by losing a load.
+The backhaul is how compound orders stay one sentence long: "fleece to the
+shingle, and home with jenever" automates the whole owling round — and
+hands the till to a man on a beach at night. He spends what is in the
+purse when the lugger stands off; a bad night can leave the rent short.
+That is a bet, not a bug (§6.15's mercy exists for exactly these losers).
+Hub-and-spoke is *not* hard-coded: relays emerge from orders meeting at a
+store (jenever farm → cutting house; brandy cutting house → Ryne), and
+MAX_CARTS = 3 makes the yard the real constraint.
+
 Night-only orders, pack-ponies and the rest of §21's stable are deferred to
 their milestones; the hired mouth that can be *turned* joins the informer
 system in M4/M5 — the payroll is where informers will start.
@@ -1448,6 +1508,12 @@ See §18. Small caps, high Heat, no buffering.
 the node's popover: a cart in the farmyard is part of the farm's menu (its
 cargo, its carter, its dyke), never a separate sprite to hunt for. Only a
 cart on the road — where there is no place to click — answers for itself.
+
+**The menu closes when the yard empties (M5a-4, playtest).** A node's
+popover closes itself after a dispatch or a hire that leaves no undirected
+cart standing there — sending the last cart off is how a visit ends. Every
+other action leaves the menu open: shearing, buying, loading, and cutting
+are mid-visit verbs, and a visit often issues several orders in a row.
 
 ### 20.1 The one exception: THE LEDGER
 The single screen you switch into — and it is **diegetic**, because bookkeeping *is* the cover mechanic.
