@@ -150,6 +150,12 @@ export const HORSE_TICKS_PER_TILE_MARSH = 0.45; // the marsh fights horses
 // ---- M3: the books (spec §6.10 / §19.2) ----
 export const PLAUSIBLE_YIELD_MIN = 0.5; // he knows what a Romney ewe gives
 export const WOOL_GAP_COEFF = 1.0; // regional heat per fleece adrift at inspection
+// §6.10 (M5, §6.17 Beat 3) — the audit cadence: the dawn after each rent day
+// the farm is the officer's target regardless of stains, so the books are
+// read even when the hub keeps the barn spotless. Without it a crime run
+// entirely off-farm never has its wool ledger opened.
+export const BOOK_AUDIT_PERIOD_DAYS = 6;
+export const BOOK_AUDIT_OFFSET_DAYS = 1;
 
 // ---- M3: wheels (spec §6.11) ----
 export const CART_COST = 50; // coin, cart and pony, bought at the farm

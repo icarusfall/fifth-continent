@@ -3,6 +3,8 @@
 // GameState: no dice, no clocks. Outplaying him is timetabling, not luck.
 
 import {
+  BOOK_AUDIT_OFFSET_DAYS,
+  BOOK_AUDIT_PERIOD_DAYS,
   COVER_CAPACITY,
   DIFFICULTY,
   DITCH_HEAT,
@@ -27,6 +29,7 @@ import {
   STORAGE_HEAT_COEFF,
   SUSPICION_DECAY,
   SUSPICION_SHARE,
+  TICKS_PER_DAY,
   WOOL_GAP_COEFF,
 } from './balance';
 import { firstHop, horseLatency, nodeById, officerEdgesFor, otherEnd } from './map';
@@ -185,9 +188,18 @@ export function dawnRevenue(state: GameState): void {
     return;
   }
 
-  // The day's plan: the sorest stain if any is sore enough, else his beat.
+  // The day's plan: the sorest stain if any is sore enough, else his beat —
+  // except on an audit dawn (§6.10): the dawn after each rent day the farm is
+  // his target regardless, so the books are read even when the hub keeps the
+  // barn spotless. The Board's calendar bends for no stain.
   officer.inspectedToday = false;
-  officer.targetNodeId = patrolTarget(state);
+  officer.targetNodeId = isAuditDawn(state.tick) ? 'farm' : patrolTarget(state);
+}
+
+/** §6.10 — the audit cadence: day % period == offset, and never day 1. */
+export function isAuditDawn(tick: number): boolean {
+  const day = Math.floor(tick / TICKS_PER_DAY);
+  return day > BOOK_AUDIT_OFFSET_DAYS && day % BOOK_AUDIT_PERIOD_DAYS === BOOK_AUDIT_OFFSET_DAYS;
 }
 
 /**

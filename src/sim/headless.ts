@@ -1,14 +1,25 @@
 // Demo: play a policy-driven game in Node and print the ledger.
-// `npm run headless [seed] [days] [carter|smuggler]`
+// `npm run headless [seed] [days] [carter|smuggler|hub|hub-bare]`
 
 import process from 'node:process';
 import { TICKS_PER_DAY } from './balance';
-import { greedyCarterPolicy, runPolicyGame, smugglerPolicy } from './policy';
+import {
+  greedyCarterPolicy,
+  hubNoAlibiPolicy,
+  hubPolicy,
+  runPolicyGame,
+  smugglerPolicy,
+} from './policy';
 import { clockOf } from './time';
 
 const seed = Number(process.argv[2] ?? 1740);
 const days = Number(process.argv[3] ?? 3);
-const life = process.argv[4] === 'smuggler' ? smugglerPolicy : greedyCarterPolicy;
+const LIVES = {
+  smuggler: smugglerPolicy,
+  hub: hubPolicy,
+  'hub-bare': hubNoAlibiPolicy,
+} as const;
+const life = LIVES[process.argv[4] as keyof typeof LIVES] ?? greedyCarterPolicy;
 
 const state = runPolicyGame(seed, TICKS_PER_DAY * days, life);
 const clock = clockOf(state.tick);

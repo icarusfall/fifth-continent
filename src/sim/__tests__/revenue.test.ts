@@ -424,3 +424,40 @@ describe('the shingle order (spec §6.11, M5a-3)', () => {
     expect(s.dutchmanBook).toBe(100 - proceeds / 2);
   });
 });
+
+describe('the book audit — the Board’s calendar bends for no stain (spec §6.10, M5 hub-3)', () => {
+  const DAWN = SHEARING_HOUR * TICKS_PER_HOUR;
+
+  /** An arrived officer at home, mid-run, with suspicion painted as given. */
+  function arrivedOfficer(suspicion: Record<string, number>): GameState {
+    const s = initialState(9);
+    s.revenue.officer.arrived = true;
+    s.revenue.suspicion = suspicion;
+    s.heat.regional = OFFICER_ARRIVAL_HEAT;
+    return s;
+  }
+
+  it('the dawn after a rent day, the farm is his target no matter how loud Ryne is', () => {
+    // Day 7 dawn (rent fell day 6): tick lands on the audit cadence.
+    let s = arrivedOfficer({ ryne: 99 });
+    s.tick = 7 * TICKS_PER_DAY + DAWN - 1;
+    s = tick(s, []);
+    expect(s.revenue.officer.targetNodeId).toBe('farm');
+  });
+
+  it('every other dawn the sorest stain still rules', () => {
+    let s = arrivedOfficer({ ryne: 99 });
+    s.tick = 8 * TICKS_PER_DAY + DAWN - 1;
+    s = tick(s, []);
+    expect(s.revenue.officer.targetNodeId).toBe('ryne');
+  });
+
+  it('a lawful life is never audited: no Heat, no officer, no knock (§6.10)', () => {
+    // Day 7 dawn with no officer arrived: the audit exists only once he does.
+    let s = initialState(9);
+    s.tick = 7 * TICKS_PER_DAY + DAWN - 1;
+    s = tick(s, []);
+    expect(s.revenue.officer.arrived).toBe(false);
+    expect(s.revenue.officer.targetNodeId).toBeNull();
+  });
+});

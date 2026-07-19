@@ -6,9 +6,29 @@ A single-player, browser-based god/builder game about smuggling, logistics, and
 the two kinds of magic you can use to hide a crime. Design spec and build brief:
 [the-fifth-continent-spec.md](./the-fifth-continent-spec.md).
 
-## Status: Milestone 5a — the bench and the soft hand ✅ (awaiting review)
+## Status: M5 — the cutting house as a working hub ✅ (awaiting review)
 
-**M5a (spec §6.14–6.16):** the difficulty dial (gentle/fair/hard, chosen at
+**M5 hub pass (spec §6.17):** the cutting house stops being a button and
+becomes a building that stores, staffs, and refines two trades at once. Its
+own store (cap 32, cover 6 — dispersal, not relief), smouching (1 tea + 1
+coin → 2 bulked-tea for the cheap second market), and the fence (uncapped,
+0.6×, manual only — automation may not buy its way out of the risk it was
+sent into). The refiner runs the whole house at dawn to a standing
+instruction — a cut depth and a smouch toggle — for 2 coin a day. The
+carter grows up: the hire picker chooses its origin, the cutting house
+offers the products it makes before they exist, orders carry `backTo` (the
+backhaul drops at a third node on the way home, so one cart runs the whole
+owling loop and contraband never enters the wool barn), and a carter who
+cannot sell waits at the sated market, exposed, two days at most. The
+Riding Officer gained the book audit: the dawn after each rent day the farm
+is his target regardless of stains — found by the Beat-3 distribution pass,
+where a hub run entirely off-farm never had its wool ledger opened and
+crime-only out-earned crime-behind-an-alibi until the audit closed the
+loop. The 200-game hub pass asserts the §18 claims: without the lawful leg
+the barn silts and the clip rots on the sheep's backs, and the hub earns
+less running hotter. 243 tests green.
+
+Earlier: **M5a — the bench and the soft hand ✅.** (spec §6.14–6.16): the difficulty dial (gentle/fair/hard, chosen at
 new game, lowerable mid-run and never raisable) scaling rent, heat gained,
 and the raid muster — never the player's own yields. Mercy, diegetic and
 priced: the Dutchman covers a short rent at a vig and takes half of every
@@ -19,7 +39,7 @@ hands-free — and the fully hired farm pays the rent *to the coin*. The flock
 market (buy dear, sell cheap, pasture-capped) grows alibi, not lawful income:
 Ryne's fleece appetite now sits just over the starting clip, so a grown
 flock's surplus is owling. The research bench opens with trade tier 1, the
-false-bottom cart. 195 tests green.
+false-bottom cart.
 
 Earlier: **M4 — Force ✅** (spec §6.12–6.13, §14; signed off 2026-07-17).
 
@@ -66,9 +86,10 @@ alliances and endings (M6), the moving-price market model (§17).
 ```bash
 npm install
 npm run dev        # play at http://localhost:5173
-npm test           # 195 tests incl. replay determinism + headless game batches
+npm test           # 243 tests incl. replay determinism + headless game batches
 npm run headless   # play 3 scripted days in Node, no browser
 npm run headless 1740 20 smuggler   # twenty days of the Dutchman's argument
+npm run headless 1740 30 hub        # a month of the cutting house as a hub
 ```
 
 ## Architecture (the rules that matter)

@@ -387,6 +387,17 @@ dice roll).
 ```
 at dawn    target = argmax suspicion[node], if the max ≥ PATROL_THRESHOLD (4);
            otherwise his beat: Customs House → Ryne → back
+audit      (M5, §6.17) every BOOK_AUDIT_PERIOD_DAYS = 6, on the dawn after
+           the rent falls (day % 6 == BOOK_AUDIT_OFFSET_DAYS = 1), the farm
+           is his target regardless of any stain: the Board's calendar bends
+           for nothing, and the books are read on it. Without this cadence a
+           hub run entirely off-farm (§6.17's backTo launders the barn) keeps
+           the farm forever the least sore node — and the wool ledger, the
+           designed counterweight to owling (§19.2), is never opened. Found
+           by the Beat-3 distribution pass: crime-only out-earned
+           crime-behind-an-alibi until the audit closed the loop. A lawful
+           life is untouched — no Heat, no officer, no audit (§6.10's quiet
+           verdict stands)
 riding     HORSE_TICKS_PER_TILE: road 0.18, marsh 0.45 — the marsh fights
            horses; the shingle is a long, sour ride
 stop       if he and a cart share an edge on the same tick, the cart is

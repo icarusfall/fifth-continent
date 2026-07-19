@@ -11,13 +11,23 @@
 import { describe, expect, it } from 'vitest';
 import {
   CARTER_WAGE,
+  FARM_STORE_CAPACITY,
   FLEECE_PER_HEAD_PER_DAY,
+  FLOCK_CAP,
   RENT_AMOUNT,
   STARTING_FLOCK,
   TICKS_PER_DAY,
   WOOL_PRICE_DOMESTIC,
 } from '../balance';
-import { delegatorPolicy, relayPolicy, runPolicyGame, smugglerPolicy } from '../policy';
+import {
+  delegatorPolicy,
+  hubNoAlibiPolicy,
+  hubPolicy,
+  relayPolicy,
+  runPolicyGame,
+  smugglerPolicy,
+} from '../policy';
+import type { GameState } from '../types';
 
 const GAMES = 200;
 const DAYS = 14; // two rent dues fall inside this window
@@ -149,6 +159,77 @@ describe(`${GAMES} seeded games, ${DAYS} days each — the delegator (spec §6.1
     }
 
     expect(new Set(coins).size).toBe(1); // deterministic, like everything here
+  });
+});
+
+describe(`${GAMES} seeded games, 30 days — the hub (spec §6.17, Beat 3)`, () => {
+  // Long enough for §6.16's designed trajectory: crime's proceeds grow the
+  // flock to the pasture cap, and the grown clip is where the hub's claims
+  // bind — the owl alone cannot move 24 fleece a day.
+  const HUB_DAYS = 30;
+  const RENTS = 4; // days 6, 12, 18, 24 fall inside the window
+
+  /** Every fleece not yet sold, wherever it sits — barn, backs, or boards. */
+  function fleeceInWorld(s: GameState): number {
+    return (
+      (s.stores.farm?.fleece ?? 0) +
+      s.fleeceReady +
+      s.carts.reduce((n, c) => n + (c.cargo.fleece ?? 0), 0)
+    );
+  }
+
+  it('dispersal and smouching are priced, and the lawful leg is load-bearing', { timeout: 300_000 }, () => {
+    const hubCoins: number[] = [];
+    const bareCoins: number[] = [];
+
+    for (let seed = 1; seed <= GAMES; seed++) {
+      const hub = runPolicyGame(seed, TICKS_PER_DAY * HUB_DAYS, hubPolicy);
+      const bare = runPolicyGame(seed, TICKS_PER_DAY * HUB_DAYS, hubNoAlibiPolicy);
+
+      for (const s of [hub, bare]) {
+        // Both lives survive every rent with the flock grown to the cap.
+        expect(s.lost).toBe(false);
+        expect(s.rentPaid).toBe(RENTS * RENT_AMOUNT);
+        expect(s.flockSize).toBe(FLOCK_CAP);
+        // The hub ran: house up, refiner at his dawn work, bulked tea sold.
+        expect(s.cuttingHouse).not.toBeNull();
+        expect(s.refiner.hired).toBe(true);
+        expect(s.contrabandSold).toBeGreaterThan(0);
+        // §18 / §19.3 — dispersal did not defuse the pressure: the second
+        // covered store is stained on its own account, the officer is on the
+        // marsh, and the parish stays hot. Two hides, two stains.
+        expect(s.revenue.officer.arrived).toBe(true);
+        expect(s.heat.regional).toBeGreaterThan(0);
+        expect(s.revenue.suspicion['cutting-house'] ?? 0).toBeGreaterThan(0);
+      }
+
+      // The working hub out-earns the lawful ceiling by a distance (§6.9).
+      const lawfulCeiling =
+        STARTING_FLOCK * FLEECE_PER_HEAD_PER_DAY * (HUB_DAYS + 1) * WOOL_PRICE_DOMESTIC -
+        RENTS * RENT_AMOUNT;
+      expect(hub.coin).toBeGreaterThan(lawfulCeiling);
+
+      // §6.10 — the audit reads the books even when the barn is spotless:
+      // nothing illicit ever touches the no-alibi farm, yet it is stained.
+      expect(bare.revenue.suspicion.farm ?? 0).toBeGreaterThan(0);
+
+      // §18 — without the lawful leg the wool backs up: the barn silts and
+      // the clip rots on the sheep's backs. The alibi keeps it all moving.
+      expect(fleeceInWorld(bare)).toBeGreaterThanOrEqual(2 * FARM_STORE_CAPACITY);
+      expect(fleeceInWorld(hub)).toBeLessThan(FARM_STORE_CAPACITY);
+
+      // The M5a-4 relay learning, held under §6.17: the hub cannot out-earn
+      // the alibi'd life without the lawful leg — and it runs hotter trying.
+      expect(hub.coin).toBeGreaterThan(bare.coin);
+      expect(bare.heat.regional).toBeGreaterThan(hub.heat.regional);
+
+      hubCoins.push(hub.coin);
+      bareCoins.push(bare.coin);
+    }
+
+    // Deterministic policies, no randomness in the economy: still points.
+    expect(new Set(hubCoins).size).toBe(1);
+    expect(new Set(bareCoins).size).toBe(1);
   });
 });
 

@@ -14,14 +14,17 @@ import {
   CART_COST,
   CUTTING_HOUSE_COST,
   DUTCHMAN_PRICE,
+  FARM_STORE_CAPACITY,
+  FLOCK_CAP,
   LEIDEN_PRICE_MULT,
   PLAUSIBLE_YIELD_MIN,
   RENT_AMOUNT,
+  SHEEP_PRICE_BUY,
   WOOL_PRICE_DOMESTIC,
 } from './balance';
 import { isFlooded } from './time';
 import { initialState, tick } from './tick';
-import type { Action, Cart, GameState, Good } from './types';
+import type { Action, Cart, CarterOrder, GameState, Good } from './types';
 
 export function greedyCarterPolicy(state: GameState): Action[] {
   const actions: Action[] = [];
@@ -291,6 +294,129 @@ export function relayPolicy(state: GameState): Action[] {
         ? { from: 'farm', to: 'ryne', good: 'tea' }
         : { from: 'farm', to: 'shingle', good: 'fleece', back: 'tea' },
     });
+  }
+  return actions;
+}
+
+/**
+ * hubPolicy: §6.17 lived in miniature — the cutting house as a working hub,
+ * on §6.16's designed trajectory (crime's proceeds grow the flock to the
+ * pasture cap). Cart-1 owls with a tea backhaul dropped at the cutting house
+ * (`backTo` — contraband never enters the wool barn); cart-3 runs the hub's
+ * bulked tea to town, an order written before any bulked tea exists
+ * (§6.17's products-haulable); the refiner smouches the leaf at dawn. The
+ * arithmetic closes: one lugger-hold of tea (8) smouches to 16 — exactly
+ * Ryne's daily appetite for the stretched leaf.
+ *
+ * Cart-2 is the lawful leg as §6.16 means it: an overflow valve. The owl
+ * moves what the lugger's nights allow; the grown flock clips more than
+ * that, and the surplus either goes to Ryne on the books or silts the barn.
+ * The valve hires when the wool backs up and stands down when it drains,
+ * so honest sales never cannibalize the gunwale's 4× price.
+ */
+export function hubPolicy(state: GameState): Action[] {
+  return runHub(state, true);
+}
+
+/**
+ * hubNoAlibiPolicy: the same hub with the lawful leg cut — no fleece ever
+ * sold at Ryne once the crime begins. §18's claim, held to in the test:
+ * the barn silts with unsold wool, the clip rots on the sheep's backs, the
+ * books gape at every audit, and the hub earns *less* than the same crime
+ * run behind an honest alibi.
+ */
+export function hubNoAlibiPolicy(state: GameState): Action[] {
+  return runHub(state, false);
+}
+
+function runHub(state: GameState, alibi: boolean): Action[] {
+  const actions: Action[] = [];
+  const [first, second, third] = state.carts;
+  if (!first) return actions;
+  if (state.fleeceReady > 0) actions.push({ type: 'shear' });
+
+  // The lawful life, until the first rent has been felt.
+  if (!state.dutchman.unlocked) {
+    if (!first.carter) {
+      actions.push({
+        type: 'hireCarter',
+        cartId: first.id,
+        order: { from: 'farm', to: 'ryne', good: 'fleece' },
+      });
+    }
+    return actions;
+  }
+
+  // The owling begins: the books drop to the plausible floor (§6.10).
+  const floor = Math.floor(state.flockSize * PLAUSIBLE_YIELD_MIN);
+  if (state.ledger.declaredYield > floor) {
+    actions.push({ type: 'setDeclaredYield', fleecePerDay: floor });
+  }
+
+  // The night trade pays for the hub: the house when affordable, then the
+  // wheels, then the flock toward the pasture cap (§6.16's loop) — rent
+  // always in reserve.
+  if (!state.cuttingHouse && state.coin >= CUTTING_HOUSE_COST + RENT_AMOUNT) {
+    actions.push({ type: 'placeCuttingHouse', ...BOT_CUTTING_HOUSE_SITE });
+  }
+  const cartsWanted = alibi ? 3 : 2;
+  if (state.cuttingHouse && state.carts.length < cartsWanted && state.coin >= CART_COST + RENT_AMOUNT) {
+    actions.push({ type: 'buyCart' });
+  } else if (
+    state.cuttingHouse &&
+    state.flockSize + state.sheepArriving < FLOCK_CAP &&
+    state.coin >= SHEEP_PRICE_BUY + RENT_AMOUNT
+  ) {
+    actions.push({ type: 'buySheep', qty: 1 });
+  }
+
+  // Cart-1 owls from the first unlocked night. Once the house stands, the
+  // same order grows the back leg (§6.17): fleece over the gunwale, home
+  // with tea, the tea dropped where it will be smouched.
+  const owl: CarterOrder = state.cuttingHouse
+    ? { from: 'farm', to: 'shingle', good: 'fleece', back: 'tea', backTo: 'cutting-house' }
+    : { from: 'farm', to: 'shingle', good: 'fleece' };
+  if (!first.carter || first.carter.to !== owl.to || first.carter.backTo !== owl.backTo) {
+    actions.push({ type: 'hireCarter', cartId: first.id, order: owl });
+  }
+
+  if (state.cuttingHouse) {
+    // The refiner runs the house: every dawn the backhauled leaf is smouched.
+    if (!state.refiner.hired) actions.push({ type: 'hireRefiner' });
+    if (!state.refiner.smouch) {
+      actions.push({ type: 'setRefinerOrders', cutDepth: 'standard', smouch: true });
+    }
+    // Cart-2 (alibi only): the lawful leg as an overflow valve — hired when
+    // the wool backs up past what the gunwale can move, stood down when the
+    // barn drains, so honest sales never undercut the owl's 4× price.
+    const teaCart = alibi ? third : second;
+    if (alibi && second) {
+      // True surplus only: the barn brimming (wool already stuck on the
+      // sheep's backs) hires him; a barn back down to one owl-load stands
+      // him down. He skims the top and never strips the gunwale's stock.
+      const woolBanked = state.stores.farm?.fleece ?? 0;
+      if (!second.carter && woolBanked >= FARM_STORE_CAPACITY - CART_CAPACITY / 2) {
+        actions.push({
+          type: 'hireCarter',
+          cartId: second.id,
+          order: { from: 'farm', to: 'ryne', good: 'fleece' },
+        });
+      } else if (
+        second.carter?.to === 'ryne' &&
+        woolBanked <= CART_CAPACITY &&
+        (second.cargo.fleece ?? 0) === 0
+      ) {
+        actions.push({ type: 'dismissCarter', cartId: second.id });
+      }
+    }
+    // The hub's product to town — bulked tea into the cheap channel.
+    if (teaCart && !teaCart.carter) {
+      actions.push({
+        type: 'hireCarter',
+        cartId: teaCart.id,
+        order: { from: 'cutting-house', to: 'ryne', good: 'bulked-tea' },
+      });
+    }
   }
   return actions;
 }
