@@ -8,6 +8,7 @@ import {
   CARTER_WAGE,
   CREW_WAGE,
   MILITIA_WAGE,
+  REFINER_WAGE,
   SHEARER_WAGE,
 } from '../sim/balance';
 import { rentAmount } from '../sim/tick';
@@ -16,15 +17,16 @@ import type { GameState } from '../sim/types';
 import { useGameStore } from '../state/store';
 import { HEAT_RED, ROOF } from './palette';
 
-/** The day's standing wages: carters, the shearing lad, and every posted man. */
+/** The day's standing wages: carters, the shearing lad, the refiner, and every posted man. */
 function wageBill(state: GameState): number {
   const carters = state.carts.filter((c) => c.carter !== null).length * CARTER_WAGE;
   const shearer = state.shearer.hired ? SHEARER_WAGE : 0;
+  const refiner = state.refiner.hired ? REFINER_WAGE : 0;
   const garrisons = Object.values(state.garrisons).reduce(
     (sum, g) => sum + (g ? g.militia * MILITIA_WAGE + g.crew * CREW_WAGE : 0),
     0,
   );
-  return carters + shearer + garrisons;
+  return carters + shearer + refiner + garrisons;
 }
 
 export function LedgerPanel({ state }: { state: GameState }) {

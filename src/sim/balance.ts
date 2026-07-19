@@ -83,6 +83,13 @@ export const CUTS: Record<CutDepth, { yield: number; brandy: Good }> = {
   deep: { yield: 4, brandy: 'brandy-rough' },
 };
 
+// ---- The refiner (spec §6.17): one hired hand runs the whole house at dawn ----
+// Dearer than the shearer's 1: this hand knows what the work is, and what it is.
+export const REFINER_WAGE = 2; // coin per day, due at dawn with the wool
+/** Acts of processing by hand (cuts and smouches together) before his offer
+ *  appears — the §6.11 pattern: automation is sold once the chore is felt. */
+export const REFINER_UNLOCK = 6;
+
 // ---- The Ryne market: fixed prices, daily appetite (spec §6.9) ----
 // §17's moving prices wait for their milestone. Jenever price 0 = no legal buyer.
 // §6.17 — the fence: a back-door buyer at Ryne, uncapped by the daily appetite,
@@ -156,6 +163,13 @@ export const CARTER_WAGE = 3; // coin per carter, due at dawn with the wool
  * to reset the tally before this; see revenue.ts.)
  */
 export const CARTER_UNLOCK_FLEECE = 2 * CART_CAPACITY;
+/**
+ * §6.11 / §6.17 — a carter who cannot sell his whole load waits at the market
+ * for the appetite to refresh, exposed (a laden cart in town has no cover and
+ * is seized whole if the officer inspects there), up to this many days — then
+ * carries the remainder home to cover rather than bleed Heat forever.
+ */
+export const CARTER_MARKET_PATIENCE_DAYS = 2;
 
 // ---- M5a-4: asking on the quay (spec §6.9) ----
 export const ROUND_COST = 2; // coin, a round for the alehouse, once a day
@@ -352,6 +366,9 @@ export const SHEARER_UNLOCK_SHEARS = 6;
 export const SHEEP_PRICE_BUY = 15; // coin, at Ryne; home by the next dawn
 export const SHEEP_PRICE_SELL = 8; // the market pays cash and pays worse than the agent values
 export const FLOCK_CAP = 24; // Walland's pasture holds what it holds (dykes raise it, M5½)
+/** §6.16 — the one-time card naming the flock-vs-carter fork, raised the first
+ *  dawn on or after this day: before the first rent, as the carter comes into view. */
+export const FLOCK_SPOTLIGHT_DAY = 4;
 
 // ---- M5a: the research bench (spec §6.14) ----
 // Coin is nominal everywhere in research — the real price is always a meter

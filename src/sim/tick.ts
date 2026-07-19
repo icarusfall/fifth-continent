@@ -19,9 +19,11 @@ import {
   PARISH_VOUCH_COOLDOWN_DAYS,
   PARISH_VOUCH_COST,
   PARISH_VOUCH_STANDING,
+  REFINER_WAGE,
   RESEARCH_COST,
   RESEARCH_DAYS,
   SHEARER_WAGE,
+  CARTER_MARKET_PATIENCE_DAYS,
   SHEEP_PRICE_BUY,
   SHEEP_PRICE_SELL,
   FARM_STORE_CAPACITY,
@@ -77,6 +79,7 @@ import type {
   Action,
   Cart,
   CarterOrder,
+  CutDepth,
   Difficulty,
   GameState,
   Garrison,
@@ -105,6 +108,7 @@ export function initialState(seed: number, difficulty: Difficulty = 'fair'): Gam
     lastCrisisTick: 0,
     sheepArriving: 0,
     shearer: { hired: false, handShears: 0 },
+    refiner: { hired: false, cutDepth: 'standard', smouch: false, handRefines: 0 },
     rumoursHeard: 0,
     lastRoundDay: -1,
     research: { active: null, completed: { trade: 0, marsh: 0, leiden: 0 } },
@@ -279,6 +283,52 @@ function marketSale(state: GameState, cart: Cart, good: Good): number {
     accrueMarketTattle(state, good, qty);
   }
   return qty;
+}
+
+/**
+ * The cut itself (spec §6.9 / §6.17), shared by the player's verb and the
+ * refiner's dawn round: clamps to the tubs on hand, the sugar money, and the
+ * house's walls (each tub nets yield − 1 beyond the jenever it consumes).
+ * Returns tubs cut; the caller does its own talking.
+ */
+function doCut(state: GameState, depth: CutDepth, tubsWanted: number): number {
+  if (!state.cuttingHouse) return 0;
+  const store = state.stores['cutting-house'] ?? {};
+  const cut = CUTS[depth];
+  const room = storeRoom(state, 'cutting-house');
+  const maxByRoom = Math.floor(Math.max(0, room) / (cut.yield - 1));
+  const tubs = Math.min(
+    tubsWanted,
+    store.jenever ?? 0,
+    Math.floor(state.coin / CUT_SUGAR_COST),
+    maxByRoom,
+  );
+  if (tubs <= 0) return 0;
+  store.jenever = (store.jenever ?? 0) - tubs;
+  state.coin -= tubs * CUT_SUGAR_COST;
+  addToStore(store, cut.brandy, tubs * cut.yield);
+  state.stores['cutting-house'] = store;
+  return tubs;
+}
+
+/** The smouch itself (spec §6.17), shared the same way. Returns chests smouched. */
+function doSmouch(state: GameState, chestsWanted: number): number {
+  if (!state.cuttingHouse) return 0;
+  const store = state.stores['cutting-house'] ?? {};
+  const room = storeRoom(state, 'cutting-house');
+  const maxByRoom = Math.floor(Math.max(0, room) / (SMOUCH_YIELD - 1));
+  const chests = Math.min(
+    chestsWanted,
+    store.tea ?? 0,
+    Math.floor(state.coin / SMOUCH_COST),
+    maxByRoom,
+  );
+  if (chests <= 0) return 0;
+  store.tea = (store.tea ?? 0) - chests;
+  state.coin -= chests * SMOUCH_COST;
+  addToStore(store, 'bulked-tea', chests * SMOUCH_YIELD);
+  state.stores['cutting-house'] = store;
+  return chests;
 }
 
 /** Spec §6.13 — the garrison's two kinds: muster cost, daily wage, and a name. */
@@ -557,17 +607,8 @@ function applyAction(state: GameState, action: Action): void {
     case 'cut': {
       if (!state.cuttingHouse) return;
       const store = state.stores['cutting-house'] ?? {};
-      const cut = CUTS[action.depth];
-      // Cutting grows the store (a tub in, yield out): it must fit the walls
-      // (§6.17). Each tub nets (yield − 1) beyond the jenever it consumes.
       const room = storeRoom(state, 'cutting-house');
-      const maxByRoom = Math.floor(Math.max(0, room) / (cut.yield - 1));
-      const tubs = Math.min(
-        action.tubs,
-        store.jenever ?? 0,
-        Math.floor(state.coin / CUT_SUGAR_COST),
-        maxByRoom,
-      );
+      const tubs = doCut(state, action.depth, action.tubs);
       if (tubs <= 0) {
         logEvent(
           state,
@@ -579,13 +620,10 @@ function applyAction(state: GameState, action: Action): void {
         );
         return;
       }
-      store.jenever = (store.jenever ?? 0) - tubs;
-      state.coin -= tubs * CUT_SUGAR_COST;
-      addToStore(store, cut.brandy, tubs * cut.yield);
-      state.stores['cutting-house'] = store;
+      state.refiner.handRefines += 1; // the chore, counted toward his offer (§6.17)
       logEvent(
         state,
-        `Cut ${tubs} tub${tubs === 1 ? '' : 's'} ${action.depth}: ${tubs * cut.yield} of ${cut.brandy} for the town.`,
+        `Cut ${tubs} tub${tubs === 1 ? '' : 's'} ${action.depth}: ${tubs * CUTS[action.depth].yield} of ${CUTS[action.depth].brandy} for the town.`,
       );
       return;
     }
@@ -596,13 +634,7 @@ function applyAction(state: GameState, action: Action): void {
       if (!state.cuttingHouse) return;
       const store = state.stores['cutting-house'] ?? {};
       const room = storeRoom(state, 'cutting-house');
-      const maxByRoom = Math.floor(Math.max(0, room) / (SMOUCH_YIELD - 1));
-      const chests = Math.min(
-        action.chests,
-        store.tea ?? 0,
-        Math.floor(state.coin / SMOUCH_COST),
-        maxByRoom,
-      );
+      const chests = doSmouch(state, action.chests);
       if (chests <= 0) {
         logEvent(
           state,
@@ -614,13 +646,47 @@ function applyAction(state: GameState, action: Action): void {
         );
         return;
       }
-      store.tea = (store.tea ?? 0) - chests;
-      state.coin -= chests * SMOUCH_COST;
-      addToStore(store, 'bulked-tea', chests * SMOUCH_YIELD);
-      state.stores['cutting-house'] = store;
+      state.refiner.handRefines += 1; // the chore, counted toward his offer (§6.17)
       logEvent(
         state,
         `Smouched ${chests} chest${chests === 1 ? '' : 's'}: ${chests * SMOUCH_YIELD} of bulked tea, ash and sloe and all.`,
+      );
+      return;
+    }
+
+    case 'hireRefiner': {
+      // Spec §6.17 — the house that runs itself: the shearer's pattern (§6.16),
+      // priced dearer because this hand knows what the work is.
+      if (!state.cuttingHouse) {
+        logEvent(state, 'No cutting house stands. There is nothing for a refiner to run.');
+        return;
+      }
+      if (state.refiner.hired) {
+        logEvent(state, 'The refiner already works the house at dawn.');
+        return;
+      }
+      state.refiner.hired = true;
+      logEvent(
+        state,
+        `A quiet man takes the cutting house's dawn work for ${REFINER_WAGE} coin a day. He knows what the work is, and what it is.`,
+      );
+      return;
+    }
+
+    case 'dismissRefiner': {
+      if (!state.refiner.hired) return;
+      state.refiner.hired = false;
+      logEvent(state, 'The refiner is paid off. The cutting and the smouching are your hands again.');
+      return;
+    }
+
+    case 'setRefinerOrders': {
+      // Spec §6.17 — the standing instruction: a cut depth, and a smouch toggle.
+      state.refiner.cutDepth = action.cutDepth;
+      state.refiner.smouch = action.smouch;
+      logEvent(
+        state,
+        `The refiner's orders: cut ${action.cutDepth}${action.smouch ? ', and smouch the leaf' : ', and leave the leaf alone'}. He holds to them.`,
       );
       return;
     }
@@ -789,10 +855,28 @@ function applyAction(state: GameState, action: Action): void {
       // A man already on the reins takes new orders in place — no need to pay
       // him off and hire afresh just to redirect the round (spec §6.11).
       const reorder = !!cart.carter;
-      cart.carter = { ...action.order };
+      const order: CarterOrder = { ...action.order };
+      // §6.17 — the backhaul's drop node: home (`from`) is the default, and a
+      // drop at either end of the run means nothing. A bad node degrades to it.
+      if (
+        order.backTo !== undefined &&
+        (order.backTo === from || order.backTo === to || !nodesKnown.includes(order.backTo))
+      ) {
+        delete order.backTo;
+      }
+      cart.carter = order;
+      delete cart.marketPatienceUntil; // a fresh instruction is fresh patience
       const route = `${nodeById(from, state.farm, state.cuttingHouse).name} to ${
         nodeById(to, state.farm, state.cuttingHouse).name
-      }${action.order.back ? `, home with ${action.order.back}` : ''}`;
+      }${
+        order.back
+          ? `, home with ${order.back}${
+              order.backTo
+                ? ` dropped at ${nodeById(order.backTo, state.farm, state.cuttingHouse).name}`
+                : ''
+            }`
+          : ''
+      }`;
       logEvent(
         state,
         reorder
@@ -806,6 +890,7 @@ function applyAction(state: GameState, action: Action): void {
       const cart = findCart(state, action.cartId);
       if (!cart || !cart.carter) return;
       cart.carter = null;
+      delete cart.marketPatienceUntil;
       logEvent(state, `The carter is paid off ${cart.name}. He knew the roads, and he knows things now.`);
       return;
     }
@@ -1017,6 +1102,40 @@ function shearerAtDawn(state: GameState): void {
   logEvent(state, `The lad shears ${qty} fleece into the barn before breakfast.`);
 }
 
+/**
+ * Spec §6.17 — the refiner: wage at dawn with the wool, then the whole house
+ * worked to the standing instruction — all jenever cut at his depth, all tea
+ * smouched if told to. Dumb as the shearer: he refines what is there and does
+ * nothing else. Unpaid, he walks the same morning.
+ */
+function refinerAtDawn(state: GameState): void {
+  if (!isDawn(state.tick) || !state.refiner.hired) return;
+  if (state.coin < REFINER_WAGE) {
+    state.refiner.hired = false;
+    logEvent(state, 'No wage, no refiner: the man walks off, and the house stands idle.');
+    return;
+  }
+  state.coin -= REFINER_WAGE;
+  const tubs = doCut(state, state.refiner.cutDepth, Number.MAX_SAFE_INTEGER);
+  const chests = state.refiner.smouch ? doSmouch(state, Number.MAX_SAFE_INTEGER) : 0;
+  if (tubs > 0 && chests > 0) {
+    logEvent(
+      state,
+      `The refiner cuts ${tubs} tub${tubs === 1 ? '' : 's'} ${state.refiner.cutDepth} and smouches ${chests} chest${chests === 1 ? '' : 's'} before breakfast.`,
+    );
+  } else if (tubs > 0) {
+    logEvent(
+      state,
+      `The refiner cuts ${tubs} tub${tubs === 1 ? '' : 's'} ${state.refiner.cutDepth} before breakfast.`,
+    );
+  } else if (chests > 0) {
+    logEvent(
+      state,
+      `The refiner smouches ${chests} chest${chests === 1 ? '' : 's'} before breakfast.`,
+    );
+  }
+}
+
 /** Spec §6.14 — the bench: a project completes the tick its time is served. */
 function researchProgress(state: GameState): void {
   const active = state.research.active;
@@ -1042,6 +1161,7 @@ function payCartersAtDawn(state: GameState): void {
       state.coin -= CARTER_WAGE;
     } else {
       cart.carter = null;
+      delete cart.marketPatienceUntil;
       logEvent(
         state,
         `No wage, no carter: the man walks off ${cart.name} and leaves it standing.`,
@@ -1208,6 +1328,28 @@ function runCarters(state: GameState): void {
               `The carter sells ${sold} ${order.good} at ${node.name} for ${sold * RYNE_PRICE[order.good]} coin.`,
             );
           }
+          // §6.11 / §6.17 — the sated market: what the town would not take he
+          // no longer sloshes home. He waits for the appetite to refresh —
+          // exposed, a laden cart in town has no cover — until his patience
+          // runs out, then carries the remainder home to cover.
+          if ((cart.cargo[order.good] ?? 0) > 0) {
+            if (cart.marketPatienceUntil === undefined) {
+              cart.marketPatienceUntil =
+                state.tick + CARTER_MARKET_PATIENCE_DAYS * TICKS_PER_DAY;
+              logEvent(
+                state,
+                `${node.name} has had its fill of ${order.good}. The carter waits on the appetite, laden and in plain view.`,
+              );
+            }
+            if (state.tick < cart.marketPatienceUntil) continue; // waiting, exposed
+            delete cart.marketPatienceUntil;
+            logEvent(
+              state,
+              `The carter's patience runs out at ${node.name}: he turns for home with the remainder.`,
+            );
+          } else {
+            delete cart.marketPatienceUntil;
+          }
         } else {
           // Unload into the store, respecting the barn's walls (§6.9).
           const held = cart.cargo[order.good] ?? 0;
@@ -1220,16 +1362,57 @@ function runCarters(state: GameState): void {
           }
         }
       }
-      // The back leg (§6.11, M5a-4), then home. What cannot be sold or
-      // unloaded rides with him either way.
+      // The back leg (§6.11, M5a-4), then home — by way of the drop node when
+      // one is named and the backhaul is aboard (§6.17). What cannot be sold
+      // or unloaded rides with him either way.
       carterBackload(state, cart, order);
-      carterDispatch(state, cart, order.from);
+      carterDispatch(state, cart, carterHomeward(cart, order));
       continue;
     }
 
-    // Anywhere else: head for the work — deliveries first.
-    carterDispatch(state, cart, (cart.cargo[order.good] ?? 0) > 0 ? order.to : order.from);
+    // §6.17 — the drop node: the backhaul lands here on the way home, as far
+    // as the walls allow. What cannot fit stays aboard and rides on to `from`.
+    if (
+      order.backTo !== undefined &&
+      at === order.backTo &&
+      order.back !== undefined &&
+      (cart.cargo[order.back] ?? 0) > 0
+    ) {
+      const held = cart.cargo[order.back] ?? 0;
+      const qty = Math.min(held, Math.max(0, storeRoom(state, at)));
+      if (qty > 0) {
+        cart.cargo[order.back] = held - qty;
+        state.stores[at] = state.stores[at] ?? {};
+        addToStore(state.stores[at], order.back, qty);
+        logEvent(
+          state,
+          `The carter drops ${qty} ${order.back} at ${nodeById(at, state.farm, state.cuttingHouse).name} on his way home.`,
+        );
+      }
+      // Deliveries still first: a leftover backhaul dropped in passing must
+      // not turn an outbound cart for home.
+      carterDispatch(state, cart, (cart.cargo[order.good] ?? 0) > 0 ? order.to : order.from);
+      continue;
+    }
+
+    // Anywhere else: head for the work — deliveries first, then the drop
+    // node if the backhaul is aboard (§6.17), then home.
+    carterDispatch(
+      state,
+      cart,
+      (cart.cargo[order.good] ?? 0) > 0 ? order.to : carterHomeward(cart, order),
+    );
   }
+}
+
+/** Where a carter turning for home actually heads (§6.17): the backhaul's
+ *  drop node while the backhaul is aboard, `from` otherwise. */
+function carterHomeward(cart: Cart, order: CarterOrder): NodeId {
+  return order.backTo !== undefined &&
+    order.back !== undefined &&
+    (cart.cargo[order.back] ?? 0) > 0
+    ? order.backTo
+    : order.from;
 }
 
 /**
@@ -1362,6 +1545,7 @@ export function tick(state: GameState, actions: Action[]): GameState {
   growWoolAtDawn(next);
   sheepArriveAtDawn(next); // after the clip: they arrive shorn of the morning
   shearerAtDawn(next);
+  refinerAtDawn(next);
   researchProgress(next);
   payCartersAtDawn(next);
   payGarrisonsAtDawn(next);

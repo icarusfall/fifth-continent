@@ -26,6 +26,8 @@ import {
   LEIDEN_PRICE_MULT,
   MAX_CARTS,
   MAX_FORT_TIER,
+  REFINER_UNLOCK,
+  REFINER_WAGE,
   RESEARCH_COST,
   RESEARCH_DAYS,
   ROUND_COST,
@@ -1153,9 +1155,72 @@ function CuttingHouseMenu({ state }: { state: GameState }) {
         )}
       </div>
 
+      <RefinerRow state={state} />
+
       <FortifyRow state={state} nodeId="cutting-house" />
 
       <CartsAtNode state={state} nodeId="cutting-house" />
+    </>
+  );
+}
+
+/**
+ * Spec §6.17 — the refiner: offered once the chore is felt (six hand cuts and
+ * smouches together, or a carter already on the reins — the §6.11 pattern).
+ * Hired, he takes a standing instruction: a cut depth, and a smouch toggle.
+ */
+function RefinerRow({ state }: { state: GameState }) {
+  const enqueue = useEnqueue();
+  const r = state.refiner;
+  const offered =
+    r.hired || r.handRefines >= REFINER_UNLOCK || state.carts.some((c) => c.carter !== null);
+  if (!offered) return null;
+  if (!r.hired) {
+    return (
+      <div className="menu-buttons">
+        <button
+          title="At dawn he cuts every tub at your standing depth, and smouches the leaf if told to. He does nothing else, and asks nothing."
+          onClick={() => enqueue({ type: 'hireRefiner' })}
+        >
+          Hire a refiner · {REFINER_WAGE} coin a day
+        </button>
+      </div>
+    );
+  }
+  return (
+    <>
+      <p className="flavour">
+        The refiner works the house at dawn: cut {r.cutDepth},{' '}
+        {r.smouch ? 'and smouch the leaf' : 'leaf left alone'} · {REFINER_WAGE} coin a day.
+      </p>
+      <div className="menu-buttons">
+        {(['gentle', 'standard', 'deep'] as CutDepth[])
+          .filter((depth) => depth !== r.cutDepth)
+          .map((depth) => (
+            <button
+              key={depth}
+              onClick={() => enqueue({ type: 'setRefinerOrders', cutDepth: depth, smouch: r.smouch })}
+            >
+              Have him cut {depth} · {CUTS[depth].yield} {GOOD_LABEL[CUTS[depth].brandy]} a tub
+            </button>
+          ))}
+        <button
+          title={
+            r.smouch
+              ? 'The bohea stays bohea: the fine market pays better a chest, and buys less.'
+              : 'Ash and sloe at dawn: every chest becomes two of bulked tea for the cheap market.'
+          }
+          onClick={() => enqueue({ type: 'setRefinerOrders', cutDepth: r.cutDepth, smouch: !r.smouch })}
+        >
+          {r.smouch ? 'Have him leave the leaf alone' : 'Have him smouch the leaf too'}
+        </button>
+        <button
+          title="The cutting and the smouching become your hands again."
+          onClick={() => enqueue({ type: 'dismissRefiner' })}
+        >
+          Dismiss the refiner
+        </button>
+      </div>
     </>
   );
 }
@@ -1455,26 +1520,34 @@ function CartsAtNode({
   const send = useSendCart(state, nodeId);
   const close = useContext(CloseCtx);
   const flooded = isFlooded(state.tick);
-  // The picker walks a sentence (§6.11): good → destination → the back leg.
-  // The order picker walks a sentence (§6.11): good → destination → back leg.
-  // `from` is the node the order loads at — the menu's node for a fresh hire,
-  // or the carter's existing base when re-ordering a man already on the reins.
+  // The order picker walks a sentence (§6.11): origin → good → destination →
+  // back leg → its drop node (§6.17). `from` is the node the order loads at —
+  // the menu's node for a fresh hire (switchable: the origin pick), or the
+  // carter's existing base when re-ordering a man already on the reins.
   const [hiring, setHiring] = useState<{
     cartId: string;
     from: NodeId;
     good?: Good;
     to?: NodeId;
+    back?: Good;
   } | null>(null);
   const carts = stable
     ? state.carts
     : state.carts.filter((c) => c.location.kind === 'node' && c.location.nodeId === nodeId);
   if (carts.length === 0) return null;
 
-  const hire = (cartId: string, from: NodeId, to: NodeId, good: Good, back?: Good) => {
+  const hire = (
+    cartId: string,
+    from: NodeId,
+    to: NodeId,
+    good: Good,
+    back?: Good,
+    backTo?: NodeId,
+  ) => {
     enqueue({
       type: 'hireCarter',
       cartId,
-      order: { from, to, good, ...(back ? { back } : {}) },
+      order: { from, to, good, ...(back ? { back } : {}), ...(backTo ? { backTo } : {}) },
     });
     setHiring(null);
     // A directed cart is dealt with: if that was the last undirected one, the
@@ -1499,6 +1572,12 @@ function CartsAtNode({
           .filter(([, n]) => n > 0)
           .map(([g]) => g),
         ...(from === 'farm' ? (['fleece'] as Good[]) : []),
+        // §6.17 — name a product not yet made: the house always offers what it
+        // produces, exactly as the farm always offers fleece. Without this,
+        // "run brandy to Ryne" could not be written until brandy existed.
+        ...(from === 'cutting-house'
+          ? (['brandy-gent', 'brandy-fair', 'brandy-rough', 'bulked-tea'] as Good[])
+          : []),
       ]),
     );
   const destinationsFrom = (from: NodeId): NodeId[] =>
@@ -1507,6 +1586,12 @@ function CartsAtNode({
         n !== from &&
         (n !== 'cutting-house' || state.cuttingHouse) &&
         (n !== 'shingle' || state.dutchman.unlocked),
+    );
+  // §6.17 — where a backhaul may be dropped on the way home: a covered store
+  // that is neither end of the run. Home (`from`) is always the default.
+  const dropNodesFor = (from: NodeId, to: NodeId): NodeId[] =>
+    (['farm', 'cutting-house'] as NodeId[]).filter(
+      (n) => n !== from && n !== to && (n !== 'cutting-house' || state.cuttingHouse),
     );
 
   return (
@@ -1528,7 +1613,13 @@ function CartsAtNode({
                 ? ` · standing order: ${GOOD_LABEL[cart.carter.good]} → ${
                     nodeById(cart.carter.to, state.farm, state.cuttingHouse).name
                   }${
-                    cart.carter.back ? `, home with ${GOOD_LABEL[cart.carter.back]}` : ''
+                    cart.carter.back
+                      ? `, home with ${GOOD_LABEL[cart.carter.back]}${
+                          cart.carter.backTo
+                            ? ` dropped at ${nodeById(cart.carter.backTo, state.farm, state.cuttingHouse).name}`
+                            : ''
+                        }`
+                      : ''
                   }, ${CARTER_WAGE} coin a day. ` +
                   (cart.carter.to === 'shingle' && cart.carter.good === 'fleece'
                     ? 'He sells over the gunwale when the lugger stands off, and waits when it does not.'
@@ -1540,8 +1631,10 @@ function CartsAtNode({
               {drivable && roadButtons(nodeId, state, cart, send, flooded)}
               {hiring?.cartId === cart.id ? (
                 hiring.good === undefined ? (
-                  // Re-order (§6.11): choose the new load first. The current
-                  // load is always offered, so the picker never dead-ends.
+                  // The load, at the chosen origin (§6.11 / §6.17): the current
+                  // load is always offered, so the picker never dead-ends, and
+                  // the origin itself is switchable — any loop among the known
+                  // nodes is a standing order, not just farm-and-back.
                   <>
                     {Array.from(
                       new Set([
@@ -1550,7 +1643,14 @@ function CartsAtNode({
                       ]),
                     ).map((good) => (
                       <button key={good} onClick={() => setHiring({ ...hiring, good })}>
-                        Have him haul {GOOD_LABEL[good]}
+                        Have him load {GOOD_LABEL[good]} at{' '}
+                        {nodeById(hiring.from, state.farm, state.cuttingHouse).name}
+                      </button>
+                    ))}
+                    {destinationsFrom(hiring.from).map((n) => (
+                      <button key={`load-${n}`} onClick={() => setHiring({ ...hiring, from: n })}>
+                        …or have him load at{' '}
+                        {nodeById(n, state.farm, state.cuttingHouse).name} instead
                       </button>
                     ))}
                     <button onClick={() => setHiring(null)}>Never mind — leave the order</button>
@@ -1580,7 +1680,7 @@ function CartsAtNode({
                       </button>
                     ))}
                   </>
-                ) : (
+                ) : hiring.back === undefined ? (
                   <>
                     <button onClick={() => hire(cart.id, hiring.from, hiring.to!, hiring.good!)}>
                       …and home empty-handed, until told otherwise
@@ -1593,11 +1693,42 @@ function CartsAtNode({
                             ? 'He buys with the coin in the till, to the cart’s room. No credit, and no keeping back the rent.'
                             : undefined
                         }
-                        onClick={() => hire(cart.id, hiring.from, hiring.to!, hiring.good!, g)}
+                        onClick={() => {
+                          // A drop node worth naming asks one more question
+                          // (§6.17: the backhaul's destination); else hire.
+                          if (dropNodesFor(hiring.from, hiring.to!).length > 0) {
+                            setHiring({ ...hiring, back: g });
+                          } else {
+                            hire(cart.id, hiring.from, hiring.to!, hiring.good!, g);
+                          }
+                        }}
                       >
                         {hiring.to === 'shingle'
                           ? `…and home with ${GOOD_LABEL[g]}, bought off the lugger with the till’s coin`
                           : `…and home with ${GOOD_LABEL[g]}, when the store holds any`}
+                      </button>
+                    ))}
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() =>
+                        hire(cart.id, hiring.from, hiring.to!, hiring.good!, hiring.back)
+                      }
+                    >
+                      …dropped at home —{' '}
+                      {nodeById(hiring.from, state.farm, state.cuttingHouse).name}
+                    </button>
+                    {dropNodesFor(hiring.from, hiring.to!).map((n) => (
+                      <button
+                        key={n}
+                        title="Delivered on the way home, so the backhaul never touches the wool barn."
+                        onClick={() =>
+                          hire(cart.id, hiring.from, hiring.to!, hiring.good!, hiring.back, n)
+                        }
+                      >
+                        …dropped at {nodeById(n, state.farm, state.cuttingHouse).name} on the way
+                        home
                       </button>
                     ))}
                   </>
@@ -1621,14 +1752,24 @@ function CartsAtNode({
                   </button>
                 </>
               ) : !present ? null : carterAvailable ? (
-                haulablesFrom(nodeId).map((good) => (
-                  <button
-                    key={good}
-                    onClick={() => setHiring({ cartId: cart.id, from: nodeId, good })}
-                  >
-                    Hire a carter to haul {GOOD_LABEL[good]} · {CARTER_WAGE} coin a day
-                  </button>
-                ))
+                <>
+                  {haulablesFrom(nodeId).map((good) => (
+                    <button
+                      key={good}
+                      onClick={() => setHiring({ cartId: cart.id, from: nodeId, good })}
+                    >
+                      Hire a carter to haul {GOOD_LABEL[good]} · {CARTER_WAGE} coin a day
+                    </button>
+                  ))}
+                  {destinationsFrom(nodeId).length > 0 && (
+                    <button
+                      title="Any loop among the known places is a standing order — the round need not start here."
+                      onClick={() => setHiring({ cartId: cart.id, from: nodeId })}
+                    >
+                      Hire a carter for a round starting elsewhere…
+                    </button>
+                  )}
+                </>
               ) : null}
               {laden && drivable && (
                 <button onClick={() => enqueue({ type: 'ditchCargo', cartId: cart.id })}>

@@ -7,11 +7,16 @@ import { create } from 'zustand';
 import {
   CART_CAPACITY,
   CART_COST,
+  FLOCK_CAP,
+  FLOCK_SPOTLIGHT_DAY,
   MAX_CARTS,
+  REFINER_UNLOCK,
+  REFINER_WAGE,
   RESEARCH_COST,
   RUMOUR_TRUST,
   SHEARER_UNLOCK_SHEARS,
   SHEARER_WAGE,
+  SHEEP_PRICE_BUY,
   SHEEP_VALUE,
   TICKS_PER_DAY,
 } from '../sim/balance';
@@ -31,7 +36,8 @@ import type { Action, ActionLog, Difficulty, GameState, NodeId } from '../sim/ty
 // v6: M3 adds Heat, the Revenue, the ledger, and carters to GameState.
 // Older saves are incompatible and are silently abandoned.
 // v12: rumoursHeard/lastRoundDay joined GameState (§6.9 M5a-4).
-const SAVE_KEY = 'fifth-continent-save-v12';
+// v13: the refiner joined GameState (§6.17 M5 hub-2); orders may carry backTo.
+const SAVE_KEY = 'fifth-continent-save-v13';
 const AUTOSAVE_EVERY_TICKS = 30;
 const AUTOPAY_KEY = 'fifth-continent-autopay-rent'; // a UI preference, not game state
 
@@ -271,6 +277,18 @@ const MILESTONES: Milestone[] = [
     body: 'You have walked the wool round enough to feel it. A carter will take the reins for 3 coin a day — hire one at a cart and free your own hands for other work.',
   },
   {
+    // §6.16 (M5 hub-2) — the flock as an early choice: one card, the first
+    // dawn on or after day FLOCK_SPOTLIGHT_DAY, naming the fork against the
+    // carter's wage. It changes no rule; it makes an existing lever legible
+    // at the moment it first matters — before the first rent.
+    key: 'flock-spotlight',
+    when: (s) =>
+      s.tick >= FLOCK_SPOTLIGHT_DAY * TICKS_PER_DAY &&
+      s.flockSize + s.sheepArriving < FLOCK_CAP,
+    title: 'More sheep, or more hands',
+    body: `The first coin is in the purse, and it pulls two ways. A sheep at Ryne is ${SHEEP_PRICE_BUY} coin — one more fleece every dawn, for good. A carter is 3 a day — the round runs without you. The pasture holds ${FLOCK_CAP}; the rent does not wait for either.`,
+  },
+  {
     key: 'second-cart',
     when: (s) => s.carts.length < MAX_CARTS && s.coin >= CART_COST && s.dutchman.unlocked,
     title: 'Room in the yard',
@@ -289,6 +307,17 @@ const MILESTONES: Milestone[] = [
       (s.shearer.handShears >= SHEARER_UNLOCK_SHEARS || s.carts.some((c) => c.carter !== null)),
     title: 'The dawn clip, sold',
     body: `You have felt the shears enough. A neighbour's lad will clip the flock into the barn at dawn for ${SHEARER_WAGE} coin a day — hire him at the farm, and the wool round runs without you.`,
+  },
+  {
+    // §6.17 — the refiner's offer, announced like the shearer's: once the
+    // cutting-house chore is felt, or a carter already runs the roads.
+    key: 'refiner-for-hire',
+    when: (s) =>
+      !!s.cuttingHouse &&
+      !s.refiner.hired &&
+      (s.refiner.handRefines >= REFINER_UNLOCK || s.carts.some((c) => c.carter !== null)),
+    title: 'A hand for the house',
+    body: `You have worked the cutting house enough to be known for it. A quiet man will run the whole house at dawn — every tub cut at your standing depth, the leaf smouched if you say so — for ${REFINER_WAGE} coin a day. Hire him at the cutting house. He knows what the work is, and what it is.`,
   },
   {
     key: 'wheelwright-bench',
@@ -380,6 +409,7 @@ function loadSave(): SaveFile | null {
       !parsed.state.research?.completed
     )
       return null;
+    if (typeof parsed.state.refiner?.hired !== 'boolean') return null;
     return parsed;
   } catch {
     return null;

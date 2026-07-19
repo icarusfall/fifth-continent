@@ -6,6 +6,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   CART_CAPACITY,
+  CARTER_MARKET_PATIENCE_DAYS,
   CARTER_WAGE,
   DUTCHMAN_PRICE,
   LEIDEN_PRICE_MULT,
@@ -63,6 +64,62 @@ describe("the carter's back leg (spec §6.11, M5a-4)", () => {
     expect(s.coin).toBe(100 + sale - tubs - wages);
   });
 
+  it('drops the backhaul at `backTo` on the way home — contraband never enters the barn (§6.17)', () => {
+    let s = initialState(1);
+    s.coin = 200;
+    s.dutchman.unlocked = true;
+    s.cuttingHouse = { ...BOT_CUTTING_HOUSE_SITE };
+    s.stores['cutting-house'] = {};
+    s.stores.farm = { fleece: CART_CAPACITY };
+    s = tick(s, [
+      {
+        type: 'hireCarter',
+        cartId: 'cart-1',
+        order: {
+          from: 'farm',
+          to: 'shingle',
+          good: 'fleece',
+          back: 'jenever',
+          backTo: 'cutting-house',
+        },
+      },
+    ]);
+    s = runTicks(s, 4 * TICKS_PER_DAY);
+    // The whole owling loop, one cart: fleece over the gunwale, tubs home by
+    // way of the cutting house. The wool barn never smells the jenever.
+    expect(s.stores['cutting-house']?.jenever).toBe(CART_CAPACITY);
+    expect(s.stores.farm?.jenever ?? 0).toBe(0);
+    expect(s.carts[0].cargo.jenever ?? 0).toBe(0); // landed, not hoarded
+  });
+
+  it('a drop at either end of the run is no drop at all: backTo degrades to home', () => {
+    let s = initialState(1);
+    s.stores.farm = { fleece: CART_CAPACITY };
+    s = tick(s, [
+      {
+        type: 'hireCarter',
+        cartId: 'cart-1',
+        order: { from: 'farm', to: 'shingle', good: 'fleece', back: 'jenever', backTo: 'shingle' },
+      },
+    ]);
+    expect(s.carts[0].carter?.backTo).toBeUndefined();
+    // And a node the map does not know (no cutting house stands) degrades too.
+    s = tick(s, [
+      {
+        type: 'hireCarter',
+        cartId: 'cart-1',
+        order: {
+          from: 'farm',
+          to: 'shingle',
+          good: 'fleece',
+          back: 'jenever',
+          backTo: 'cutting-house',
+        },
+      },
+    ]);
+    expect(s.carts[0].carter?.backTo).toBeUndefined();
+  });
+
   it('no credit: an empty till buys only what the night’s wool paid for', () => {
     let s = initialState(1);
     s.coin = 20;
@@ -78,5 +135,65 @@ describe("the carter's back leg (spec §6.11, M5a-4)", () => {
     s = runTicks(s, 3 * TICKS_PER_DAY);
     expect(s.coin).toBeGreaterThanOrEqual(0); // he never spends coin that is not there
     expect(s.stores.farm?.jenever ?? 0).toBeGreaterThan(0); // but the wool's coin bought tubs
+  });
+});
+
+describe('the sated market — the carter waits, exposed (spec §6.11 / §6.17)', () => {
+  it('waits at the market for the appetite to refresh, and sells into the new dawn', () => {
+    let s = initialState(1);
+    s.tick = 60; // mid-morning: the day's appetite is spent long before dawn refreshes it
+    s.coin = 100;
+    // Ryne drinks only DAILY_DEMAND['brandy-fair'] = 6 a day; the cart holds 8.
+    s.stores.farm = { 'brandy-fair': CART_CAPACITY };
+    s = tick(s, [
+      {
+        type: 'hireCarter',
+        cartId: 'cart-1',
+        order: { from: 'farm', to: 'ryne', good: 'brandy-fair' },
+      },
+    ]);
+    // Half a day in he has sold what the town would take and stands laden in town.
+    const midday = runTicks(s, TICKS_PER_DAY / 2);
+    expect(midday.carts[0].location).toEqual({ kind: 'node', nodeId: 'ryne' });
+    expect(midday.carts[0].cargo['brandy-fair']).toBeGreaterThan(0);
+    expect(midday.carts[0].marketPatienceUntil).toBeDefined();
+    // By the day after the next dawn, the refreshed appetite has taken the rest.
+    const later = runTicks(midday, TICKS_PER_DAY);
+    const held = later.carts[0].cargo['brandy-fair'] ?? 0;
+    const landed = later.stores.farm?.['brandy-fair'] ?? 0;
+    expect(held + landed).toBe(0); // all sold, none sloshed home
+  });
+
+  it('patience runs out: he holds his ground to the tick, then turns for home laden', () => {
+    let s = initialState(1);
+    s.coin = 100;
+    // No buyer in Ryne touches jenever at any price: the order is a dead one.
+    // (Legal to write and stupid to keep, §6.11 — the carter keeps trying it;
+    // what the patience cap buys is that he no longer stands in town forever.)
+    s.stores.farm = { jenever: 4 };
+    s = tick(s, [
+      {
+        type: 'hireCarter',
+        cartId: 'cart-1',
+        order: { from: 'farm', to: 'ryne', good: 'jenever' },
+      },
+    ]);
+    // Run until the sated market sets his patience clock.
+    let guard = 0;
+    while (s.carts[0].marketPatienceUntil === undefined && guard++ < 2 * TICKS_PER_DAY) {
+      s = tick(s, []);
+    }
+    const until = s.carts[0].marketPatienceUntil!;
+    expect(until - s.tick).toBe(CARTER_MARKET_PATIENCE_DAYS * TICKS_PER_DAY);
+    // He is a fixture of the town square while it runs — laden, in plain view.
+    s = runTicks(s, until - s.tick - 1);
+    expect(s.carts[0].location).toEqual({ kind: 'node', nodeId: 'ryne' });
+    expect(s.carts[0].cargo.jenever).toBe(4);
+    // The tick it expires, he gives the town up and takes the load with him.
+    s = runTicks(s, 2);
+    const loc = s.carts[0].location;
+    expect(loc.kind === 'node' && loc.nodeId === 'ryne').toBe(false);
+    expect(s.carts[0].cargo.jenever).toBe(4);
+    expect(s.carts[0].marketPatienceUntil).toBeUndefined();
   });
 });

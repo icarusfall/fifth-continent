@@ -91,12 +91,16 @@ export type CartLocation =
 
 /** A hired carter's standing order (spec §6.11): shuttle `good` from → to.
  *  `back` (M5a-4) is the optional return leg: loaded at `to` from the store,
- *  or bought over the gunwale with the till's coin, and unloaded at `from`. */
+ *  or bought over the gunwale with the till's coin. `backTo` (M5, §6.17) is
+ *  where that backhaul is dropped — delivered on the way home, from → to →
+ *  backTo → from — so one cart runs a whole owling loop and contraband need
+ *  never enter the wool barn. Default: `from`. */
 export interface CarterOrder {
   from: NodeId;
   to: NodeId;
   good: Good;
   back?: Good;
+  backTo?: NodeId;
 }
 
 export interface Cart {
@@ -107,6 +111,12 @@ export interface Cart {
   location: CartLocation;
   /** Non-null = a hired man drives this cart on a standing order (§6.11). */
   carter: CarterOrder | null;
+  /**
+   * §6.11 / §6.17 — set while the carter waits at a sated market for the
+   * appetite to refresh: the tick his patience runs out and he turns for
+   * home with the remainder. Absent when he is not waiting.
+   */
+  marketPatienceUntil?: number;
 }
 
 /** A building's posted men (spec §6.13): the two kinds of the §14.2 pair. */
@@ -182,6 +192,13 @@ export interface GameState {
   sheepArriving: number;
   /** Spec §6.16 — the hired shearer, and the hand-shears that earn his offer. */
   shearer: { hired: boolean; handShears: number };
+  /**
+   * Spec §6.17 — the refiner: one hired hand who works the whole cutting
+   * house at dawn. He cuts all jenever at the standing depth, smouches all
+   * tea if told to, and does nothing else. `handRefines` counts the player's
+   * own cuts and smouches toward his offer (the §6.11 pattern).
+   */
+  refiner: { hired: boolean; cutDepth: CutDepth; smouch: boolean; handRefines: number };
   /** Spec §6.9 (M5a-4) — rumours heard on the quay, 0..RUMOUR_TRUST.length. */
   rumoursHeard: number;
   /** Day index of the last round stood in the alehouse (−1 = never). */
@@ -290,6 +307,9 @@ export type Action =
   | { type: 'setDifficulty'; difficulty: Difficulty }
   | { type: 'hireShearer' }
   | { type: 'dismissShearer' }
+  | { type: 'hireRefiner' }
+  | { type: 'dismissRefiner' }
+  | { type: 'setRefinerOrders'; cutDepth: CutDepth; smouch: boolean }
   | { type: 'buySheep'; qty: number }
   | { type: 'sellSheep'; qty: number }
   | { type: 'startResearch'; tree: ResearchTree }
