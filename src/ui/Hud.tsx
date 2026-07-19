@@ -1,4 +1,14 @@
-import { DIFFICULTY_ORDER, FLOCK_CAP, TICKS_PER_HOUR } from '../sim/balance';
+import { useRef } from 'react';
+import {
+  DIFFICULTY_ORDER,
+  DRAGOON_HEAT,
+  FLOCK_CAP,
+  LONDON_GAUGE_CEILING,
+  OFFICER_ARRIVAL_HEAT,
+  PROMOTION_THRESHOLD,
+  TICKS_PER_HOUR,
+  WATER_GUARD_HEAT,
+} from '../sim/balance';
 import { rentAmount } from '../sim/tick';
 import {
   clockOf,
@@ -36,6 +46,86 @@ function DifficultyNote({ state }: { state: GameState }) {
         </>
       )}
     </span>
+  );
+}
+
+/**
+ * §6.10 / §20.2 — the two Heat gauges. No numbers on the face: the parish's
+ * meter fills toward the promotion threshold (a notch where the officer
+ * comes) and boils when pinned over the top; London's fills toward its
+ * doom, with marks where the Crown escalates. Exact values ride in the
+ * tooltips. The gauges appear only once there is heat to show (§10).
+ */
+function HeatGauges({ state, day }: { state: GameState; day: number }) {
+  // Dawn-to-dawn trend, kept in the component: yesterday's reading against
+  // the day before's. Decoration only — it never touches sim or save.
+  const trend = useRef({ day, atDay: state.heat.regional, prev: null as number | null });
+  if (day !== trend.current.day) {
+    trend.current = { day, atDay: state.heat.regional, prev: trend.current.atDay };
+  }
+  const drift = trend.current.prev === null ? 0 : trend.current.atDay - trend.current.prev;
+
+  const regional = state.heat.regional;
+  const boiling = regional > PROMOTION_THRESHOLD;
+  const parishPct = Math.min(1, regional / PROMOTION_THRESHOLD);
+  // Cool green through amber to red as the parish warms — full is bad here,
+  // the same visual sentence the store-fill bars speak.
+  const hue = Math.round(120 * (1 - parishPct));
+  const londonPct = Math.min(1, state.heat.national / LONDON_GAUGE_CEILING);
+
+  return (
+    <div className="hud-block">
+      <span className="hud-label" style={{ color: REVENUE_BLUE }}>
+        Heat
+        {drift < -0.5 && (
+          <span title="Cooler than yesterday. Lying low is working."> ▾</span>
+        )}
+        {drift > 0.5 && (
+          <span style={{ color: HEAT_RED }} title="Hotter than yesterday. The parish is talking.">
+            {' '}
+            ▴
+          </span>
+        )}
+      </span>
+      <div
+        className="heat-gauge"
+        title={
+          `The parish noticing (${Math.round(regional)}). It cools a little each dawn.` +
+          (boiling
+            ? ' Boiling over: the excess spills into London’s ear every morning.'
+            : ' The notch is where a Riding Officer takes rooms.')
+        }
+      >
+        <div
+          className={boiling ? 'heat-fill heat-boil' : 'heat-fill'}
+          style={{ width: `${parishPct * 100}%`, background: `hsl(${hue} 55% 45%)` }}
+        />
+        <div
+          className="heat-notch"
+          style={{ left: `${(OFFICER_ARRIVAL_HEAT / PROMOTION_THRESHOLD) * 100}%` }}
+        />
+      </div>
+      <div
+        className="heat-gauge london"
+        title={`London noticing (${Math.round(state.heat.national)}). London does not forget. The marks are where the Crown sends worse men.`}
+      >
+        <div
+          className="heat-fill"
+          style={{ width: `${londonPct * 100}%`, background: REVENUE_BLUE }}
+        />
+        <div
+          className="heat-notch"
+          style={{ left: `${(WATER_GUARD_HEAT / LONDON_GAUGE_CEILING) * 100}%` }}
+        />
+        <div
+          className="heat-notch"
+          style={{ left: `${(DRAGOON_HEAT / LONDON_GAUGE_CEILING) * 100}%` }}
+        />
+      </div>
+      <span className="hud-note">
+        London{state.revenue.officer.arrived ? ' · an officer rides the Gault' : ''}
+      </span>
+    </div>
   );
 }
 
@@ -129,22 +219,7 @@ export function Hud({ state }: { state: GameState }) {
       </div>
 
       {(state.heat.regional >= 0.5 || state.revenue.officer.arrived) && (
-        <div className="hud-block">
-          <span className="hud-label" style={{ color: REVENUE_BLUE }}>
-            Heat
-          </span>
-          <span
-            className="hud-coin"
-            style={{ color: state.heat.regional >= 50 ? HEAT_RED : undefined }}
-            title="The parish noticing. It cools a little each dawn."
-          >
-            {Math.round(state.heat.regional)}
-          </span>
-          <span className="hud-note" title="London noticing. London does not forget.">
-            London {state.heat.national < 1 ? state.heat.national.toFixed(1) : Math.round(state.heat.national)}
-            {state.revenue.officer.arrived ? ' · an officer rides the Gault' : ''}
-          </span>
-        </div>
+        <HeatGauges state={state} day={clock.day} />
       )}
     </div>
   );

@@ -450,7 +450,15 @@ yesterday's Revenue mind, not today's. One toggle paints the gossip stains on
 the map; the full A/B/C overlay set waits until there are flows worth
 superimposing. The officer himself is always visible — one horse in open
 country; it is his mind that is fogged, not his body. The HUD gains the two
-Heat gauges. Dispatch buttons carry the warning a marshman's eyes would:
+Heat gauges — meters, not numbers (M5 hub polish, playtest): the parish's
+fills 0 → PROMOTION_THRESHOLD, cool green through amber to HEAT-red, with a
+notch at OFFICER_ARRIVAL_HEAT; over the top it pins full and *boils* (the
+excess is spilling into London's ear, §6.3). London's fills 0 →
+LONDON_GAUGE_CEILING = 100 (a display scale until M6 names the ending's
+true threshold) in Revenue blue, with unlabeled marks at the Crown's
+escalations (§6.13). A dawn-over-dawn drift tick shows cooling or climbing.
+Exact values ride in the tooltips only; the raw sim numbers are uncapped
+and unchanged. Dispatch buttons carry the warning a marshman's eyes would:
 when the officer is on an edge or standing at its far node, the button says
 so — *"the blue coat is on the high road."* Hired carters (§6.11) do not
 read buttons and do not heed the coat; the warning is for the hand on the

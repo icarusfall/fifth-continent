@@ -140,6 +140,9 @@ export const COVER_CAPACITY: Partial<Record<string, number>> = {
 
 // ---- M3: the Riding Officer (spec §6.10) ----
 export const OFFICER_ARRIVAL_HEAT = 30; // first dawn regional at or above this, he comes
+/** §20.2 — the London gauge's display ceiling (the doom dial reads full here).
+ *  A display scale only, until M6 names the ending's true threshold. */
+export const LONDON_GAUGE_CEILING = 100;
 export const PATROL_THRESHOLD = 4; // max suspicion below this, he rides his beat
 export const SEIZURE_HEAT = 1.5; // regional heat per unit seized
 export const SEARCH_RELIEF = 0.5; // × suspicion at a node searched clean
