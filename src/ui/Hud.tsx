@@ -1,4 +1,4 @@
-import { DIFFICULTY_ORDER, TICKS_PER_HOUR } from '../sim/balance';
+import { DIFFICULTY_ORDER, FLOCK_CAP, TICKS_PER_HOUR } from '../sim/balance';
 import { rentAmount } from '../sim/tick';
 import {
   clockOf,
@@ -110,6 +110,18 @@ export function Hud({ state }: { state: GameState }) {
       <div className="hud-block">
         <span className="hud-label">Fleece in store</span>
         <span className="hud-coin">{state.stores.farm?.fleece ?? 0}</span>
+      </div>
+      <div className="hud-block">
+        <span className="hud-label">Flock</span>
+        <span
+          className="hud-coin"
+          title={`Your sheep. The pasture holds ${FLOCK_CAP}.`}
+        >
+          {state.flockSize}
+        </span>
+        {state.sheepArriving > 0 && (
+          <span className="hud-note">+{state.sheepArriving} on the drove road</span>
+        )}
       </div>
       <div className="hud-block">
         <span className="hud-label">Wool on flock</span>
