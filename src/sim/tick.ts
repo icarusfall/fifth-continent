@@ -136,6 +136,7 @@ export function initialState(seed: number, difficulty: Difficulty = 'fair'): Gam
       declaredToDate: 0,
       grownToDate: 0,
       soldLawfully: 0,
+      soldToday: 0,
       // The clip the flock arrives with is stock on hand, not new-grown wool.
       openingStock: STARTING_FLOCK * FLEECE_PER_HEAD_PER_DAY,
     },
@@ -275,13 +276,21 @@ function marketSale(state: GameState, cart: Cart, good: Good): number {
   if (good === 'jenever') return 0; // no legal buyer at any price
   const held = cart.cargo[good] ?? 0;
   const appetite = state.demandRemaining[good] ?? 0;
-  const qty = Math.min(held, appetite);
+  // §6.10 — the wool-stapler's tally: lawful fleece sells only to the
+  // declared figure each day. Wool the ledger never grew cannot cross his
+  // scales; it moves over the gunwale or not at all.
+  const bookAllows =
+    good === 'fleece'
+      ? Math.max(0, state.ledger.declaredYield - state.ledger.soldToday)
+      : Number.MAX_SAFE_INTEGER;
+  const qty = Math.min(held, appetite, bookAllows);
   if (qty <= 0) return 0;
   cart.cargo[good] = held - qty;
   state.demandRemaining[good] = appetite - qty;
   state.coin += creditProceeds(state, qty * RYNE_PRICE[good]);
   if (good === 'fleece') {
     state.ledger.soldLawfully += qty; // lawful wool enters the books (§6.10)
+    state.ledger.soldToday += qty;
   } else {
     accrueMarketTattle(state, good, qty);
   }
@@ -502,6 +511,17 @@ function applyAction(state: GameState, action: Action): void {
       if (held <= 0) return;
       if ((state.demandRemaining[action.good] ?? 0) <= 0) {
         logEvent(state, `Ryne has had its fill of ${action.good} today. Dawn brings appetite.`);
+        return;
+      }
+      if (
+        action.good === 'fleece' &&
+        state.ledger.declaredYield - state.ledger.soldToday <= 0
+      ) {
+        // §6.10 — the squeeze: short books cap lawful sales at the declared figure.
+        logEvent(
+          state,
+          `The wool-stapler checks his tally against your book: ${state.ledger.declaredYield} fleece a day, and he has had them. Selling wool the ledger never grew is a confession.`,
+        );
         return;
       }
       const qty = marketSale(state, cart, action.good);
@@ -1064,8 +1084,10 @@ function growWoolAtDawn(state: GameState): void {
   const grown = state.flockSize * FLEECE_PER_HEAD_PER_DAY;
   state.fleeceReady += grown;
   logEvent(state, `Dawn. The flock carries ${state.fleeceReady} fleece of wool.`);
-  // Ryne wakes hungry (spec §6.9): yesterday's saturation is forgiven.
+  // Ryne wakes hungry (spec §6.9): yesterday's saturation is forgiven —
+  // and the wool-stapler turns to a fresh page of his own (§6.10).
   state.demandRemaining = { ...DAILY_DEMAND };
+  state.ledger.soldToday = 0;
   // The books accrue (§6.10): what grew, and what the page admits grew.
   state.ledger.grownToDate += grown;
   state.ledger.declaredToDate += Math.min(state.ledger.declaredYield, grown);
@@ -1339,9 +1361,15 @@ function runCarters(state: GameState): void {
             if (cart.marketPatienceUntil === undefined) {
               cart.marketPatienceUntil =
                 state.tick + CARTER_MARKET_PATIENCE_DAYS * TICKS_PER_DAY;
+              // §6.10: wool can also be stopped by the book, not the town —
+              // the stapler's tally ran out before Ryne's appetite did.
+              const bookCapped =
+                order.good === 'fleece' && (state.demandRemaining.fleece ?? 0) > 0;
               logEvent(
                 state,
-                `${node.name} has had its fill of ${order.good}. The carter waits on the appetite, laden and in plain view.`,
+                bookCapped
+                  ? `The wool-stapler will take no more against your book today. The carter waits on tomorrow's page.`
+                  : `${node.name} has had its fill of ${order.good}. The carter waits on the appetite, laden and in plain view.`,
               );
             }
             if (state.tick < cart.marketPatienceUntil) continue; // waiting, exposed

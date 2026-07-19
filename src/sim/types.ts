@@ -247,6 +247,12 @@ export interface GameState {
     grownToDate: number;
     /** Fleece sold at Ryne since the page opened. */
     soldLawfully: number;
+    /**
+     * Fleece sold at Ryne since dawn — the wool-stapler's own tally. Lawful
+     * sales are capped at declaredYield per day (§6.10): wool the ledger
+     * never grew cannot cross his scales. Reset with the town's appetite.
+     */
+    soldToday: number;
     /** Fleece on hand when the page opened — carried stock is not new wool. */
     openingStock: number;
   };

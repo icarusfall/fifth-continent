@@ -347,9 +347,12 @@ function runHub(state: GameState, alibi: boolean): Action[] {
     return actions;
   }
 
-  // The owling begins: the books drop to the plausible floor (§6.10).
+  // The owling begins: the books drop to the plausible floor (§6.10). Under
+  // the stapler's cap this also caps the valve's lawful sales at the floor —
+  // declaring more was tried and buys its own audit gap unless every
+  // declared fleece is reliably sold; the floor, fully sold, reads cleanest.
   const floor = Math.floor(state.flockSize * PLAUSIBLE_YIELD_MIN);
-  if (state.ledger.declaredYield > floor) {
+  if (state.ledger.declaredYield !== floor) {
     actions.push({ type: 'setDeclaredYield', fleecePerDay: floor });
   }
 

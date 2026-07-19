@@ -433,6 +433,15 @@ declaredYield   fleece per day the books admit the flock gives, 0..flockSize,
                 changed at will; accrues declaredToDate at each dawn
 grownToDate     what the flock actually grew (accrued at dawn)
 soldLawfully    fleece sold at Ryne, accrued at sale
+soldToday       fleece sold at Ryne since dawn; resets with the town's
+                appetite (M5 hub polish — the squeeze below, finally enforced)
+at Ryne         fleece sells only into min(remaining appetite,
+                declaredYield − soldToday): the wool-stapler keeps his own
+                tally against your book, and wool the ledger never grew
+                cannot cross his scales. Any hand — yours or a carter's —
+                obeys the same page; a capped carter waits out his §6.11
+                patience, then carries the surplus home. The gunwale is
+                untouched: undeclared wool has no scales to cross
 ```
 Undeclared wool does not exist and may vanish over any gunwale it likes.
 Declared wool must be accounted for. When the officer inspects the farm he

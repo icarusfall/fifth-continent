@@ -214,14 +214,23 @@ describe(`${GAMES} seeded games, 30 days — the hub (spec §6.17, Beat 3)`, () 
       expect(bare.revenue.suspicion.farm ?? 0).toBeGreaterThan(0);
 
       // §18 — without the lawful leg the wool backs up: the barn silts and
-      // the clip rots on the sheep's backs. The alibi keeps it all moving.
+      // the clip rots on the sheep's backs. The alibi keeps it moving —
+      // under two days' clip in flight, now that the stapler caps lawful
+      // sales at the declared figure (§6.10), against an ever-growing rot.
       expect(fleeceInWorld(bare)).toBeGreaterThanOrEqual(2 * FARM_STORE_CAPACITY);
-      expect(fleeceInWorld(hub)).toBeLessThan(FARM_STORE_CAPACITY);
+      expect(fleeceInWorld(hub)).toBeLessThan(2 * FARM_STORE_CAPACITY);
+      expect(fleeceInWorld(hub)).toBeLessThan(fleeceInWorld(bare) / 2);
 
-      // The M5a-4 relay learning, held under §6.17: the hub cannot out-earn
-      // the alibi'd life without the lawful leg — and it runs hotter trying.
-      expect(hub.coin).toBeGreaterThan(bare.coin);
-      expect(bare.heat.regional).toBeGreaterThan(hub.heat.regional);
+      // The M5a-4 relay learning, held under §6.17: without the lawful leg
+      // the hub cannot pull ahead — before the book audit closed the loop,
+      // crime-only ran ~50% richer; now its raw-coin edge is pinned to a
+      // razor's margin (the stapler's cap binds only lawful sales, so the
+      // bare life never feels it), and it pays for that margin in a
+      // decisively hotter run — the doom clock M6's endings will spend.
+      // Watch this band: if the bare life ever pulls ahead by a distance
+      // again, an enforcement loop has broken.
+      expect(bare.coin).toBeLessThan(hub.coin * 1.05);
+      expect(bare.heat.regional).toBeGreaterThan(hub.heat.regional * 1.05);
 
       hubCoins.push(hub.coin);
       bareCoins.push(bare.coin);

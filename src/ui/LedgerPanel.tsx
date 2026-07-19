@@ -100,6 +100,10 @@ export function LedgerPanel({ state }: { state: GameState }) {
                 this page: {Math.round(l.declaredToDate)} declared · {l.soldLawfully} sold at
                 Ryne · {l.grownToDate} grown
               </p>
+              <p title="The wool-stapler keeps his own tally against your book: lawful sales stop at the declared figure each day.">
+                today the stapler took <strong>{l.soldToday}</strong> of the{' '}
+                <strong>{l.declaredYield}</strong> the book allows
+              </p>
               <p className="ledger-hint">
                 {honest
                   ? 'An honest page. Every fleece the lugger swallows will read as a gap.'

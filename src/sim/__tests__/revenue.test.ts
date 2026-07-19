@@ -248,7 +248,7 @@ describe('the books (spec §6.10 / §19.2)', () => {
 
   it('honest books balance: all wool declared, sold or on hand', () => {
     const { after } = inspectionAt((s) => {
-      s.ledger = { declaredYield: 12, declaredToDate: 24, grownToDate: 24, soldLawfully: 16, openingStock: 0 };
+      s.ledger = { declaredYield: 12, declaredToDate: 24, grownToDate: 24, soldLawfully: 16, soldToday: 0, openingStock: 0 };
       s.stores.farm = { fleece: 8 };
     });
     expect(after.heat.regional).toBe(0);
@@ -258,7 +258,7 @@ describe('the books (spec §6.10 / §19.2)', () => {
   it('vanished wool is priced at the gap', () => {
     const { after } = inspectionAt((s) => {
       // Declared 24, sold 8 lawfully, nothing on hand: 16 fleece adrift.
-      s.ledger = { declaredYield: 12, declaredToDate: 24, grownToDate: 24, soldLawfully: 8, openingStock: 0 };
+      s.ledger = { declaredYield: 12, declaredToDate: 24, grownToDate: 24, soldLawfully: 8, soldToday: 0, openingStock: 0 };
       s.stores.farm = { fleece: 0 };
     });
     expect(after.heat.regional).toBeCloseTo(16 * WOOL_GAP_COEFF, 5);
@@ -268,14 +268,14 @@ describe('the books (spec §6.10 / §19.2)', () => {
   it('swearing to less than half the clip is priced as a lie', () => {
     const { after } = inspectionAt((s) => {
       // Declared nothing, holds nothing, sold nothing — but 24 grew: floor is 12.
-      s.ledger = { declaredYield: 0, declaredToDate: 0, grownToDate: 24, soldLawfully: 0, openingStock: 0 };
+      s.ledger = { declaredYield: 0, declaredToDate: 0, grownToDate: 24, soldLawfully: 0, soldToday: 0, openingStock: 0 };
     });
     expect(after.heat.regional).toBeCloseTo(12 * WOOL_GAP_COEFF, 5);
   });
 
   it('the page is initialled: a gap is paid for once, not nightly', () => {
     const { after } = inspectionAt((s) => {
-      s.ledger = { declaredYield: 12, declaredToDate: 24, grownToDate: 24, soldLawfully: 8, openingStock: 0 };
+      s.ledger = { declaredYield: 12, declaredToDate: 24, grownToDate: 24, soldLawfully: 8, soldToday: 0, openingStock: 0 };
     });
     expect(after.ledger.declaredToDate).toBe(0);
     expect(after.ledger.grownToDate).toBe(0);
@@ -462,5 +462,61 @@ describe('the book audit — the Board’s calendar bends for no stain (spec §6
     s = tick(s, []);
     expect(s.revenue.officer.arrived).toBe(false);
     expect(s.revenue.officer.targetNodeId).toBeNull();
+  });
+});
+
+describe('the wool-stapler’s tally — lawful sales cap at the declared figure (spec §6.10, M5 hub polish)', () => {
+  /** A laden cart standing in Ryne, the books sworn as given. */
+  function cartInRyne(fleece: number, declared: number): GameState {
+    const s = initialState(3);
+    s.tick = 60; // mid-morning: a clean run at the day's page
+    s.ledger.declaredYield = declared;
+    s.carts[0].cargo = { fleece };
+    s.carts[0].location = { kind: 'node', nodeId: 'ryne' };
+    return s;
+  }
+
+  it('the town is hungry, but the book is not: sales stop at declaredYield', () => {
+    let s = cartInRyne(10, 6);
+    s = tick(s, [{ type: 'sell', cartId: 'cart-1', good: 'fleece' }]);
+    expect(s.carts[0].cargo.fleece).toBe(4); // 6 sold, 4 refused
+    expect(s.ledger.soldToday).toBe(6);
+    expect(s.coin).toBe(6 * WOOL_PRICE_DOMESTIC);
+    // A second try the same day moves nothing: the tally is full.
+    s = tick(s, [{ type: 'sell', cartId: 'cart-1', good: 'fleece' }]);
+    expect(s.carts[0].cargo.fleece).toBe(4);
+    expect(s.log.some((e) => e.text.includes('wool-stapler'))).toBe(true);
+  });
+
+  it('dawn turns the stapler’s page: the allowance refreshes with the appetite', () => {
+    let s = cartInRyne(10, 6);
+    s = tick(s, [{ type: 'sell', cartId: 'cart-1', good: 'fleece' }]);
+    expect(s.carts[0].cargo.fleece).toBe(4);
+    s = runTicks(s, TICKS_PER_DAY); // through the next dawn
+    expect(s.ledger.soldToday).toBe(0);
+    s = tick(s, [{ type: 'sell', cartId: 'cart-1', good: 'fleece' }]);
+    expect(s.carts[0].cargo.fleece).toBe(0); // the rest sells on the new page
+  });
+
+  it('raising the declared figure mid-day frees the rest of the load', () => {
+    let s = cartInRyne(10, 6);
+    s = tick(s, [{ type: 'sell', cartId: 'cart-1', good: 'fleece' }]);
+    s = tick(s, [{ type: 'setDeclaredYield', fleecePerDay: 12 }]);
+    s = tick(s, [{ type: 'sell', cartId: 'cart-1', good: 'fleece' }]);
+    expect(s.carts[0].cargo.fleece).toBe(0); // the book now admits the wool
+  });
+
+  it('the gunwale has no scales: undeclared wool vanishes over it uncapped', () => {
+    const s0 = initialState(3);
+    s0.tick = 60;
+    s0.ledger.declaredYield = 0; // the book swears the flock gives nothing
+    s0.dutchman.unlocked = true;
+    s0.dutchman.present = true;
+    s0.dutchman.fleeceAppetite = 24;
+    s0.carts[0].cargo = { fleece: 8 };
+    s0.carts[0].location = { kind: 'node', nodeId: 'shingle' };
+    const s = tick(s0, [{ type: 'sellToDutchman', cartId: 'cart-1' }]);
+    expect(s.carts[0].cargo.fleece).toBe(0);
+    expect(s.ledger.soldToday).toBe(0); // no page records it
   });
 });

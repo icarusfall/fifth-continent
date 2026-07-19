@@ -41,7 +41,9 @@ import type { Action, ActionLog, Difficulty, GameState, NodeId } from '../sim/ty
 // v13: the refiner joined GameState (§6.17 M5 hub-2); orders may carry backTo.
 // v14: goodsSeized/lastSeizureNode/distraintSheep — tallies the seizure and
 //      distraint cards watch (§6.10/§6.8, M5 hub polish).
-const SAVE_KEY = 'fifth-continent-save-v14';
+// v15: ledger.soldToday — the wool-stapler's daily tally; lawful fleece
+//      sales cap at declaredYield/day (§6.10's squeeze, finally enforced).
+const SAVE_KEY = 'fifth-continent-save-v15';
 const AUTOSAVE_EVERY_TICKS = 30;
 const AUTOPAY_KEY = 'fifth-continent-autopay-rent'; // a UI preference, not game state
 
@@ -498,6 +500,7 @@ function loadSave(): SaveFile | null {
       typeof parsed.state.distraintSheep !== 'number'
     )
       return null;
+    if (typeof parsed.state.ledger?.soldToday !== 'number') return null;
     return parsed;
   } catch {
     return null;
