@@ -54,6 +54,8 @@ describe('rent (spec §6.8)', () => {
     expect(s.flockSize).toBe(STARTING_FLOCK - Math.ceil((RENT_AMOUNT - 70) / SHEEP_VALUE));
     expect(s.lost).toBe(false);
     expect(s.log.some((e) => e.text.includes('Distraint'))).toBe(true);
+    // §6.8 (M5 hub polish) — the tally the distraint card watches.
+    expect(s.distraintSheep).toBe(Math.ceil((RENT_AMOUNT - 70) / SHEEP_VALUE));
   });
 
   it('a smaller flock grows less wool the next dawn', () => {

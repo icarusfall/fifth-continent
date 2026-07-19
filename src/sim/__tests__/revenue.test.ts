@@ -198,6 +198,9 @@ describe('the Riding Officer (spec §6.10)', () => {
     expect(s.stores.farm?.fleece).toBe(2); // wool is not his to take
     expect(s.log.some((e) => e.text.includes('seizes 6 goods'))).toBe(true);
     expect(s.heat.regional).toBeGreaterThanOrEqual(6 * SEIZURE_HEAT);
+    // §6.10 (M5 hub polish) — the tally the seizure card watches.
+    expect(s.goodsSeized).toBe(6);
+    expect(s.lastSeizureNode).toBe('farm');
   });
 
   it('a clean search cools the trail — node suspicion and regional Heat both', () => {

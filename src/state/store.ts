@@ -10,6 +10,7 @@ import {
   FLOCK_CAP,
   FLOCK_SPOTLIGHT_DAY,
   MAX_CARTS,
+  MILESTONE_CARD_SPACING_DAYS,
   REFINER_UNLOCK,
   REFINER_WAGE,
   RESEARCH_COST,
@@ -20,6 +21,7 @@ import {
   SHEEP_VALUE,
   TICKS_PER_DAY,
 } from '../sim/balance';
+import { illicitAnywhere } from '../sim/revenue';
 import { simulateBattle } from '../sim/combat';
 import type { BattleSetup, Call, CombatLog, ScheduledCall } from '../sim/combat';
 import { nodeById } from '../sim/map';
@@ -37,7 +39,9 @@ import type { Action, ActionLog, Difficulty, GameState, NodeId } from '../sim/ty
 // Older saves are incompatible and are silently abandoned.
 // v12: rumoursHeard/lastRoundDay joined GameState (§6.9 M5a-4).
 // v13: the refiner joined GameState (§6.17 M5 hub-2); orders may carry backTo.
-const SAVE_KEY = 'fifth-continent-save-v13';
+// v14: goodsSeized/lastSeizureNode/distraintSheep — tallies the seizure and
+//      distraint cards watch (§6.10/§6.8, M5 hub polish).
+const SAVE_KEY = 'fifth-continent-save-v14';
 const AUTOSAVE_EVERY_TICKS = 30;
 const AUTOPAY_KEY = 'fifth-continent-autopay-rent'; // a UI preference, not game state
 
@@ -134,6 +138,29 @@ function rentCard(next: GameState): EventCard {
       ? `The agent is at the door for his ${due} coin, and the purse holds it.`
       : `The agent wants ${due} coin; the purse holds ${next.coin}. Short by ${short} — his men will drive off ${Math.ceil(short / SHEEP_VALUE)} sheep for the rest.`;
   return { id: `rent-${next.rentDueTick}`, kind: 'rent', title: 'Rent day', body };
+}
+
+/** §6.10 — the officer took goods: pause, and say what the cover could not hide. */
+function seizureCard(next: GameState, units: number): EventCard {
+  const where = next.lastSeizureNode
+    ? nodeById(next.lastSeizureNode, next.farm, next.cuttingHouse).name
+    : 'the road';
+  return {
+    id: `seizure-${next.tick}`,
+    kind: 'info',
+    title: 'Seized for the Crown',
+    body: `The Riding Officer takes ${units} good${units === 1 ? '' : 's'} at ${where} — everything the cover could not hide. What the Crown takes, it keeps, and the parish talks the louder for it. Split your stock, mind his road, and keep the stains moving.`,
+  };
+}
+
+/** §6.8 — the rent came short and the agent took sheep: pause, and count them. */
+function distraintCard(next: GameState, sheep: number): EventCard {
+  return {
+    id: `distraint-${next.tick}`,
+    kind: 'info',
+    title: 'Distraint',
+    body: `The rent came short, and the agent's men drove off ${sheep} sheep — distraint, he calls it, and the law agrees. The flock stands at ${next.flockSize}: fewer fleece every dawn from here, so the next rent starts harder than this one. The Dutchman's coin or the parish's patience may not always be there.`,
+  };
 }
 
 /** Spec §6.15 — the parish vouched: say so, plainly, and what it cost. */
@@ -237,6 +264,13 @@ interface Milestone {
   when: (s: GameState) => boolean;
   title: string;
   body: string;
+  /**
+   * §10 (playtest) — an *offer* card: something new for sale, not something
+   * happening. Offers keep MILESTONE_CARD_SPACING_DAYS of daylight between
+   * them so the day-6 pile reads as a week of discoveries; world events
+   * (the officer arriving, the lugger offshore) are never held back.
+   */
+  paced?: boolean;
 }
 
 // Order is priority when several come true at once — the pause sequences them.
@@ -266,12 +300,14 @@ const MILESTONES: Milestone[] = [
   },
   {
     key: 'cutting-house',
+    paced: true,
     when: (s) => !s.cuttingHouse && hasOverproofJenever(s),
     title: 'Spirit no one will buy',
     body: 'You are holding overproof jenever, and no honest buyer will touch a drop. Raise a cutting house on the marsh: cut it with water and burnt sugar and it sells in Ryne as brandy.',
   },
   {
     key: 'carter-for-hire',
+    paced: true,
     when: (s) => s.dutchman.unlocked || s.ledger.soldLawfully >= 2 * CART_CAPACITY,
     title: 'Hands for hire',
     body: 'You have walked the wool round enough to feel it. A carter will take the reins for 3 coin a day — hire one at a cart and free your own hands for other work.',
@@ -282,6 +318,7 @@ const MILESTONES: Milestone[] = [
     // carter's wage. It changes no rule; it makes an existing lever legible
     // at the moment it first matters — before the first rent.
     key: 'flock-spotlight',
+    paced: true,
     when: (s) =>
       s.tick >= FLOCK_SPOTLIGHT_DAY * TICKS_PER_DAY &&
       s.flockSize + s.sheepArriving < FLOCK_CAP,
@@ -289,8 +326,16 @@ const MILESTONES: Milestone[] = [
     body: `The first coin is in the purse, and it pulls two ways. A sheep at Ryne is ${SHEEP_PRICE_BUY} coin — one more fleece every dawn, for good. A carter is 3 a day — the round runs without you. The pasture holds ${FLOCK_CAP}; the rent does not wait for either.`,
   },
   {
+    // §10 (playtest) — a second cart is an answer to a felt limit: offered
+    // once a carter already runs a round (your own hands are spoken for),
+    // not the moment the purse can cover it.
     key: 'second-cart',
-    when: (s) => s.carts.length < MAX_CARTS && s.coin >= CART_COST && s.dutchman.unlocked,
+    paced: true,
+    when: (s) =>
+      s.carts.length < MAX_CARTS &&
+      s.coin >= CART_COST &&
+      s.dutchman.unlocked &&
+      s.carts.some((c) => c.carter !== null),
     title: 'Room in the yard',
     body: 'There is coin enough for a second cart and pony now, and the yard holds three. More wheels move more at once — buy one at the farm.',
   },
@@ -302,6 +347,7 @@ const MILESTONES: Milestone[] = [
   },
   {
     key: 'shearer-for-hire',
+    paced: true,
     when: (s) =>
       !s.shearer.hired &&
       (s.shearer.handShears >= SHEARER_UNLOCK_SHEARS || s.carts.some((c) => c.carter !== null)),
@@ -312,6 +358,7 @@ const MILESTONES: Milestone[] = [
     // §6.17 — the refiner's offer, announced like the shearer's: once the
     // cutting-house chore is felt, or a carter already runs the roads.
     key: 'refiner-for-hire',
+    paced: true,
     when: (s) =>
       !!s.cuttingHouse &&
       !s.refiner.hired &&
@@ -320,17 +367,51 @@ const MILESTONES: Milestone[] = [
     body: `You have worked the cutting house enough to be known for it. A quiet man will run the whole house at dawn — every tub cut at your standing depth, the leaf smouched if you say so — for ${REFINER_WAGE} coin a day. Hire him at the cutting house. He knows what the work is, and what it is.`,
   },
   {
+    // §10 / §6.14 (playtest) — hollow floors matter only once there is
+    // something to hide: offered when contraband has touched your hands,
+    // not the moment the coast opens.
     key: 'wheelwright-bench',
-    when: (s) => s.dutchman.unlocked && s.coin >= RESEARCH_COST.trade[0],
+    paced: true,
+    when: (s) =>
+      s.dutchman.unlocked &&
+      s.coin >= RESEARCH_COST.trade[0] &&
+      (s.contrabandSold > 0 || illicitAnywhere(s) > 0),
     title: 'The wheelwright asks no questions',
     body: `There is coin enough for quiet improvements now. The wheelwright will fit your carts with hollow floors — ${RESEARCH_COST.trade[0]} coin, a couple of days, and the road-stops miss what rides under the boards. Start the work at the farm.`,
   },
 ];
 
-/** The first milestone whose moment has come and has not yet been shown. */
-function detectMilestone(s: GameState, shown: Shown): Milestone | null {
-  for (const m of MILESTONES) if (!shown[m.key] && m.when(s)) return m;
+/** The first milestone whose moment has come and has not yet been shown.
+ *  Paced (offer) cards keep their spacing from the last paced card; a world
+ *  event further down the list may still speak in the meantime (§10). */
+function detectMilestone(s: GameState, shown: Shown, lastPacedTick: number): Milestone | null {
+  const spacing = MILESTONE_CARD_SPACING_DAYS * TICKS_PER_DAY;
+  for (const m of MILESTONES) {
+    if (shown[m.key] || !m.when(s)) continue;
+    if (m.paced && lastPacedTick > 0 && s.tick - lastPacedTick < spacing) continue;
+    return m;
+  }
   return null;
+}
+
+// The pacing latch persists beside the seen-cards latch: losing it only
+// risks two offers landing close together after a reload.
+const PACED_KEY = 'fifth-continent-last-paced-tick';
+
+function loadPacedTick(): number {
+  try {
+    return Number(localStorage.getItem(PACED_KEY) ?? 0) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+function savePacedTick(tick: number): void {
+  try {
+    localStorage.setItem(PACED_KEY, String(tick));
+  } catch {
+    /* ignore */
+  }
 }
 
 interface SaveFile {
@@ -352,6 +433,8 @@ export interface GameStore {
   autoPayRent: boolean;
   /** Milestone cards already shown, so each punchy notice fires only once. */
   shownCards: Shown;
+  /** Tick of the last paced (offer) milestone card — the §10 spacing latch. */
+  lastPacedTick: number;
   /** A raid being watched frame by frame (spec §14). Freezes the world too. */
   battle: BattlePlayback | null;
 
@@ -410,6 +493,11 @@ function loadSave(): SaveFile | null {
     )
       return null;
     if (typeof parsed.state.refiner?.hired !== 'boolean') return null;
+    if (
+      typeof parsed.state.goodsSeized !== 'number' ||
+      typeof parsed.state.distraintSheep !== 'number'
+    )
+      return null;
     return parsed;
   } catch {
     return null;
@@ -439,12 +527,13 @@ export const useGameStore = create<GameStore>()((set, get) => {
     activeCard: null,
     autoPayRent: loadAutoPay(),
     shownCards: saved ? loadShown() : {},
+    lastPacedTick: saved ? loadPacedTick() : 0,
     battle: null,
 
     enqueue: (action) => set((s) => ({ pending: [...s.pending, action] })),
 
     step: () => {
-      const { state, pending, actionLog, autoPayRent, activeCard, shownCards, battle } = get();
+      const { state, pending, actionLog, autoPayRent, activeCard, shownCards, lastPacedTick, battle } = get();
       if (activeCard || battle) return; // the world is frozen behind a card or a battle
       const nextLog =
         pending.length > 0 ? { ...actionLog, [state.tick]: pending } : actionLog;
@@ -457,12 +546,17 @@ export const useGameStore = create<GameStore>()((set, get) => {
       let nextPending: Action[] = [];
       let card: EventCard | null = null;
       let shown = shownCards;
+      let paced = lastPacedTick;
 
       // Raid beats (§6.13): the muster gathering, then the blow at the wall.
       const musterGathered = !!next.raid && !state.raid;
       const battlePending = !!next.raid?.pendingBattle && !state.raid?.pendingBattle;
       // Mercy (§6.15): the parish vouched — pause and say so.
       const justVouched = next.vouches > state.vouches;
+      // Consequences pause too (§6.8/§6.10, playtest): sheep driven off in
+      // distraint, and goods taken by the officer's hand.
+      const justDistrained = next.distraintSheep > state.distraintSheep;
+      const justSeized = next.goodsSeized > state.goodsSeized;
       // §6.9 (M5a-4): a round was stood and a rumour heard. The last rumour
       // unlocks the Dutchman, and its own milestone card owns that moment —
       // so the round card yields to it (the !unlocked guard below).
@@ -474,22 +568,30 @@ export const useGameStore = create<GameStore>()((set, get) => {
         nextPending = [{ type: 'payRent' }];
       } else if (justVouched) {
         card = vouchCard(next);
+      } else if (justDistrained) {
+        card = distraintCard(next, next.distraintSheep - state.distraintSheep);
       } else if (battlePending) {
         card = raidCard(next);
       } else if (musterGathered) {
         card = musterCard(next);
+      } else if (justSeized) {
+        card = seizureCard(next, next.goodsSeized - state.goodsSeized);
       } else if (roundStood && !next.dutchman.unlocked) {
         card = roundCard(next);
       } else {
-        const m = detectMilestone(next, shownCards);
+        const m = detectMilestone(next, shownCards, lastPacedTick);
         if (m) {
           card = { id: m.key, kind: 'info', title: m.title, body: m.body };
           shown = { ...shownCards, [m.key]: true };
           saveShown(shown);
+          if (m.paced) {
+            paced = next.tick;
+            savePacedTick(paced);
+          }
         }
       }
 
-      set({ state: next, pending: nextPending, actionLog: nextLog, activeCard: card, shownCards: shown });
+      set({ state: next, pending: nextPending, actionLog: nextLog, activeCard: card, shownCards: shown, lastPacedTick: paced });
       if (next.tick % AUTOSAVE_EVERY_TICKS === 0) writeSave(next, nextLog);
     },
 
@@ -506,6 +608,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
     startNewGame: (difficulty) => {
       localStorage.removeItem(SAVE_KEY);
       clearShown(); // a new tenancy meets its milestones fresh
+      savePacedTick(0);
       set({
         state: initialState(DEFAULT_SEED, difficulty),
         actionLog: {},
@@ -513,6 +616,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
         paused: false,
         activeCard: null,
         shownCards: {},
+        lastPacedTick: 0,
         battle: null,
       });
     },

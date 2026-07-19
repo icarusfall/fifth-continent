@@ -191,7 +191,10 @@ at each due dawn:
 Perfect lawful play earns 144 coin per period against 120 rent. You can
 survive on wool; you cannot live on it. Distraint compounds: every seized
 sheep shrinks future income now and the smuggler's alibi later (§19.2).
-This arithmetic is the Dutchman's opening argument in M2.
+This arithmetic is the Dutchman's opening argument in M2. A distraint
+raises its own auto-pause card (M5 hub polish, playtest — `distraintSheep`
+tally in GameState): sheep driven off must never happen in the corner of
+the player's eye.
 
 ### 6.9 M2 — the crime (the Dutchman, the shingle, running, cutting)
 
@@ -415,6 +418,10 @@ search     at his target node: found = max(0, illicitStored - coverCapacity);
 decay      suspicion[node] ×= 0.99 at dawn — he keeps notes
 ```
 Seizure takes the goods and nothing else: no arrest, no fine, no combat.
+A seizure raises an auto-pause card (M5 hub polish, playtest —
+`goodsSeized`/`lastSeizureNode` tallies in GameState): the Crown's hand in
+your stores must never happen in the corner of the player's eye. Raid
+plunder is not double-carded — the raid owns its own beats (§6.13).
 There is deliberately no verb for violence against him — that verb arrives
 with M4 and §7 prices it as catastrophe. The ditch (§6.9) becomes the panic
 button it was built to be: see the blue coat on your road, tip the lot.
@@ -1345,6 +1352,17 @@ Full attrition combat. **See §14 — do not implement a single-roll siege check
 
 **Zero text walls. No tutorial panels.** The principle: *never introduce a mechanic before the player has a problem it solves.* Each rung is caused by the previous one. Total dialogue budget for the entire opening: **about six lines.**
 
+**Pacing the offers (M5 hub polish, playtest).** The first rent unlocks the
+coast, and with it half the game's shop window — the shingle, the carter,
+the second cart, the wheelwright — all inside a day, which reads as an
+avalanche to a player still in rung 2. Two rules space it out: *offer*
+cards (something newly for sale) keep `MILESTONE_CARD_SPACING_DAYS = 1` of
+daylight between one another, while *world* cards (the officer arriving,
+the lugger offshore, the coast opening) are never delayed; and two offers
+gained problem-shaped conditions — the second cart waits until a carter
+already runs a round, and the wheelwright's false bottoms (card *and*
+bench row) wait until contraband has actually touched the player's hands.
+
 1. **Cart wool to Ryne.** Twelve sheep, one cart. Teaches routes, capacity, latency — and the tide-locked low road vs the slow high road past the Customs House.
 2. **The price is insulting.** The market screen shows why: wool cannot legally leave the country, and the domestic buyers know it. The player *feels* a policy without reading about one.
 3. **A Dutchman on the shingle offers four times.** Night, falling tide. Your existing product is *already contraband*. The player doesn't choose to become a criminal — they choose whether to accept the actual value of their own labour. **This is the inciting incident and it is emergent, not narrated.**
@@ -1781,6 +1799,11 @@ stay verbs; the panel is where the lying gets done.)*
 
 ### 20.2 Supply flow visibility
 Goods on the map look like **carts, not belts**. Flows are an **overlay**, toggled.
+
+*(First cut, M5 hub polish: every edge a hired carter's standing order
+rides — from → to → backTo → from, walked with tide-blind latencies so the
+ribbon holds still — glows with a soft translucent white line over the
+road. Overlay A's seed: what you are actually doing, visible at a glance.)*
 
 **The killer feature, and it must be one keystroke:**
 - Overlay A: what you are actually doing.

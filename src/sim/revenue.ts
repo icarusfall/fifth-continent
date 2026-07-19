@@ -296,6 +296,8 @@ function searchNode(state: GameState, nodeId: NodeId): void {
     if (remaining <= 0) break;
     remaining -= seizeFrom(cart.cargo, remaining);
   }
+  state.goodsSeized += found;
+  state.lastSeizureNode = nodeId;
   addHeat(state, found * SEIZURE_HEAT); // no extra stain: the stain was earned already
   logEvent(state, `The officer searches ${name} and seizes ${found} goods for the Crown.`);
 }
@@ -388,6 +390,8 @@ function stopCartsOnEdge(state: GameState, edge: MapEdge): void {
     const found = Math.max(0, illicitCount(cart.cargo) - hidden);
     if (found <= 0) continue; // honest wool is waved on, silently
     seizeFrom(cart.cargo, found);
+    state.goodsSeized += found;
+    state.lastSeizureNode = cart.location.to;
     addHeat(state, found * SEIZURE_HEAT, cart.location.to);
     logEvent(
       state,

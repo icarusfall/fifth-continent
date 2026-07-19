@@ -285,6 +285,34 @@ export function drawRoad(
   ctx.setLineDash([]);
 }
 
+/**
+ * §20 (M5 hub polish, playtest) — a carter's round, named in light: a soft
+ * translucent white ribbon over every edge a standing order rides, so the
+ * served routes read at a glance. Drawn over the road, under everything
+ * that moves.
+ */
+export function drawCarterRoute(
+  ctx: CanvasRenderingContext2D,
+  pts: Array<{ x: number; y: number }>,
+): void {
+  const trace = () => {
+    ctx.beginPath();
+    pts.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+    ctx.stroke();
+  };
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.setLineDash([]);
+
+  // The glow: a wide, faint halo, then a thin bright core.
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
+  ctx.lineWidth = 8;
+  trace();
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+  ctx.lineWidth = 2;
+  trace();
+}
+
 export function drawLabel(ctx: CanvasRenderingContext2D, text: string, x: number, y: number): void {
   ctx.font = `600 9px Georgia, serif`;
   ctx.textAlign = 'center';

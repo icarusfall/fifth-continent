@@ -270,6 +270,15 @@ export interface GameState {
   informer: boolean;
   /** Spec §6.13 — cumulative contraband sold at Ryne; your market footprint. */
   contrabandSold: number;
+  /**
+   * Spec §6.10 / §6.8 — running tallies the event cards watch: goods the
+   * officer has seized (and where the last blow fell), and sheep the agent's
+   * men have driven off in distraint. Cumulative, so a watcher reads the
+   * delta; raid plunder is not counted here (the raid has its own cards).
+   */
+  goodsSeized: number;
+  lastSeizureNode: NodeId | null;
+  distraintSheep: number;
   /** Spec §6.13 — the Hawksmere Company's intent, and the raid it has in the field. */
   hawksmere: Hawksmere;
   raid: Raid | null;

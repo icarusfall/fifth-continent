@@ -44,13 +44,15 @@ import {
   SHINGLE,
   edgeById,
   edgesFor,
+  firstHop,
   horseLatency,
   isPlaceable,
   nodeById,
   officerEdgesFor,
+  otherEnd,
 } from '../sim/map';
 import { dayPhaseOf, isFlooded, ticksUntilTideTurn } from '../sim/time';
-import { CONTRABAND, fortVisibility } from '../sim/revenue';
+import { CONTRABAND, fortVisibility, illicitAnywhere } from '../sim/revenue';
 import { GOOD_LABEL, spanOf, storeSummary } from './format';
 import type { Action, Cart, CutDepth, EdgeId, GameState, Good, NodeId } from '../sim/types';
 import { useGameStore } from '../state/store';
@@ -59,6 +61,7 @@ import { pathPoints, pointAlong, TILE, tileCenter } from './geometry';
 import { getTerrainCanvas } from './paint';
 import {
   drawCart,
+  drawCarterRoute,
   drawCustoms,
   drawCuttingHouse,
   drawFarm,
@@ -178,6 +181,34 @@ function coatOn(state: GameState, edgeId: EdgeId, from: NodeId): boolean {
 /** '· the blue coat…' suffix for a dispatch button, or empty. */
 function coatNote(state: GameState, edgeId: EdgeId, from: NodeId): string {
   return coatOn(state, edgeId, from) ? ' · the blue coat rides it' : '';
+}
+
+/**
+ * §20 — the edges a carter's round rides: from → to (→ backTo) → from,
+ * walked hop by hop with tide-blind latencies so the drawn ribbon is stable
+ * (he may detour with the tide; the round itself is what the glow names).
+ */
+function carterRouteEdges(state: GameState): Set<EdgeId> {
+  const edges = edgesFor(state.farm, state.cuttingHouse);
+  const served = new Set<EdgeId>();
+  for (const cart of state.carts) {
+    const order = cart.carter;
+    if (!order) continue;
+    const stops: NodeId[] = [order.from, order.to];
+    if (order.back && order.backTo) stops.push(order.backTo);
+    stops.push(order.from);
+    for (let i = 0; i < stops.length - 1; i++) {
+      let at = stops[i];
+      let guard = 0;
+      while (at !== stops[i + 1] && guard++ < 6) {
+        const hop = firstHop(at, stops[i + 1], edges, (e) => e.latency);
+        if (!hop) break;
+        served.add(hop.id);
+        at = otherEnd(hop, at);
+      }
+    }
+  }
+  return served;
 }
 
 function routesVisible(state: GameState): boolean {
@@ -312,6 +343,12 @@ export function GameMap({ state }: { state: GameState }) {
         if (visible) {
           drawRoad(ctx, pathPoints(edge, false), edge.condition === 'tideLocked' && floodedNow);
         }
+      }
+      // §20 — the carter's rounds, named in light: a soft white ribbon over
+      // every edge a standing order rides (playtest: "which roads are his?").
+      const served = carterRouteEdges(s);
+      for (const edge of edgesFor(s.farm, s.cuttingHouse)) {
+        if (served.has(edge.id)) drawCarterRoute(ctx, pathPoints(edge, false));
       }
       drawSheep(ctx, s.farm, s.flockSize);
       drawFarm(ctx, s.farm);
@@ -849,10 +886,19 @@ function FlockMarketRow({ state }: { state: GameState }) {
   );
 }
 
-/** Spec §6.14 — the bench: one project at a time; trade tier 1 in M5a. */
+/** Spec §6.14 — the bench: one project at a time; trade tier 1 in M5a.
+ *  Offered once contraband has touched your hands (§10, playtest): hollow
+ *  floors mean nothing to a farmer who has nothing to hide. */
 function BenchRow({ state }: { state: GameState }) {
   const enqueue = useEnqueue();
   const r = state.research;
+  if (
+    !r.active &&
+    r.completed.trade < 1 &&
+    !(state.dutchman.unlocked && (state.contrabandSold > 0 || illicitAnywhere(state) > 0))
+  ) {
+    return null;
+  }
   if (r.completed.trade >= 1) {
     return (
       <p className="flavour">

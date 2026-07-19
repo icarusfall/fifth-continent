@@ -400,3 +400,8 @@ export const FALSE_BOTTOM_COVER = 4;
 
 // ---- Bookkeeping ----
 export const MAX_LOG_EVENTS = 50; // event log ring buffer, part of state
+/** §10 (M5 hub polish, playtest) — offer-type milestone cards keep this much
+ *  daylight between them, so the day-6 unlock pile reads as a week of
+ *  discoveries instead of an avalanche. World-event cards (the officer
+ *  arriving, the lugger offshore) are never delayed. */
+export const MILESTONE_CARD_SPACING_DAYS = 1;

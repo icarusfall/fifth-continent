@@ -149,6 +149,9 @@ export function initialState(seed: number, difficulty: Difficulty = 'fair'): Gam
     standing: STANDING_START,
     informer: false,
     contrabandSold: 0,
+    goodsSeized: 0,
+    lastSeizureNode: null,
+    distraintSheep: 0,
     hawksmere: { provoked: false, raidsSurvived: 0, nextRaidTick: 0 },
     raid: null,
     carts: [
@@ -1479,6 +1482,7 @@ function payRent(state: GameState): void {
       );
     } else {
       state.flockSize -= seized;
+      state.distraintSheep += seized;
       state.lastCrisisTick = state.tick;
       logEvent(
         state,
