@@ -211,12 +211,17 @@ export interface GameState {
   cuttingHouse: { x: number; y: number } | null;
   /**
    * The Dutchman (spec §6.9). Unlocked once the first rent is collected;
-   * present at the shingle on night ∩ falling tide. Hold and appetite are
-   * per-visit, restocked on arrival.
+   * present at the shingle on night ∩ falling tide — but until first `met`
+   * (coin across the gunwale, either direction) he stands off all night:
+   * the first invitation cannot be missed. Hold and appetite are per-visit,
+   * restocked on arrival; the hold opens one good at a time as
+   * `fleeceBought` (cumulative wool he has taken) climbs the trust ladder.
    */
   dutchman: {
     unlocked: boolean;
     present: boolean;
+    met: boolean;
+    fleeceBought: number;
     hold: Store;
     fleeceAppetite: number;
   };

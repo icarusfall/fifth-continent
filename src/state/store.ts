@@ -43,7 +43,9 @@ import type { Action, ActionLog, Difficulty, GameState, NodeId } from '../sim/ty
 //      distraint cards watch (§6.10/§6.8, M5 hub polish).
 // v15: ledger.soldToday — the wool-stapler's daily tally; lawful fleece
 //      sales cap at declaredYield/day (§6.10's squeeze, finally enforced).
-const SAVE_KEY = 'fifth-continent-save-v15';
+// v16: dutchman.met + dutchman.fleeceBought — the first meeting that waits,
+//      and the trust ladder that opens his hold one good at a time (§6.9).
+const SAVE_KEY = 'fifth-continent-save-v16';
 const AUTOSAVE_EVERY_TICKS = 30;
 const AUTOPAY_KEY = 'fifth-continent-autopay-rent'; // a UI preference, not game state
 
@@ -298,7 +300,21 @@ const MILESTONES: Milestone[] = [
     key: 'dutchman-offshore',
     when: (s) => s.dutchman.present,
     title: 'A light on the water',
-    body: 'A lugger stands off the shingle — no lights, no flag, a falling tide. He pays four times Ryne’s price for wool, and asks nothing. Run a cartload down to the beach while the tide falls.',
+    body: 'A lugger stands off the shingle — no lights, no flag. He pays four times Ryne’s price for wool, and asks nothing. He has come to meet you, and he will wait the whole night: load a cart with fleece and take the marsh track down to the beach.',
+  },
+  {
+    // §6.9 (M5 tutorial pass) — the ladder's rungs: each new tarpaulin is
+    // its own moment, fired the first visit the good is actually aboard.
+    key: 'dutchman-tea',
+    when: (s) => s.dutchman.present && (s.dutchman.hold.tea ?? 0) > 0,
+    title: 'A second tarpaulin',
+    body: 'The wool has bought his trust. He lifts a second tarpaulin: bohea tea, four the chest — Ryne drinks eight chests a day at seven, and asks no more questions than he does. The volume trade, if you can move it.',
+  },
+  {
+    key: 'dutchman-jenever',
+    when: (s) => s.dutchman.present && (s.dutchman.hold.jenever ?? 0) > 0,
+    title: 'The third tarpaulin',
+    body: 'Tonight he shows you the tubs: overproof jenever, ten the tub — and no buyer in Ryne will touch a drop of it raw. He grins like a man selling you a problem. It wants cutting, and cutting wants a house.',
   },
   {
     key: 'cutting-house',
@@ -306,6 +322,18 @@ const MILESTONES: Milestone[] = [
     when: (s) => !s.cuttingHouse && hasOverproofJenever(s),
     title: 'Spirit no one will buy',
     body: 'You are holding overproof jenever, and no honest buyer will touch a drop. Raise a cutting house on the marsh: cut it with water and burnt sugar and it sells in Ryne as brandy.',
+  },
+  {
+    // §6.9 (M5 tutorial pass) — the fast lane, made findable: the six slow
+    // days hold a thread to pull, but only if the player knows the room.
+    key: 'alehouse-talks',
+    paced: true,
+    when: (s) =>
+      !s.dutchman.unlocked &&
+      s.rumoursHeard === 0 &&
+      s.ledger.soldLawfully >= RUMOUR_TRUST[0],
+    title: 'The quay might talk',
+    body: 'Your wool is known on the quay now, and the alehouse is where the parish talks. Stand a round at Ryne — 2 coin buys a loosened tongue, once a day — and you may hear where the wool really goes before the rent teaches you.',
   },
   {
     key: 'carter-for-hire',
@@ -501,6 +529,11 @@ function loadSave(): SaveFile | null {
     )
       return null;
     if (typeof parsed.state.ledger?.soldToday !== 'number') return null;
+    if (
+      typeof parsed.state.dutchman?.met !== 'boolean' ||
+      typeof parsed.state.dutchman?.fleeceBought !== 'number'
+    )
+      return null;
     return parsed;
   } catch {
     return null;

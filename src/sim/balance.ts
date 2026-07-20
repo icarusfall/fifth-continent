@@ -56,6 +56,11 @@ export const LEIDEN_PRICE_MULT = 4; // the Dutchman's offer
 
 // ---- The Dutchman (spec §6.9: night, falling tide, no credit) ----
 export const DUTCHMAN_FLEECE_DEMAND = 24; // fleece he'll take per visit
+// §6.9 (M5 tutorial pass) — the ladder: his hold opens one good at a time,
+// priced in the fleece he has taken over the gunwale. Lace from the first
+// meeting; the mirror of the quay's RUMOUR_TRUST, in owled wool.
+export const DUTCHMAN_TRUST_TEA = 16; // two cart-runs of wool
+export const DUTCHMAN_TRUST_JENEVER = 40; // and jenever arrives with the cutting house in reach
 /** His hold on arrival — restocked each visit. */
 export const DUTCHMAN_HOLD: Partial<Record<Good, number>> = {
   jenever: 12,
@@ -165,6 +170,11 @@ export const CART_COST = 50; // coin, cart and pony, bought at the farm
 export const CART_RESALE = 40; // the wheelwright buys back at a small loss (§6.11)
 export const MAX_CARTS = 3; // the yard holds three
 export const CARTER_WAGE = 3; // coin per carter, due at dawn with the wool
+/** §6.11 (M5 tutorial pass) — danger money: an order that names contraband
+ *  (outbound or backhaul) or touches the shingle costs this instead. The
+ *  ordinary carting folk will not run the risk at the honest rate; the
+ *  lawful round stays 3, so §6.16's designed identity is untouched. */
+export const CARTER_DANGER_WAGE = 5;
 /**
  * Lawful fleece sold by hand before a carter may be hired (spec §6.11 / §10):
  * automation is offered only once the manual round is a felt chore — about two

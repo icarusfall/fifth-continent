@@ -23,7 +23,10 @@ import {
   RESEARCH_COST,
   RESEARCH_DAYS,
   SHEARER_WAGE,
+  CARTER_DANGER_WAGE,
   CARTER_MARKET_PATIENCE_DAYS,
+  DUTCHMAN_TRUST_JENEVER,
+  DUTCHMAN_TRUST_TEA,
   SHEEP_PRICE_BUY,
   SHEEP_PRICE_SELL,
   FARM_STORE_CAPACITY,
@@ -117,7 +120,14 @@ export function initialState(seed: number, difficulty: Difficulty = 'fair'): Gam
     // action is a shear, not a wait for dawn.
     fleeceReady: STARTING_FLOCK * FLEECE_PER_HEAD_PER_DAY,
     cuttingHouse: null,
-    dutchman: { unlocked: false, present: false, hold: {}, fleeceAppetite: 0 },
+    dutchman: {
+      unlocked: false,
+      present: false,
+      met: false,
+      fleeceBought: 0,
+      hold: {},
+      fleeceAppetite: 0,
+    },
     demandRemaining: { ...DAILY_DEMAND },
     heat: { regional: 0, national: 0 },
     revenue: {
@@ -224,6 +234,22 @@ function findCart(state: GameState, cartId: string): Cart | undefined {
   return state.carts.find((c) => c.id === cartId);
 }
 
+/**
+ * §6.11 — a standing order's daily wage: the honest rate for the honest
+ * round, danger money when the order names contraband (outbound or back)
+ * or touches the shingle. The ordinary carting folk will not run the risk
+ * at 3 coin a day. Exported for the picker, the ledger, and the dawn bill.
+ */
+export function carterWageOf(order: CarterOrder): number {
+  const risky =
+    CONTRABAND.includes(order.good) ||
+    (order.back !== undefined && CONTRABAND.includes(order.back)) ||
+    order.from === 'shingle' ||
+    order.to === 'shingle' ||
+    order.backTo === 'shingle';
+  return risky ? CARTER_DANGER_WAGE : CARTER_WAGE;
+}
+
 /** A crewed cart answers to its carter, not the player (spec §6.11). */
 function underOrders(state: GameState, cart: Cart): boolean {
   if (!cart.carter) return false;
@@ -263,6 +289,9 @@ function dutchmanFleeceSale(state: GameState, cart: Cart): number {
   if (qty <= 0) return 0;
   cart.cargo.fleece = held - qty;
   state.dutchman.fleeceAppetite -= qty;
+  // §6.9 — coin across the gunwale: he is met, and the wool climbs his trust.
+  state.dutchman.met = true;
+  state.dutchman.fleeceBought += qty;
   state.coin += creditProceeds(state, qty * WOOL_PRICE_DOMESTIC * LEIDEN_PRICE_MULT);
   return qty;
 }
@@ -599,6 +628,7 @@ function applyAction(state: GameState, action: Action): void {
       }
       state.dutchman.hold[action.good] = stocked - qty;
       state.coin -= qty * price;
+      state.dutchman.met = true; // §6.9 — coin across the gunwale, either way
       addToStore(cart.cargo, action.good, qty);
       logEvent(state, `Bought ${qty} ${action.good} off the lugger for ${qty * price} coin.`);
       return;
@@ -900,11 +930,12 @@ function applyAction(state: GameState, action: Action): void {
             }`
           : ''
       }`;
+      const wage = carterWageOf(order);
       logEvent(
         state,
         reorder
-          ? `New orders for ${cart.name}: ${route}. The same man keeps the reins.`
-          : `A carter takes ${cart.name}: ${route}, ${CARTER_WAGE} coin a day. He does not ask what is in the load.`,
+          ? `New orders for ${cart.name}: ${route}, ${wage} coin a day${wage > CARTER_WAGE ? ' — danger money' : ''}. The same man keeps the reins.`
+          : `A carter takes ${cart.name}: ${route}, ${wage} coin a day${wage > CARTER_WAGE ? ' — danger money; the honest rate does not cover this work' : ''}. He does not ask what is in the load.`,
       );
       return;
     }
@@ -1177,13 +1208,15 @@ function researchProgress(state: GameState): void {
   }
 }
 
-/** Spec §6.11 — wages at dawn, with the wool. Unpaid men walk the same morning. */
+/** Spec §6.11 — wages at dawn, with the wool: the honest rate or danger
+ *  money, by the order. Unpaid men walk the same morning. */
 function payCartersAtDawn(state: GameState): void {
   if (!isDawn(state.tick)) return;
   for (const cart of state.carts) {
     if (!cart.carter) continue;
-    if (state.coin >= CARTER_WAGE) {
-      state.coin -= CARTER_WAGE;
+    const wage = carterWageOf(cart.carter);
+    if (state.coin >= wage) {
+      state.coin -= wage;
     } else {
       cart.carter = null;
       delete cart.marketPatienceUntil;
@@ -1448,20 +1481,40 @@ function carterHomeward(cart: Cart, order: CarterOrder): NodeId {
 
 /**
  * Spec §6.9 — the Dutchman stands off the shingle on night ∩ falling tide,
- * once the first rent has been felt. His hold and appetite restock on the
- * rising edge of his presence: each visit is its own market.
+ * once the first rent has been felt. Until first met he ignores the tide
+ * and waits the whole night out — the first invitation cannot be missed
+ * (the drive is 1.5h; some nights' windows are shorter). His hold and
+ * appetite restock on the rising edge of his presence, the hold opened one
+ * good at a time by the trust his wool has bought (the ladder).
  */
+function dutchmanHoldFor(state: GameState): Store {
+  const hold: Store = { lace: DUTCHMAN_HOLD.lace };
+  if (state.dutchman.fleeceBought >= DUTCHMAN_TRUST_TEA) hold.tea = DUTCHMAN_HOLD.tea;
+  if (state.dutchman.fleeceBought >= DUTCHMAN_TRUST_JENEVER) {
+    hold.jenever = DUTCHMAN_HOLD.jenever;
+  }
+  return hold;
+}
+
 function dutchmanTide(state: GameState): void {
   const here =
     state.dutchman.unlocked &&
     dayPhaseOf(state.tick) === 'night' &&
-    !tideIsRising(state.tick);
+    (state.dutchman.met ? !tideIsRising(state.tick) : true);
   if (here && !state.dutchman.present) {
-    state.dutchman.hold = { ...DUTCHMAN_HOLD };
+    state.dutchman.hold = dutchmanHoldFor(state);
     state.dutchman.fleeceAppetite = DUTCHMAN_FLEECE_DEMAND;
-    logEvent(state, 'A lugger stands off the shingle. No lights, no flag, a falling tide.');
+    logEvent(
+      state,
+      state.dutchman.met
+        ? 'A lugger stands off the shingle. No lights, no flag, a falling tide.'
+        : 'A lugger stands off the shingle, and waits. He has come to meet you, and he will wait the night.',
+    );
   } else if (!here && state.dutchman.present) {
-    logEvent(state, 'The lugger slips out with the tide.');
+    logEvent(
+      state,
+      state.dutchman.met ? 'The lugger slips out with the tide.' : 'At first light the lugger slips away, unmet.',
+    );
   }
   state.dutchman.present = here;
 }

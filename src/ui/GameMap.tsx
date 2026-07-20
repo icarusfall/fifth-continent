@@ -9,8 +9,11 @@ import {
   CART_CAPACITY,
   CART_COST,
   CART_RESALE,
+  CARTER_DANGER_WAGE,
   CARTER_UNLOCK_FLEECE,
   CARTER_WAGE,
+  DUTCHMAN_TRUST_JENEVER,
+  DUTCHMAN_TRUST_TEA,
   CUTS,
   CUTTING_HOUSE_COST,
   CUTTING_HOUSE_STORE_CAPACITY,
@@ -52,6 +55,7 @@ import {
   otherEnd,
 } from '../sim/map';
 import { dayPhaseOf, isFlooded, ticksUntilTideTurn } from '../sim/time';
+import { carterWageOf } from '../sim/tick';
 import { CONTRABAND, fortVisibility, illicitAnywhere } from '../sim/revenue';
 import { GOOD_LABEL, spanOf, storeSummary } from './format';
 import type { Action, Cart, CutDepth, EdgeId, GameState, Good, NodeId } from '../sim/types';
@@ -153,11 +157,17 @@ function useSendCart(state: GameState, nodeId: NodeId) {
   };
 }
 
-/** §6.11 (M5a-4) — what a carter can bring home from each destination. */
-function backOptionsFor(to: NodeId): Good[] {
+/** §6.11 (M5a-4) — what a carter can bring home from each destination. The
+ *  shingle's list follows the Dutchman's trust ladder (§6.9): no menu names
+ *  a good he has not yet shown you. */
+function backOptionsFor(state: GameState, to: NodeId): Good[] {
   switch (to) {
-    case 'shingle':
-      return ['jenever', 'tea', 'lace'];
+    case 'shingle': {
+      const goods: Good[] = ['lace'];
+      if (state.dutchman.fleeceBought >= DUTCHMAN_TRUST_TEA) goods.unshift('tea');
+      if (state.dutchman.fleeceBought >= DUTCHMAN_TRUST_JENEVER) goods.unshift('jenever');
+      return goods;
+    }
     case 'cutting-house':
       return ['brandy-gent', 'brandy-fair', 'brandy-rough'];
     case 'farm':
@@ -166,6 +176,21 @@ function backOptionsFor(to: NodeId): Good[] {
       return [];
   }
 }
+
+/** §6.11 / §10 (M5 tutorial pass) — the Dutchman tutorial, done by hand:
+ *  met at the gunwale, and contraband sold in town (the fence counts).
+ *  Until then no standing order names the shingle and no backhaul exists —
+ *  no carter automates a trade his master has never made. */
+function shingleRoutesOpen(state: GameState): boolean {
+  return state.dutchman.met && state.contrabandSold > 0;
+}
+
+/** §10 — one-line whispers for the smuggled goods, so nothing arrives unnamed. */
+const GOOD_WHISPER: Partial<Record<Good, string>> = {
+  lace: 'Flanders lace — Ryne pays 24 the parcel, quietly, for about 2 a day. The Crown calls it smuggling.',
+  tea: 'Bohea tea — Ryne drinks 8 chests a day at 7 the chest. The Crown calls it smuggling.',
+  jenever: 'Overproof jenever — no buyer in Ryne will touch it raw. It wants cutting, and cutting wants a house.',
+};
 
 /**
  * Spec §6.10: dispatch buttons carry the warning a marshman's eyes would.
@@ -1245,13 +1270,24 @@ function RyneMenu({ state }: { state: GameState }) {
         Wool fetches {WOOL_PRICE_DOMESTIC} coin the fleece here, and every buyer on the quay knows
         it cannot lawfully leave the country.
       </p>
+      {/* §10 — no contraband is named before the player holds any: the
+          appetite board grows a channel the day its good first exists. */}
       <p className="flavour">
         The town will still take today —{' '}
         {(Object.keys(DAILY_DEMAND) as Good[])
-          .filter((g) => DAILY_DEMAND[g] > 0)
+          .filter(
+            (g) =>
+              DAILY_DEMAND[g] > 0 &&
+              // A contraband channel is named only while its good is actually
+              // in your hands somewhere — no spoilers, nothing stale (§10).
+              (!CONTRABAND.includes(g) || heldAnywhere(state, g) > 0),
+          )
           .map((g) => `${GOOD_LABEL[g]} ${state.demandRemaining[g] ?? 0}/${DAILY_DEMAND[g]}`)
           .join(' · ')}
-        . Sell past the day's appetite and the rest waits exposed — unless a fence takes it.
+        .{' '}
+        {state.contrabandSold > 0 || illicitAnywhere(state) > 0
+          ? 'Sell past the day’s appetite and the rest waits exposed — unless a fence takes it.'
+          : 'Sell past the day’s appetite and the rest waits for dawn.'}
       </p>
       {!state.dutchman.unlocked && (
         <p className="flavour">
@@ -1303,6 +1339,9 @@ function ShingleMenu({ state, onPlace }: { state: GameState; onPlace: () => void
           <p className="flavour">
             The Dutchman. {beachPrice} coin the fleece, and he&rsquo;ll take {d.fleeceAppetite}{' '}
             more tonight. Coin on the nail; no credit, no names, no questions in either direction.
+            {!d.met
+              ? ' He came to meet you, and he will wait the night out.'
+              : ' Gone when the tide turns — he minds it better than you do.'}
           </p>
         </>
       )}
@@ -1600,7 +1639,11 @@ function cargoButtons(
           <button
             key={`buy-${good}`}
             disabled={can <= 0}
-            title={can <= 0 ? 'No room in the cart, or no coin. He does not give credit.' : undefined}
+            title={
+              can <= 0
+                ? 'No room in the cart, or no coin. He does not give credit.'
+                : GOOD_WHISPER[good]
+            }
             onClick={() => enqueue({ type: 'buyFromDutchman', cartId: cart.id, good, qty: 99 })}
           >
             {can > 0
@@ -1837,7 +1880,8 @@ function CartsAtNode({
       (n) =>
         n !== from &&
         (n !== 'cutting-house' || state.cuttingHouse) &&
-        (n !== 'shingle' || state.dutchman.unlocked),
+        // §6.11 — the shingle gate: the tutorial done by hand first.
+        (n !== 'shingle' || shingleRoutesOpen(state)),
     );
   // §6.17 — where a backhaul may be dropped on the way home: a covered store
   // that is neither end of the run. Home (`from`) is always the default.
@@ -1872,7 +1916,9 @@ function CartsAtNode({
                             : ''
                         }`
                       : ''
-                  }, ${CARTER_WAGE} coin a day. ` +
+                  }, ${carterWageOf(cart.carter)} coin a day${
+                    carterWageOf(cart.carter) > CARTER_WAGE ? ' (danger money)' : ''
+                  }. ` +
                   (cart.carter.to === 'shingle' && cart.carter.good === 'fleece'
                     ? 'He sells over the gunwale when the lugger stands off, and waits when it does not.'
                     : 'He minds the tide and nothing else.')
@@ -1920,15 +1966,15 @@ function CartsAtNode({
                         onClick={() => {
                           // Destinations with something worth fetching ask one
                           // more question (§6.11: the back leg); the rest hire.
-                          if (backOptionsFor(to).length > 0) setHiring({ ...hiring, to });
+                          if (backOptionsFor(state, to).length > 0) setHiring({ ...hiring, to });
                           else hire(cart.id, hiring.from, to, hiring.good!);
                         }}
                       >
                         {to === 'shingle' && hiring.good === 'fleece'
-                          ? `${GOOD_LABEL[hiring.good]} to the shingle — over the gunwale when the lugger comes`
+                          ? `${GOOD_LABEL[hiring.good]} to the shingle — over the gunwale when the lugger comes · danger money`
                           : `${GOOD_LABEL[hiring.good!]} to ${
                               nodeById(to, state.farm, state.cuttingHouse).name
-                            }`}
+                            }${to === 'shingle' ? ' · danger money' : ''}`}
                       </button>
                     ))}
                   </>
@@ -1937,12 +1983,12 @@ function CartsAtNode({
                     <button onClick={() => hire(cart.id, hiring.from, hiring.to!, hiring.good!)}>
                       …and home empty-handed, until told otherwise
                     </button>
-                    {backOptionsFor(hiring.to).map((g) => (
+                    {backOptionsFor(state, hiring.to).map((g) => (
                       <button
                         key={g}
                         title={
                           hiring.to === 'shingle'
-                            ? 'He buys with the coin in the till, to the cart’s room. No credit, and no keeping back the rent.'
+                            ? `${GOOD_WHISPER[g] ?? ''} He buys with the coin in the till, to the cart’s room. No credit, and no keeping back the rent.`
                             : undefined
                         }
                         onClick={() => {
@@ -2008,9 +2054,13 @@ function CartsAtNode({
                   {haulablesFrom(nodeId).map((good) => (
                     <button
                       key={good}
+                      title={GOOD_WHISPER[good]}
                       onClick={() => setHiring({ cartId: cart.id, from: nodeId, good })}
                     >
-                      Hire a carter to haul {GOOD_LABEL[good]} · {CARTER_WAGE} coin a day
+                      Hire a carter to haul {GOOD_LABEL[good]} ·{' '}
+                      {CONTRABAND.includes(good)
+                        ? `${CARTER_DANGER_WAGE} coin a day — danger money`
+                        : `${CARTER_WAGE} coin a day`}
                     </button>
                   ))}
                   {destinationsFrom(nodeId).length > 0 && (

@@ -93,8 +93,13 @@ describe(`${GAMES} seeded games, ${DAYS} days each`, () => {
   });
 });
 
-describe(`${GAMES} seeded games, 20 days each — the smuggler (spec §6.9)`, () => {
-  const SMUGGLER_DAYS = 20; // three rent dues fall inside this window
+describe(`${GAMES} seeded games, 26 days each — the smuggler (spec §6.9)`, () => {
+  // 26 days, not the old 20: the Dutchman's ladder (§6.9, M5 tutorial pass)
+  // deliberately stretches the crime's on-ramp — lace before tea before
+  // jenever — so the officer and the doom clock arrive a handful of days
+  // later than they used to. Four rent dues fall inside this window.
+  const SMUGGLER_DAYS = 26;
+  const SMUGGLER_RENTS = 4;
 
   it('crime pays: rents met, flock intact, and the lawful ceiling left far below', { timeout: 120_000 }, () => {
     const coins: number[] = [];
@@ -104,9 +109,9 @@ describe(`${GAMES} seeded games, 20 days each — the smuggler (spec §6.9)`, ()
 
       expect(s.lost).toBe(false);
       expect(s.flockSize).toBe(STARTING_FLOCK); // never distrained
-      expect(s.rentPaid).toBe(3 * RENT_AMOUNT); // all three dues met in full
+      expect(s.rentPaid).toBe(SMUGGLER_RENTS * RENT_AMOUNT); // every due met in full
       expect(s.dutchman.unlocked).toBe(true);
-      expect(s.cuttingHouse).not.toBeNull(); // the bot went into trade
+      expect(s.cuttingHouse).not.toBeNull(); // the bot climbed the whole ladder
 
       // Twenty days of trade summon the officer and start the doom clock
       // (spec §6.10) — and the trade survives him anyway.
@@ -119,7 +124,7 @@ describe(`${GAMES} seeded games, 20 days each — the smuggler (spec §6.9)`, ()
       // totalFleece × domestic price − rent (spec §6.8 arithmetic):
       const lawfulCeiling =
         STARTING_FLOCK * FLEECE_PER_HEAD_PER_DAY * (SMUGGLER_DAYS + 1) * WOOL_PRICE_DOMESTIC -
-        3 * RENT_AMOUNT;
+        SMUGGLER_RENTS * RENT_AMOUNT;
       expect(s.coin).toBeGreaterThan(lawfulCeiling);
 
       coins.push(s.coin);
@@ -165,9 +170,10 @@ describe(`${GAMES} seeded games, ${DAYS} days each — the delegator (spec §6.1
 describe(`${GAMES} seeded games, 30 days — the hub (spec §6.17, Beat 3)`, () => {
   // Long enough for §6.16's designed trajectory: crime's proceeds grow the
   // flock to the pasture cap, and the grown clip is where the hub's claims
-  // bind — the owl alone cannot move 24 fleece a day.
-  const HUB_DAYS = 30;
-  const RENTS = 4; // days 6, 12, 18, 24 fall inside the window
+  // bind — the owl alone cannot move 24 fleece a day. Stretched 30 → 34
+  // with the Dutchman's ladder (§6.9), which delays the crime era's start.
+  const HUB_DAYS = 34;
+  const RENTS = 5; // days 6, 12, 18, 24, 30 fall inside the window
 
   /** Every fleece not yet sold, wherever it sits — barn, backs, or boards. */
   function fleeceInWorld(s: GameState): number {

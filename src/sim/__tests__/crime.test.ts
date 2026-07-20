@@ -12,6 +12,8 @@ import {
   DUTCHMAN_FLEECE_DEMAND,
   DUTCHMAN_HOLD,
   DUTCHMAN_PRICE,
+  DUTCHMAN_TRUST_JENEVER,
+  DUTCHMAN_TRUST_TEA,
   LEIDEN_PRICE_MULT,
   RENT_AMOUNT,
   RYNE_PRICE,
@@ -41,6 +43,8 @@ function atShingle(s: GameState, cargo: Partial<Record<string, number>> = {}): v
   s.dutchman = {
     unlocked: true,
     present: true,
+    met: true, // an old hand: the full hold below squares with earned trust (§6.9)
+    fleeceBought: 99,
     hold: { ...DUTCHMAN_HOLD },
     fleeceAppetite: DUTCHMAN_FLEECE_DEMAND,
   };
@@ -95,17 +99,42 @@ describe('the Dutchman — presence is night ∩ falling tide', () => {
       s.dutchman.unlocked = true;
     }), []);
 
-  it('arrives on the rising edge with a full hold and a fresh appetite', () => {
+  it('arrives with a fresh appetite — and, to a stranger, only lace under the tarpaulin (§6.9)', () => {
     const s = unlockedAt(NIGHT_FALLING);
     expect(s.dutchman.present).toBe(true);
-    expect(s.dutchman.hold).toEqual(DUTCHMAN_HOLD);
+    // The ladder: the first meeting shows lace alone; wool buys the rest.
+    expect(s.dutchman.hold).toEqual({ lace: DUTCHMAN_HOLD.lace });
     expect(s.dutchman.fleeceAppetite).toBe(DUTCHMAN_FLEECE_DEMAND);
     expect(s.log.some((e) => e.text.includes('lugger'))).toBe(true);
   });
 
-  it('is absent at night on a rising tide', () => {
+  it('to an old hand the hold opens with the trust his wool has bought (§6.9)', () => {
+    const grown = tick(
+      fresh((s) => {
+        s.tick = NIGHT_FALLING;
+        s.dutchman.unlocked = true;
+        s.dutchman.met = true;
+        s.dutchman.fleeceBought = 99; // past both trust marks
+      }),
+      [],
+    );
+    expect(grown.dutchman.hold).toEqual(DUTCHMAN_HOLD);
+  });
+
+  it('unmet, he waits the night out — tide be damned; met, the tide rules (§6.9)', () => {
     expect(dayPhaseOf(NIGHT_RISING + 1)).toBe('night');
-    expect(unlockedAt(NIGHT_RISING).dutchman.present).toBe(false);
+    // A stranger's first invitation cannot be missed: rising tide, still there.
+    expect(unlockedAt(NIGHT_RISING).dutchman.present).toBe(true);
+    // Once met, a rising tide means an empty beach, as designed.
+    const met = tick(
+      fresh((s) => {
+        s.tick = NIGHT_RISING;
+        s.dutchman.unlocked = true;
+        s.dutchman.met = true;
+      }),
+      [],
+    );
+    expect(met.dutchman.present).toBe(false);
   });
 
   it('is absent by day whatever the tide does', () => {
@@ -118,7 +147,7 @@ describe('the Dutchman — presence is night ∩ falling tide', () => {
     // Mid-visit: present, hold partly drained. Still in-window next tick.
     const midVisit = fresh((s) => {
       s.tick = NIGHT_FALLING + 1;
-      s.dutchman = { unlocked: true, present: true, hold: { jenever: 1 }, fleeceAppetite: 3 };
+      s.dutchman = { unlocked: true, present: true, met: true, fleeceBought: 99, hold: { jenever: 1 }, fleeceAppetite: 3 };
     });
     const still = tick(midVisit, []);
     expect(still.dutchman.present).toBe(true);
@@ -128,7 +157,7 @@ describe('the Dutchman — presence is night ∩ falling tide', () => {
     // The tide turns under him: gone, with a line in the log.
     const turning = fresh((s) => {
       s.tick = NIGHT_RISING;
-      s.dutchman = { unlocked: true, present: true, hold: { jenever: 1 }, fleeceAppetite: 3 };
+      s.dutchman = { unlocked: true, present: true, met: true, fleeceBought: 99, hold: { jenever: 1 }, fleeceAppetite: 3 };
     });
     const gone = tick(turning, []);
     expect(gone.dutchman.present).toBe(false);
@@ -306,5 +335,51 @@ describe('the Ryne market — fixed prices, daily appetite (spec §6.9)', () => 
     expect(next.coin).toBe(0);
     expect(next.carts[0].cargo.jenever).toBe(4);
     expect(next.log.some((e) => e.text.includes('overproof'))).toBe(true);
+  });
+});
+
+describe('the Dutchman — the ladder (spec §6.9, M5 tutorial pass)', () => {
+  it('coin across the gunwale sets met, and the wool climbs his trust', () => {
+    const sale = fresh((s) => atShingle(s, { fleece: 8 }));
+    sale.dutchman.met = false;
+    sale.dutchman.fleeceBought = 0;
+    const sold = tick(sale, [{ type: 'sellToDutchman', cartId: 'cart-1' }]);
+    expect(sold.dutchman.met).toBe(true);
+    expect(sold.dutchman.fleeceBought).toBe(8);
+
+    const buy = fresh((s) => {
+      atShingle(s);
+      s.coin = 30;
+      s.dutchman.met = false;
+    });
+    const bought = tick(buy, [{ type: 'buyFromDutchman', cartId: 'cart-1', good: 'lace', qty: 1 }]);
+    expect(bought.dutchman.met).toBe(true);
+  });
+
+  it('each trust mark opens the next tarpaulin at his next arrival', () => {
+    const arrivalWith = (fleeceBought: number) =>
+      tick(
+        fresh((s) => {
+          s.tick = NIGHT_FALLING;
+          s.dutchman.unlocked = true;
+          s.dutchman.met = true;
+          s.dutchman.fleeceBought = fleeceBought;
+        }),
+        [],
+      ).dutchman.hold;
+    expect(arrivalWith(DUTCHMAN_TRUST_TEA - 1)).toEqual({ lace: DUTCHMAN_HOLD.lace });
+    expect(arrivalWith(DUTCHMAN_TRUST_TEA)).toEqual({
+      lace: DUTCHMAN_HOLD.lace,
+      tea: DUTCHMAN_HOLD.tea,
+    });
+    expect(arrivalWith(DUTCHMAN_TRUST_JENEVER)).toEqual({
+      lace: DUTCHMAN_HOLD.lace,
+      tea: DUTCHMAN_HOLD.tea,
+      jenever: DUTCHMAN_HOLD.jenever,
+    });
+  });
+
+  it('the first hold is a lesson in itself: 4 lace against a town that drinks 2 a day', () => {
+    expect(DUTCHMAN_HOLD.lace).toBeGreaterThan(DAILY_DEMAND.lace); // the fence's introduction
   });
 });

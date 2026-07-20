@@ -215,7 +215,14 @@ marshTrackLatency  = max(1, round(pathTileLength × MARSH_TICKS_PER_TILE))
 unlocked    once the first rent has been collected (§6.8) — the grind must be
             felt before the way out opens, and dawn on day six is late enough
             to hurt but early enough not to bore
-present(t)  = unlocked && night(t) && tideFalling(t)
+present(t)  = unlocked && night(t) && (met ? tideFalling(t) : true)
+met         set the first time coin crosses the gunwale in either direction.
+            Until then he stands off ALL night, tide be damned — he came to
+            meet the farmer word spoke of, and he is not leaving before he
+            has (M5 tutorial pass, playtest: the drive is 1.5h and some
+            nights' windows are 40 minutes — a new player physically could
+            not reach his first invitation). After the first trade the tide
+            rules as designed: the window is the trade's whole rhythm
 ```
 The flip of `unlocked` is announced by an event card (M5a-4, playtest): the
 shingle's options appear on the map the moment the first rent is collected,
@@ -249,6 +256,9 @@ stays emergent for the passive player (§2, §10) — the curious one earns
 the same moment a few days early and pays for it in rent-coin drunk on
 the quay. The alehouse is deliberately the room where the parish talks:
 the informer and intelligence threads of M4+/M5 will grow from this bar.
+A one-time paced card points at the room once the quay would first talk
+(soldLawfully ≥ RUMOUR_TRUST[0], M5 tutorial pass): the fast lane was
+built for the impatient, and the impatient must be able to find it.
 
 Because the tide period is deliberately not a divisor of the day (§6.7 M1),
 the night∩falling-tide window walks around the clock: some nights it is long,
@@ -267,6 +277,29 @@ sells  jenever  12 tubs   @ JENEVER_COST = 10
 No credit. He pays coin on the spot; the wool going out funds the tubs coming
 back, and the same cart carries both legs. Bidirectionality is discovered as
 margin, not presented as a feature (§10 rung 4).
+
+**The Dutchman's ladder (M5 tutorial pass, playtest — the smuggled goods
+arrive in turn, so the crime half is learned one good at a time).** He
+requires wool before he'll talk fully: his hold grows with the fleece he
+has taken over the gunwale — the mirror of the quay's RUMOUR_TRUST, priced
+in owled wool instead of lawful sales.
+
+```
+fleeceBought   cumulative fleece he has bought from you, ever
+his hold:      lace     from the first meeting — the simplest contraband:
+                        no processing, a small legible arbitrage (buys 15,
+                        sells 24 into Ryne's appetite of 2/day — and 4
+                        parcels against 2/day is the first sated market,
+                        which is the fence's introduction, unnarrated)
+               tea      once fleeceBought ≥ DUTCHMAN_TRUST_TEA = 16
+                        (two cart-runs of wool): the volume trade
+               jenever  once fleeceBought ≥ DUTCHMAN_TRUST_JENEVER = 40:
+                        the good with no legal buyer — the one that
+                        creates the cutting house (§10: rung causes rung)
+```
+Each new tarpaulin lifted is announced by its own card at the next visit.
+The thresholds pace the ladder across roughly three owling nights, and put
+jenever in hand about when the cutting house becomes affordable.
 
 **The cutting house** — the first player-sited building; the placement
 machinery held back in §6.7 finally earns its keep. Per §10 (the tutorial is
@@ -521,6 +554,19 @@ sellCart     CART_RESALE = 40 coin — the wheelwright buys back cart and
 hireCarter   a carter takes a cart and a standing order:
              order = { from: node, to: node, good }
              CARTER_WAGE = 3 coin per day, due at dawn with the wool
+danger money an order that names contraband (outbound or backhaul) or
+   (M5 tut.) touches the shingle costs CARTER_DANGER_WAGE = 5 coin/day
+             instead: the ordinary carting folk will not run the risk at
+             the honest rate. The lawful round stays 3 — the §6.16
+             designed identity (24 − 3 − 1 = 20 = rent/day) is untouched
+the shingle  no standing order may name the shingle, and no backhaul is
+   gate      offered, until the Dutchman tutorial is done by hand: he has
+   (M5 tut.) been met at the gunwale AND some contraband has been sold in
+             town (contrabandSold > 0 — the fence counts). No carter
+             automates a trade his master has never made; and no menu
+             names a contraband good before then (§10). UI-only gates,
+             like the carter's own unlock — the sim stays permissive for
+             replays and the scripted bots
 at `from`    load `good` to capacity from the store; if the store is empty
              he waits (a carter shuttles loads, not air)
 roads        between nodes joined by two edges he takes the faster one that
@@ -1374,7 +1420,7 @@ bench row) wait until contraband has actually touched the player's hands.
 
 1. **Cart wool to Ryne.** Twelve sheep, one cart. Teaches routes, capacity, latency — and the tide-locked low road vs the slow high road past the Customs House.
 2. **The price is insulting.** The market screen shows why: wool cannot legally leave the country, and the domestic buyers know it. The player *feels* a policy without reading about one.
-3. **A Dutchman on the shingle offers four times.** Night, falling tide. Your existing product is *already contraband*. The player doesn't choose to become a criminal — they choose whether to accept the actual value of their own labour. **This is the inciting incident and it is emergent, not narrated.**
+3. **A Dutchman on the shingle offers four times.** Night, falling tide. Your existing product is *already contraband*. The player doesn't choose to become a criminal — they choose whether to accept the actual value of their own labour. **This is the inciting incident and it is emergent, not narrated.** *(M5 tutorial pass: the first invitation cannot be missed — he waits all night until first met — and rungs 3–4 cannot be skipped: automation to the shingle, and every mention of a contraband good in any menu, waits until the player has met him and sold contraband in town by hand. His hold opens one good at a time — lace, then tea, then jenever — each arriving with the problem the next mechanic solves.)*
 4. **Your cart comes back empty.** Pure logistics pain. He offers to fill it. Bidirectionality discovered by feeling the inefficiency first.
 5. **A Riding Officer appears on the coast road.** Cover is introduced as the solution to a problem the player already has. The Revenue *counts your sheep* — the fleece must match the cart. **Cover is bookkeeping.**
 6. **Sheep start going missing. Lights on the marsh.** The wight arrives as a *pest*, not a power. Confronting it, the deal available is: it will hide your cargo, if you feed it. Marsh magic enters as a **logistics tool**.

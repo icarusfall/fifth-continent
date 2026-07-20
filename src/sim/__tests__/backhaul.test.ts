@@ -6,6 +6,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   CART_CAPACITY,
+  CARTER_DANGER_WAGE,
   CARTER_MARKET_PATIENCE_DAYS,
   CARTER_WAGE,
   DUTCHMAN_PRICE,
@@ -14,7 +15,7 @@ import {
   WOOL_PRICE_DOMESTIC,
 } from '../balance';
 import { BOT_CUTTING_HOUSE_SITE } from '../policy';
-import { initialState, tick } from '../tick';
+import { carterWageOf, initialState, tick } from '../tick';
 import type { GameState } from '../types';
 
 function runTicks(s: GameState, n: number): GameState {
@@ -46,6 +47,8 @@ describe("the carter's back leg (spec §6.11, M5a-4)", () => {
     let s = initialState(1);
     s.coin = 100;
     s.dutchman.unlocked = true;
+    s.dutchman.met = true; // an old hand: the ladder is climbed (§6.9)
+    s.dutchman.fleeceBought = 99;
     s.stores.farm = { fleece: CART_CAPACITY };
     s = tick(s, [
       {
@@ -60,7 +63,7 @@ describe("the carter's back leg (spec §6.11, M5a-4)", () => {
     expect(s.stores.farm?.jenever).toBe(CART_CAPACITY);
     const sale = CART_CAPACITY * WOOL_PRICE_DOMESTIC * LEIDEN_PRICE_MULT;
     const tubs = CART_CAPACITY * DUTCHMAN_PRICE.jenever!;
-    const wages = 3 * CARTER_WAGE; // three dawns pass in three days
+    const wages = 3 * CARTER_DANGER_WAGE; // three dawns, at the shingle rate (§6.11)
     expect(s.coin).toBe(100 + sale - tubs - wages);
   });
 
@@ -68,6 +71,8 @@ describe("the carter's back leg (spec §6.11, M5a-4)", () => {
     let s = initialState(1);
     s.coin = 200;
     s.dutchman.unlocked = true;
+    s.dutchman.met = true;
+    s.dutchman.fleeceBought = 99;
     s.cuttingHouse = { ...BOT_CUTTING_HOUSE_SITE };
     s.stores['cutting-house'] = {};
     s.stores.farm = { fleece: CART_CAPACITY };
@@ -124,6 +129,8 @@ describe("the carter's back leg (spec §6.11, M5a-4)", () => {
     let s = initialState(1);
     s.coin = 20;
     s.dutchman.unlocked = true;
+    s.dutchman.met = true;
+    s.dutchman.fleeceBought = 99;
     s.stores.farm = { fleece: CART_CAPACITY };
     s = tick(s, [
       {
@@ -195,5 +202,28 @@ describe('the sated market — the carter waits, exposed (spec §6.11 / §6.17)'
     expect(loc.kind === 'node' && loc.nodeId === 'ryne').toBe(false);
     expect(s.carts[0].cargo.jenever).toBe(4);
     expect(s.carts[0].marketPatienceUntil).toBeUndefined();
+  });
+});
+
+describe('danger money (spec §6.11, M5 tutorial pass)', () => {
+  it('the honest round pays the honest rate; contraband and the shingle pay danger money', () => {
+    expect(carterWageOf({ from: 'farm', to: 'ryne', good: 'fleece' })).toBe(CARTER_WAGE);
+    expect(carterWageOf({ from: 'farm', to: 'shingle', good: 'fleece' })).toBe(CARTER_DANGER_WAGE);
+    expect(carterWageOf({ from: 'cutting-house', to: 'ryne', good: 'brandy-fair' })).toBe(
+      CARTER_DANGER_WAGE,
+    );
+    expect(
+      carterWageOf({ from: 'farm', to: 'ryne', good: 'fleece', back: 'tea', backTo: 'farm' }),
+    ).toBe(CARTER_DANGER_WAGE);
+  });
+
+  it('the dawn bill charges by the order', () => {
+    let s = initialState(2);
+    s.coin = 20;
+    s.dutchman.unlocked = true;
+    s.carts[0].carter = { from: 'farm', to: 'shingle', good: 'fleece' };
+    s = runTicks(s, TICKS_PER_DAY); // through one dawn; no goods move (empty barn)
+    // One dawn's wage at the danger rate has left the purse.
+    expect(s.coin).toBe(20 - CARTER_DANGER_WAGE);
   });
 });
