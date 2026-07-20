@@ -936,11 +936,17 @@ function applyAction(state: GameState, action: Action): void {
       ) {
         delete order.backTo;
       }
+      // §6.11 — the load cap: whole, sane, and under the cart's capacity;
+      // anything else means "fill the cart" and is dropped.
+      if (order.maxLoad !== undefined) {
+        order.maxLoad = Math.round(order.maxLoad);
+        if (order.maxLoad <= 0 || order.maxLoad >= cart.capacity) delete order.maxLoad;
+      }
       cart.carter = order;
       delete cart.marketPatienceUntil; // a fresh instruction is fresh patience
       const route = `${nodeById(from, state.farm, state.cuttingHouse).name} to ${
         nodeById(to, state.farm, state.cuttingHouse).name
-      }${
+      }${order.maxLoad !== undefined ? `, no more than ${order.maxLoad} a run` : ''}${
         order.back
           ? `, home with ${order.back}${
               order.backTo
@@ -1419,7 +1425,13 @@ function runCarters(state: GameState): void {
       const store = state.stores[at];
       const available = store?.[order.good] ?? 0;
       const room = cart.capacity - cargoCount(cart.cargo);
-      const qty = Math.min(available, room);
+      // §6.11 — the load cap (M5b playtest): the order may take at most
+      // maxLoad of the good per run, counting what already rides aboard.
+      const capLeft =
+        order.maxLoad !== undefined
+          ? Math.max(0, order.maxLoad - (cart.cargo[order.good] ?? 0))
+          : Number.MAX_SAFE_INTEGER;
+      const qty = Math.min(available, room, capLeft);
       if (qty > 0) {
         store![order.good] = available - qty;
         addToStore(cart.cargo, order.good, qty);

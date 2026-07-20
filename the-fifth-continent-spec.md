@@ -578,8 +578,18 @@ the shingle  no standing order may name the shingle, and no backhaul is
              names a contraband good before then (§10). UI-only gates,
              like the carter's own unlock — the sim stays permissive for
              replays and the scripted bots
-at `from`    load `good` to capacity from the store; if the store is empty
-             he waits (a carter shuttles loads, not air)
+at `from`    load `good` to capacity from the store — or to the order's
+             optional `maxLoad`, whichever is less (M5b playtest: the
+             wool-split lever at last — the player's hand on how much of
+             the shared barn each round takes per run, so the honest leg
+             and the gunwale stop being decided by route geometry). If the
+             store is empty he waits (a carter shuttles loads, not air).
+             The picker offers the full cart, half, or a couple; absent
+             means full, and a silly value degrades to it. One good per
+             order still — spare room does NOT take a second cargo (the
+             mixed-load question is deliberately deferred: it drags in
+             danger money per good, finished-vs-intermediate rules, and a
+             fatter picker)
 roads        between nodes joined by two edges he takes the faster one that
              is open at departure — he knows the tide like everyone born here
 at `to`      market → sell into the day's remaining demand; otherwise unload

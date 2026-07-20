@@ -2040,6 +2040,8 @@ function CartsAtNode({
     cartId: string;
     from: NodeId;
     good?: Good;
+    /** §6.11 — load cap per run; 0 means the full cart. */
+    max?: number;
     to?: NodeId;
     back?: Good;
   } | null>(null);
@@ -2056,10 +2058,18 @@ function CartsAtNode({
     back?: Good,
     backTo?: NodeId,
   ) => {
+    const maxLoad = hiring?.max && hiring.max > 0 ? hiring.max : undefined;
     enqueue({
       type: 'hireCarter',
       cartId,
-      order: { from, to, good, ...(back ? { back } : {}), ...(backTo ? { backTo } : {}) },
+      order: {
+        from,
+        to,
+        good,
+        ...(maxLoad ? { maxLoad } : {}),
+        ...(back ? { back } : {}),
+        ...(backTo ? { backTo } : {}),
+      },
     });
     setHiring(null);
     // A directed cart is dealt with: if that was the last undirected one, the
@@ -2123,7 +2133,9 @@ function CartsAtNode({
               <strong>{cart.name}</strong>: {storeSummary(cart.cargo, 'empty')}
               {!present ? ` · ${cartWhereabouts(state, cart)}` : ''}
               {cart.carter
-                ? ` · standing order: ${GOOD_LABEL[cart.carter.good]} → ${
+                ? ` · standing order: ${GOOD_LABEL[cart.carter.good]}${
+                    cart.carter.maxLoad !== undefined ? ` (up to ${cart.carter.maxLoad} a run)` : ''
+                  } → ${
                     nodeById(cart.carter.to, state.farm, state.cuttingHouse).name
                   }${
                     cart.carter.back
@@ -2169,6 +2181,26 @@ function CartsAtNode({
                       </button>
                     ))}
                     <button onClick={() => setHiring(null)}>Never mind — leave the order</button>
+                  </>
+                ) : hiring.max === undefined ? (
+                  // §6.11 (M5b playtest) — the load cap: how much of the
+                  // shared store each round may take. The wool-split lever.
+                  <>
+                    <button onClick={() => setHiring({ ...hiring, max: 0 })}>
+                      Load all the cart holds ({cart.capacity})
+                    </button>
+                    <button
+                      title="Leaves the rest in the store for another round — or another buyer."
+                      onClick={() => setHiring({ ...hiring, max: cart.capacity / 2 })}
+                    >
+                      No more than half a load ({cart.capacity / 2})
+                    </button>
+                    <button
+                      title="A token round: the store stays full for whatever else wants it."
+                      onClick={() => setHiring({ ...hiring, max: cart.capacity / 4 })}
+                    >
+                      No more than a couple ({cart.capacity / 4})
+                    </button>
                   </>
                 ) : hiring.to === undefined ? (
                   <>

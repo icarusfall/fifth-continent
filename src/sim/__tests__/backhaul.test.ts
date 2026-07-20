@@ -227,3 +227,64 @@ describe('danger money (spec §6.11, M5 tutorial pass)', () => {
     expect(s.coin).toBe(20 - CARTER_DANGER_WAGE);
   });
 });
+
+describe('the load cap (spec §6.11, M5b playtest) — the wool-split lever', () => {
+  it('an order with maxLoad takes at most that much per run, and no more', () => {
+    let s = initialState(1);
+    s.tick = 60;
+    s.stores.farm = { fleece: 24 }; // a full barn: plenty to take
+    s = tick(s, [
+      {
+        type: 'hireCarter',
+        cartId: 'cart-1',
+        order: { from: 'farm', to: 'ryne', good: 'fleece', maxLoad: 4 },
+      },
+    ]);
+    s = tick(s, []); // the carter loads and sets out
+    expect(s.carts[0].cargo.fleece).toBe(4); // half a cart, as ordered
+    expect(s.stores.farm?.fleece).toBe(20); // the rest stays for other rounds
+  });
+
+  it('absent means the full cart, and silly values degrade to it', () => {
+    let s = initialState(1);
+    s.tick = 60;
+    s.stores.farm = { fleece: 24 };
+    s = tick(s, [
+      {
+        type: 'hireCarter',
+        cartId: 'cart-1',
+        order: { from: 'farm', to: 'ryne', good: 'fleece', maxLoad: 99 },
+      },
+    ]);
+    expect(s.carts[0].carter?.maxLoad).toBeUndefined(); // ≥ capacity: dropped
+    s = tick(s, []);
+    expect(s.carts[0].cargo.fleece).toBe(CART_CAPACITY);
+
+    let z = initialState(1);
+    z.tick = 60;
+    z = tick(z, [
+      {
+        type: 'hireCarter',
+        cartId: 'cart-1',
+        order: { from: 'farm', to: 'ryne', good: 'fleece', maxLoad: 0 },
+      },
+    ]);
+    expect(z.carts[0].carter?.maxLoad).toBeUndefined(); // a cap of nothing is no order
+  });
+
+  it('the cap counts what already rides aboard, so a returning remainder is honoured', () => {
+    let s = initialState(1);
+    s.tick = 60;
+    s.stores.farm = { fleece: 24 };
+    s.carts[0].cargo = { fleece: 3 }; // came home with a remainder aboard
+    s = tick(s, [
+      {
+        type: 'hireCarter',
+        cartId: 'cart-1',
+        order: { from: 'farm', to: 'ryne', good: 'fleece', maxLoad: 4 },
+      },
+    ]);
+    s = tick(s, []);
+    expect(s.carts[0].cargo.fleece).toBe(4); // topped up to the cap, not past it
+  });
+});

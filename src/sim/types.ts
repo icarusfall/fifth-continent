@@ -99,6 +99,9 @@ export interface CarterOrder {
   from: NodeId;
   to: NodeId;
   good: Good;
+  /** §6.11 (M5b playtest) — load at most this much of `good` per run;
+   *  absent = fill the cart. The wool-split lever. */
+  maxLoad?: number;
   back?: Good;
   backTo?: NodeId;
 }
