@@ -64,7 +64,7 @@ const AUTOPAY_KEY = 'fifth-continent-autopay-rent'; // a UI preference, not game
  */
 export interface EventCard {
   id: string;
-  kind: 'rent' | 'info' | 'raid' | 'newGame';
+  kind: 'rent' | 'info' | 'raid' | 'newGame' | 'vigil';
   title: string;
   body: string;
   /** Optional scene-setting line shown above the body (e.g. the alehouse's
@@ -179,6 +179,19 @@ function collectedCard(next: GameState): EventCard {
     kind: 'info',
     title: 'Collected',
     body: `At dawn they have taken ${next.lastCollected ?? 'someone'}. Nobody saw anything, and nobody will speak of it — the parish knows what a drowned path means. The account is ${PERSON_DEBT} lighter, and it was not worth it.`,
+  };
+}
+
+/** §6.9 — the vigil ends at an empty dawn: say why, and offer the next night.
+ *  Pre-met he comes every night without fail; after, the tide must serve. */
+function vigilCard(next: GameState): EventCard {
+  return {
+    id: `vigil-${next.tick}`,
+    kind: 'vigil',
+    title: 'An empty sea at dawn',
+    body: next.dutchman.met
+      ? 'You waited the night out and the lugger never showed: the tide never fell in the dark hours. Most nights it does — the tide gauge knows which. He loses nothing by missing a night; the question is whether you can say the same.'
+      : 'You waited the night out and no lugger came. Strange — word was he waits on the man he came to meet. He will stand off again come dark; the first meeting is not one he intends to miss.',
   };
 }
 
@@ -573,6 +586,8 @@ export interface GameStore {
   setAutoPayRent: (on: boolean) => void;
   /** §6.9 — start or cancel the vigil for the lugger. */
   setWaitingForLugger: (on: boolean) => void;
+  /** §6.9 — from the empty-dawn card: dismiss it and wait the next night out. */
+  waitAgain: () => void;
   /** Dismiss an informational card and let the world run on. */
   dismissCard: () => void;
   save: () => void;
@@ -734,12 +749,14 @@ export const useGameStore = create<GameStore>()((set, get) => {
 
       // §6.9 — the vigil ends when the lugger shows, a card interrupts, or
       // dawn calls it off: never fast-forward past the very thing waited for.
+      // An empty dawn explains itself and offers the next night (playtest).
       const clock = clockOf(next.tick);
+      const dawnHit = clock.hour === 5 && clock.minute === 0;
+      if (get().waitingForLugger && card === null && !next.dutchman.present && dawnHit) {
+        card = vigilCard(next);
+      }
       const stillWaiting =
-        get().waitingForLugger &&
-        card === null &&
-        !next.dutchman.present &&
-        !(clock.hour === 5 && clock.minute === 0);
+        get().waitingForLugger && card === null && !next.dutchman.present && !dawnHit;
 
       set({
         state: next,
@@ -758,6 +775,8 @@ export const useGameStore = create<GameStore>()((set, get) => {
     setSpeed: (ticksPerSecond) => set({ ticksPerSecond, waitingForLugger: false }),
 
     setWaitingForLugger: (on) => set({ waitingForLugger: on, paused: false }),
+
+    waitAgain: () => set({ activeCard: null, waitingForLugger: true, paused: false }),
 
     payRent: () => set((s) => ({ pending: [...s.pending, { type: 'payRent' }], activeCard: null })),
 

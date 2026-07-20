@@ -22,6 +22,7 @@ export function EventCard() {
   const dismissCard = useGameStore((s) => s.dismissCard);
   const startBattle = useGameStore((s) => s.startBattle);
   const startNewGame = useGameStore((s) => s.startNewGame);
+  const waitAgain = useGameStore((s) => s.waitAgain);
 
   if (!card) return null;
 
@@ -61,6 +62,15 @@ export function EventCard() {
           <button className="event-primary event-danger" onClick={startBattle}>
             See it through
           </button>
+        ) : card.kind === 'vigil' ? (
+          <>
+            <button className="event-primary" onClick={waitAgain}>
+              Wait the next night out · let the hours run
+            </button>
+            <button className="event-check" onClick={dismissCard}>
+              Go on — there is work by daylight
+            </button>
+          </>
         ) : card.kind === 'newGame' ? (
           <>
             {DIFFICULTY_CHOICE.map((d) => (

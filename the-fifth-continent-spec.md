@@ -267,7 +267,9 @@ run to the shingle is a timed bet, like everything else on this marsh.
 **The vigil (M5b playtest):** the shingle's menu offers "wait for the
 lugger" — the clock runs fast (UI pacing only, the sim untouched) until he
 stands off, any event card interrupts, or dawn calls it off; a hand on the
-speed controls cancels it. Waiting for the tide should cost patience in the
+speed controls cancels it. An empty dawn raises its own card — why he did
+not come (unmet, he always does; met, the tide must serve), and a button to
+wait the next night out. Waiting for the tide should cost patience in the
 fiction, not at the desk.
 
 Per visit, his lugger's hold:
