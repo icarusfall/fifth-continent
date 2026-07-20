@@ -143,6 +143,7 @@ export function initialState(seed: number, difficulty: Difficulty = 'fair'): Gam
     // The books open honest: the flock gives what the flock gives (§6.10).
     ledger: {
       declaredYield: STARTING_FLOCK * FLEECE_PER_HEAD_PER_DAY,
+      penTaken: false,
       declaredToDate: 0,
       grownToDate: 0,
       soldLawfully: 0,
@@ -1097,6 +1098,7 @@ function applyAction(state: GameState, action: Action): void {
     case 'setDeclaredYield': {
       const declared = Math.max(0, Math.min(state.flockSize, Math.round(action.fleecePerDay)));
       state.ledger.declaredYield = declared;
+      state.ledger.penTaken = true; // §6.10 — the number is yours now
       logEvent(
         state,
         declared < state.flockSize * FLEECE_PER_HEAD_PER_DAY
@@ -1112,6 +1114,12 @@ function applyAction(state: GameState, action: Action): void {
 
 function growWoolAtDawn(state: GameState): void {
   if (!isDawn(state.tick)) return;
+  // §6.10 (M5 tutorial pass) — until the pen is taken, the agent keeps the
+  // books square with the flock: an honest life needs no bookkeeping. Done
+  // before the day's declaration accrues, so the page never drifts.
+  if (!state.ledger.penTaken) {
+    state.ledger.declaredYield = state.flockSize * FLEECE_PER_HEAD_PER_DAY;
+  }
   const grown = state.flockSize * FLEECE_PER_HEAD_PER_DAY;
   state.fleeceReady += grown;
   logEvent(state, `Dawn. The flock carries ${state.fleeceReady} fleece of wool.`);

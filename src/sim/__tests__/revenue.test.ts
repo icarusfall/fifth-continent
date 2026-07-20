@@ -248,7 +248,7 @@ describe('the books (spec §6.10 / §19.2)', () => {
 
   it('honest books balance: all wool declared, sold or on hand', () => {
     const { after } = inspectionAt((s) => {
-      s.ledger = { declaredYield: 12, declaredToDate: 24, grownToDate: 24, soldLawfully: 16, soldToday: 0, openingStock: 0 };
+      s.ledger = { declaredYield: 12, declaredToDate: 24, grownToDate: 24, soldLawfully: 16, soldToday: 0, penTaken: true, openingStock: 0 };
       s.stores.farm = { fleece: 8 };
     });
     expect(after.heat.regional).toBe(0);
@@ -258,7 +258,7 @@ describe('the books (spec §6.10 / §19.2)', () => {
   it('vanished wool is priced at the gap', () => {
     const { after } = inspectionAt((s) => {
       // Declared 24, sold 8 lawfully, nothing on hand: 16 fleece adrift.
-      s.ledger = { declaredYield: 12, declaredToDate: 24, grownToDate: 24, soldLawfully: 8, soldToday: 0, openingStock: 0 };
+      s.ledger = { declaredYield: 12, declaredToDate: 24, grownToDate: 24, soldLawfully: 8, soldToday: 0, penTaken: true, openingStock: 0 };
       s.stores.farm = { fleece: 0 };
     });
     expect(after.heat.regional).toBeCloseTo(16 * WOOL_GAP_COEFF, 5);
@@ -268,14 +268,14 @@ describe('the books (spec §6.10 / §19.2)', () => {
   it('swearing to less than half the clip is priced as a lie', () => {
     const { after } = inspectionAt((s) => {
       // Declared nothing, holds nothing, sold nothing — but 24 grew: floor is 12.
-      s.ledger = { declaredYield: 0, declaredToDate: 0, grownToDate: 24, soldLawfully: 0, soldToday: 0, openingStock: 0 };
+      s.ledger = { declaredYield: 0, declaredToDate: 0, grownToDate: 24, soldLawfully: 0, soldToday: 0, penTaken: true, openingStock: 0 };
     });
     expect(after.heat.regional).toBeCloseTo(12 * WOOL_GAP_COEFF, 5);
   });
 
   it('the page is initialled: a gap is paid for once, not nightly', () => {
     const { after } = inspectionAt((s) => {
-      s.ledger = { declaredYield: 12, declaredToDate: 24, grownToDate: 24, soldLawfully: 8, soldToday: 0, openingStock: 0 };
+      s.ledger = { declaredYield: 12, declaredToDate: 24, grownToDate: 24, soldLawfully: 8, soldToday: 0, penTaken: true, openingStock: 0 };
     });
     expect(after.ledger.declaredToDate).toBe(0);
     expect(after.ledger.grownToDate).toBe(0);
@@ -518,5 +518,44 @@ describe('the wool-stapler’s tally — lawful sales cap at the declared figure
     const s = tick(s0, [{ type: 'sellToDutchman', cartId: 'cart-1' }]);
     expect(s.carts[0].cargo.fleece).toBe(0);
     expect(s.ledger.soldToday).toBe(0); // no page records it
+  });
+});
+
+describe('honest by default — the books follow the flock until the pen is taken (spec §6.10, M5 tutorial)', () => {
+  it('a grown flock never drifts into an accidental gap: declared follows at dawn', () => {
+    let s = initialState(4);
+    s.coin = 200;
+    s = tick(s, [{ type: 'buySheep', qty: 6 }]); // arrive at the next dawn
+    // Sheep join after that dawn's clip is booked; the agent squares the
+    // page the following morning — declared always equals the dawn's true
+    // clip, so no gap ever opens.
+    s = runTicks(s, 2 * TICKS_PER_DAY);
+    expect(s.flockSize).toBe(STARTING_FLOCK + 6);
+    expect(s.ledger.penTaken).toBe(false);
+    expect(s.ledger.declaredYield).toBe(s.flockSize);
+  });
+
+  it('taking the pen stops the agent’s hand for good', () => {
+    let s = initialState(4);
+    s.coin = 200;
+    s = tick(s, [{ type: 'setDeclaredYield', fleecePerDay: 6 }]);
+    expect(s.ledger.penTaken).toBe(true);
+    s = tick(s, [{ type: 'buySheep', qty: 6 }]);
+    s = runTicks(s, TICKS_PER_DAY);
+    expect(s.flockSize).toBe(STARTING_FLOCK + 6);
+    expect(s.ledger.declaredYield).toBe(6); // the number is yours now
+  });
+
+  it('distraint thins the flock and the honest book follows it down', () => {
+    let s = initialState(4);
+    s.coin = 70; // 50 short at the first rent → 5 sheep distrained
+    s = runTicks(s, 6 * TICKS_PER_DAY + SHEARING_HOUR * TICKS_PER_HOUR + 2, {
+      // the bots' habit: settle the rent the moment it is pending
+    });
+    // settle rent manually when pending
+    if (s.rentPending) s = tick(s, [{ type: 'payRent' }]);
+    s = runTicks(s, TICKS_PER_DAY);
+    expect(s.flockSize).toBeLessThan(STARTING_FLOCK);
+    expect(s.ledger.declaredYield).toBe(s.flockSize); // no phantom sworn wool
   });
 });

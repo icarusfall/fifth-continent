@@ -493,6 +493,17 @@ expensive. Short books free the surplus wool but cap lawful Ryne sales at the
 declared figure, and the floor keeps half the clip on the record. Cooking
 the books is one number, and it is a real decision every rent period.
 
+**Honest by default (M5 tutorial pass, playtest).** Until the player first
+sets `declaredYield` by hand (`ledger.penTaken`), the agent keeps the books
+square: declaredYield follows the flock's clip each dawn. An honest life
+therefore needs no bookkeeping at all — and a grown flock never drifts into
+an accidental gap. *Cooking* the books is the act that takes the pen; after
+it, the number is the player's and never auto-moves again. The mechanic is
+taught at its moment by three one-shot cards: the town talks (first Heat),
+sold-out-not-sold (the fence-or-wait fork, §6.17), and take-up-the-pen
+(first wool over the gunwale). The goods overlay (§20.2) names cover too:
+what the clutter hides, and what stands showing past it.
+
 **What the player sees (§20.2, first cut).** `gossip` = suspicion snapshotted
 at each dawn — the parish talks over breakfast, so the player reads
 yesterday's Revenue mind, not today's. One toggle paints the gossip stains on

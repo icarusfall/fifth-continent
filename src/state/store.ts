@@ -21,7 +21,7 @@ import {
   SHEEP_VALUE,
   TICKS_PER_DAY,
 } from '../sim/balance';
-import { illicitAnywhere } from '../sim/revenue';
+import { CONTRABAND, illicitAnywhere } from '../sim/revenue';
 import { simulateBattle } from '../sim/combat';
 import type { BattleSetup, Call, CombatLog, ScheduledCall } from '../sim/combat';
 import { nodeById } from '../sim/map';
@@ -45,7 +45,9 @@ import type { Action, ActionLog, Difficulty, GameState, NodeId } from '../sim/ty
 //      sales cap at declaredYield/day (§6.10's squeeze, finally enforced).
 // v16: dutchman.met + dutchman.fleeceBought — the first meeting that waits,
 //      and the trust ladder that opens his hold one good at a time (§6.9).
-const SAVE_KEY = 'fifth-continent-save-v16';
+// v17: ledger.penTaken — the books follow the flock until the player takes
+//      the pen; honest play needs no bookkeeping at all (§6.10).
+const SAVE_KEY = 'fifth-continent-save-v17';
 const AUTOSAVE_EVERY_TICKS = 30;
 const AUTOPAY_KEY = 'fifth-continent-autopay-rent'; // a UI preference, not game state
 
@@ -317,6 +319,37 @@ const MILESTONES: Milestone[] = [
     body: 'Tonight he shows you the tubs: overproof jenever, ten the tub — and no buyer in Ryne will touch a drop of it raw. He grins like a man selling you a problem. It wants cutting, and cutting wants a house.',
   },
   {
+    // §6.10 (M5 tutorial pass) — heat named the moment it first exists: the
+    // first contraband act warms the parish, and the meter appears with it.
+    key: 'town-talks',
+    when: (s) => s.heat.regional >= 0.5,
+    title: 'The town talks',
+    body: 'Contraband sold, moved, or left lying past what your barn’s clutter can hide — it all makes talk, and the parish meter now on the HUD is the talk rising. Live quiet and it cools. Let it climb, and London sends a man to lodge at the Customs House.',
+  },
+  {
+    // §6.10 / §6.17 — the surplus fork, stated plainly at the moment the
+    // player is actually holding it: heat against money, fence against wait.
+    key: 'sold-out-not-sold',
+    when: (s) =>
+      s.carts.some(
+        (c) =>
+          !c.carter &&
+          c.location.kind === 'node' &&
+          c.location.nodeId === 'ryne' &&
+          CONTRABAND.some((g) => (c.cargo[g] ?? 0) > 0 && (s.demandRemaining[g] ?? 0) <= 0),
+      ),
+    title: 'Sold out, not sold',
+    body: 'The town has had its fill of that today, and a laden cart in the open is remembered. The fence will take the rest now — coin in hand, cheap, and the talk dies with it. Or hold the goods for tomorrow’s full price, and know that goods hanging about draw nosy parkers from the Customs House.',
+  },
+  {
+    // §6.10 — the books become a decision at first owling, and not before:
+    // until then the agent keeps them square with the flock, unasked.
+    key: 'take-up-the-pen',
+    when: (s) => s.dutchman.fleeceBought > 0 && !s.ledger.penTaken,
+    title: 'Take up the pen',
+    body: 'That wool crossed the gunwale and left no trace — but the book still swears the flock’s whole clip, and sworn wool must show when the Revenue counts. In THE LEDGER you may teach the book to swear less — scrapie, if anyone asks — and owl the difference free. Mind: the wool-stapler buys in town only what the book admits each day.',
+  },
+  {
     key: 'cutting-house',
     paced: true,
     when: (s) => !s.cuttingHouse && hasOverproofJenever(s),
@@ -534,6 +567,7 @@ function loadSave(): SaveFile | null {
       typeof parsed.state.dutchman?.fleeceBought !== 'number'
     )
       return null;
+    if (typeof parsed.state.ledger?.penTaken !== 'boolean') return null;
     return parsed;
   } catch {
     return null;

@@ -108,9 +108,11 @@ export function LedgerPanel({ state }: { state: GameState }) {
                 <strong>{l.declaredYield}</strong> the book allows
               </p>
               <p className="ledger-hint">
-                {honest
-                  ? 'An honest page. Every fleece the lugger swallows will read as a gap.'
-                  : 'A shorted page. Declared wool must show; the rest never existed — get it over the gunwale.'}
+                {!l.penTaken
+                  ? 'The agent keeps the books square with the flock — until you take up the pen. After that, the number is yours.'
+                  : honest
+                    ? 'An honest page. Every fleece the lugger swallows will read as a gap.'
+                    : 'A shorted page. Declared wool must show; the rest never existed — get it over the gunwale.'}
               </p>
             </section>
           )}

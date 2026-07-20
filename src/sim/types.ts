@@ -248,6 +248,14 @@ export interface GameState {
   ledger: {
     /** Fleece per day the books admit the flock gives. Set at will. */
     declaredYield: number;
+    /**
+     * §6.10 (M5 tutorial pass) — false until the player first sets the
+     * declared yield by hand. Until then the agent keeps honest books:
+     * declaredYield follows the flock each dawn, so an honest life needs
+     * no bookkeeping at all. Cooking the books is the act that takes the
+     * pen — after it, the number is yours and never auto-moves again.
+     */
+    penTaken: boolean;
     declaredToDate: number;
     grownToDate: number;
     /** Fleece sold at Ryne since the page opened. */

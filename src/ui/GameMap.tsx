@@ -56,7 +56,7 @@ import {
 } from '../sim/map';
 import { dayPhaseOf, isFlooded, ticksUntilTideTurn } from '../sim/time';
 import { carterWageOf } from '../sim/tick';
-import { CONTRABAND, fortVisibility, illicitAnywhere } from '../sim/revenue';
+import { CONTRABAND, coverOf, fortVisibility, illicitAnywhere, illicitCount } from '../sim/revenue';
 import { GOOD_LABEL, spanOf, storeSummary } from './format';
 import type { Action, Cart, CutDepth, EdgeId, GameState, Good, NodeId } from '../sim/types';
 import { useGameStore } from '../state/store';
@@ -519,6 +519,18 @@ export function GameMap({ state }: { state: GameState }) {
             color: farmCount >= FARM_STORE_CAPACITY ? '#E0837A' : undefined,
           });
         }
+        // §18 made visible (M5 tutorial pass): what the clutter hides, and
+        // what stands showing past it — the storage-heat rule, on the map.
+        const coverLine = (nodeId: NodeId): { text: string; color?: string } | null => {
+          const illicit = illicitCount(s.stores[nodeId] ?? {});
+          if (illicit <= 0) return null;
+          const showing = Math.max(0, illicit - coverOf(s, nodeId));
+          return showing > 0
+            ? { text: `${showing} showing past the clutter`, color: '#E0837A' }
+            : { text: `hidden in the clutter (hides ${coverOf(s, nodeId)})` };
+        };
+        const farmCover = coverLine('farm');
+        if (farmCover) farmRows.push(farmCover);
         if (farmCount > 0 || farmRows.length > 0) {
           const fcc = tileCenter(s.farm);
           drawStockChip(
@@ -537,6 +549,9 @@ export function GameMap({ state }: { state: GameState }) {
           const chCount = cargoCount(chStore);
           if (chCount > 0) {
             const chc = tileCenter(s.cuttingHouse);
+            const chRows = stockRows(chStore);
+            const chCover = coverLine('cutting-house');
+            if (chCover) chRows.push(chCover);
             drawStockChip(
               ctx,
               chc.x + 16,
@@ -545,7 +560,7 @@ export function GameMap({ state }: { state: GameState }) {
                 text: `store ${chCount}/${CUTTING_HOUSE_STORE_CAPACITY}`,
                 color: CUTTING_HOUSE_STORE_CAPACITY - chCount <= 4 ? '#E0837A' : '#CBBFA8',
               },
-              stockRows(chStore),
+              chRows,
             );
           }
         }
