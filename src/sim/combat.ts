@@ -11,6 +11,7 @@ import {
   COMBAT_LINEAR_REF,
   COMBAT_MAX_FRAMES,
   COMBAT_MIN_STRENGTH,
+  ROUT_TOLL,
   COMBAT_START_MORALE,
   DEBT_PER_GUARDIAN_FRAME,
   ENGINE_FIRE_HEAT,
@@ -274,6 +275,10 @@ export function simulateBattle(setup: BattleSetup): CombatLog {
     const defBroke = !defSpent && breaks(def);
     if (attBroke) events.push({ kind: 'rout', side: 'attacker' });
     if (defBroke) events.push({ kind: 'rout', side: 'defender' });
+    // §14.3 — the rout's toll: broken men are cut down as they run. A
+    // voluntary retreat (handled above, before the volley) pays no toll.
+    if (attBroke) att.strength = Math.max(0, att.strength * (1 - ROUT_TOLL));
+    if (defBroke) def.strength = Math.max(0, def.strength * (1 - ROUT_TOLL));
 
     frames.push(snapshot(t, att, def, events));
 

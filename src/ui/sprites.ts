@@ -313,6 +313,46 @@ export function drawCarterRoute(
   trace();
 }
 
+/**
+ * §20.2 — the goods overlay's stock chip: a small dark card at a place
+ * listing what sits there and how hard the walls press. `header` carries
+ * its own colour so a brimming store can read hot.
+ */
+export function drawStockChip(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  header: { text: string; color: string } | null,
+  rows: Array<{ text: string; color?: string }>,
+): void {
+  const line = 8;
+  const pad = 4;
+  ctx.font = '7px Georgia, serif';
+  let w = header ? ctx.measureText(header.text).width : 0;
+  for (const r of rows) w = Math.max(w, ctx.measureText(r.text).width);
+  w += pad * 2;
+  const h = pad * 2 + (rows.length + (header ? 1 : 0)) * line - 2;
+  ctx.fillStyle = 'rgba(26, 20, 16, 0.82)';
+  ctx.strokeStyle = 'rgba(130, 110, 88, 0.9)';
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, 3);
+  ctx.fill();
+  ctx.stroke();
+  ctx.textAlign = 'left';
+  let ty = y + pad + 5;
+  if (header) {
+    ctx.fillStyle = header.color;
+    ctx.fillText(header.text, x + pad, ty);
+    ty += line;
+  }
+  for (const r of rows) {
+    ctx.fillStyle = r.color ?? '#D8CFBB';
+    ctx.fillText(r.text, x + pad, ty);
+    ty += line;
+  }
+}
+
 // ---- Feedback motes (§20, M5 hub polish) --------------------------------
 // Little world-anchored particles: wool blossoming off the shears, a coin
 // catching the light where a sale lands. Pure decoration — the sim knows

@@ -284,6 +284,16 @@ header h1 {
   color: #e0a49b;
 }
 
+/* §20.2 — the goods overlay's toggle sits above gossip's. */
+.gossip-toggle.goods {
+  bottom: 46px;
+}
+
+.gossip-toggle.on-goods {
+  border-color: #d8b764;
+  color: #e6d3a1;
+}
+
 /* §20 — the location dock: a column of place names in the left gutter, so a
    place's menu is one tap away without hunting for its pixel on the map. */
 .location-dock {
@@ -636,7 +646,8 @@ button.danger {
 
 .battle-bar > div {
   height: 100%;
-  transition: width 140ms linear;
+  /* Glide at the playback's own cadence, so attrition reads as a tide. */
+  transition: width var(--frame-ms, 140ms) linear;
 }
 
 .battle-morale {
@@ -650,7 +661,7 @@ button.danger {
 .battle-morale > div {
   height: 100%;
   background: var(--marsh);
-  transition: width 140ms linear;
+  transition: width var(--frame-ms, 140ms) linear;
 }
 
 .battle-events {
@@ -661,6 +672,62 @@ button.danger {
   font-size: 13px;
   color: #c4453a;
   letter-spacing: 0.02em;
+}
+
+/* §14 (M5 hub polish) — the watched battle breathes: a strip of night field
+   where each frame's volleys spark, and the moments that matter flare. */
+.battle-field {
+  position: relative;
+  height: 44px;
+  margin: 6px 0 10px;
+  border: 1px solid rgba(155, 130, 101, 0.35);
+  border-radius: 3px;
+  background:
+    radial-gradient(ellipse at 30% 120%, rgba(74, 94, 66, 0.35), transparent 60%),
+    radial-gradient(ellipse at 75% -20%, rgba(46, 74, 107, 0.25), transparent 55%),
+    rgba(16, 12, 10, 0.6);
+  overflow: hidden;
+}
+
+.battle-flash {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #f6e7b2;
+  box-shadow: 0 0 6px 2px rgba(246, 231, 178, 0.8), 0 0 14px 6px rgba(216, 151, 60, 0.35);
+  opacity: 0;
+  animation: musket-flash 320ms ease-out forwards;
+}
+
+@keyframes musket-flash {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  25% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
+.battle-events.flash {
+  animation: event-flare 700ms ease-out;
+}
+
+@keyframes event-flare {
+  0% {
+    transform: scale(1.25);
+    text-shadow: 0 0 14px rgba(196, 69, 58, 0.9);
+  }
+  100% {
+    transform: scale(1);
+    text-shadow: none;
+  }
 }
 
 .battle-calls {

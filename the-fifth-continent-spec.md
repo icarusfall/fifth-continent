@@ -1461,7 +1461,11 @@ interface CombatFrame {
 }
 
 interface CombatLog {
-  frames: CombatFrame[];        // 30-50 frames
+  frames: CombatFrame[];        // 30-50 frames (COMBAT_DT tuned 0.05 → 0.01,
+                                // M5 hub polish, to finally hit this target;
+                                // DEBT_PER_GUARDIAN_FRAME rescaled 2 → 0.4
+                                // with it — the Guardian's price is per unit
+                                // of fought time, not per integration step)
   outcome: 'attacker_rout' | 'defender_rout' | 'mutual_collapse' | 'paid_off';
   survivors: { attackers: number; defenders: number };
 }
@@ -1514,7 +1518,15 @@ Real smuggler fights ended when one side ran. Attrition to zero is ahistorical *
 ```
 morale -= casualtyRateThisFrame * 6 + (leaderDown ? 25 : 0)
 if (morale < breakPoint) -> ROUT
+on ROUT: strength *= (1 - ROUT_TOLL), ROUT_TOLL = 0.2
 ```
+
+**The rout's toll** (M5 hub polish): a side that *breaks* loses a fifth of
+its remaining men as it leaves the field — broken men are cut down
+running. A retreat *sounded* before morale collapses pays no toll: that is
+what the Call buys. Added when COMBAT_DT was tuned honest (0.05 → 0.01):
+with fine integration nobody died before the breakpoint, and §14.6's whole
+economy — dead officers, the parish's grief — went silent.
 
 | Force | Break point | Feel |
 |---|---|---|
@@ -1820,6 +1832,17 @@ the light — no dollar signs on this coast — wherever a sale is struck, at
 Ryne's stalls, the fence's back door, or over the gunwale. So an automated
 farm still visibly* works. *UI-only particles; the sim knows nothing of
 them.)*
+
+*(The goods overlay, same pass, playtest — once the hub splits the stores,
+"what is where" must read at a glance: a `goods` toggle beside `gossip`,
+ON by default, draws a small stock chip at every place — the barn and the
+cutting house with their fill against the walls (red when the walls
+press), wool stuck on the sheep's backs named as such, anything lying on
+the open shingle flagged coverless, and at Ryne what the town still buys
+today: wool through the book's allowance (§6.10), each contraband channel
+the player actually holds, and a red line when a carter waits exposed.
+The bottlenecks ARE the red lines. This, with the carter ribbons above,
+is Overlay A's first standing form.)*
 
 **The killer feature, and it must be one keystroke:**
 - Overlay A: what you are actually doing.

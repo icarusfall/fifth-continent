@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 import {
   BOUND_GUARDIAN_ALPHA,
   COMBAT_MAX_FRAMES,
+  DEBT_PER_GUARDIAN_FRAME,
   ENGINE_FIRE_HEAT,
   FACTION_ALPHA,
   FORT_ALPHA_PER_TIER,
@@ -71,7 +72,7 @@ describe('the two laws (§14.1)', () => {
     expect(log.playerWon).toBe(false);
     // A rout, not a massacre: the militia break with men still alive (§14.3).
     expect(log.survivors.defenders).toBeGreaterThan(0);
-    expect(log.frames.length).toBeLessThan(5);
+    expect(log.frames.length).toBeLessThan(25); // scaled with COMBAT_DT 0.05 → 0.01
   });
 
   it('prepared ground makes the attacker bleed for it, and helps the defender hold', () => {
@@ -116,7 +117,7 @@ describe('morale and rout (§14.3)', () => {
     );
     expect(log.outcome).toBe('attacker_rout');
     expect(log.playerWon).toBe(true);
-    expect(log.frames.length).toBeLessThan(12); // gone quickly
+    expect(log.frames.length).toBeLessThan(60); // gone quickly (COMBAT_DT-scaled)
   });
 
   it('Dragoons do not rout: they only ever leave the field annihilated', () => {
@@ -229,7 +230,10 @@ describe('consequences (§14.6)', () => {
       }),
     );
     expect(log.consequences.guardianActiveFrames).toBeGreaterThan(0);
-    expect(log.consequences.debt).toBe(log.consequences.guardianActiveFrames * 2);
+    expect(log.consequences.debt).toBeCloseTo(
+      log.consequences.guardianActiveFrames * DEBT_PER_GUARDIAN_FRAME,
+      8,
+    );
   });
 });
 

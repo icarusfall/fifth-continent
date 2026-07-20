@@ -76,6 +76,7 @@ import {
   drawRyne,
   drawSheep,
   drawShingle,
+  drawStockChip,
   drawTileHighlight,
   drawWoolMote,
 } from './sprites';
@@ -233,6 +234,36 @@ const WOOL_MOTE_MS = 1700;
 const COIN_MOTE_MS = 1300;
 const RYNE_CENTRE = { x: 28, y: 21 };
 
+// §20.2 — the goods overlay's short names: one small chip per place, so
+// "which goods are where" is read off the map, not hunted through popovers.
+const GOOD_SHORT: Record<Good, string> = {
+  fleece: 'wool',
+  jenever: 'jenever',
+  tea: 'tea',
+  'bulked-tea': 'bulked tea',
+  lace: 'lace',
+  'brandy-rough': 'rough brandy',
+  'brandy-fair': 'brandy',
+  'brandy-gent': 'gent’s brandy',
+};
+
+function stockRows(store: Partial<Record<Good, number>>): Array<{ text: string; color?: string }> {
+  return (Object.entries(store) as Array<[Good, number]>)
+    .filter(([, n]) => n > 0)
+    .map(([g, n]) => ({
+      text: `${n} ${GOOD_SHORT[g]}`,
+      color: CONTRABAND.includes(g) ? '#D9A6A0' : undefined, // contraband reads warm
+    }));
+}
+
+/** Units of a good held anywhere the player controls — stores and carts. */
+function heldAnywhere(state: GameState, good: Good): number {
+  let n = 0;
+  for (const k of Object.keys(state.stores)) n += state.stores[k]?.[good] ?? 0;
+  for (const c of state.carts) n += c.cargo[good] ?? 0;
+  return n;
+}
+
 function moteLife(m: Mote): number {
   return m.kind === 'wool' ? WOOL_MOTE_MS : COIN_MOTE_MS;
 }
@@ -302,6 +333,11 @@ export function GameMap({ state }: { state: GameState }) {
   const [showGossip, setShowGossip] = useState(false);
   const showGossipRef = useRef(false);
   showGossipRef.current = showGossip;
+  // The goods overlay (spec §20.2): stock chips at every place, on by default
+  // — once the hub splits the stores, "what is where" must be read at a glance.
+  const [showGoods, setShowGoods] = useState(true);
+  const showGoodsRef = useRef(true);
+  showGoodsRef.current = showGoods;
   const hoverTileRef = useRef<{ x: number; y: number } | null>(null);
   // Feedback motes (§20): spawned by state deltas below, drawn by the loop.
   const motesRef = useRef<Mote[]>([]);
@@ -444,6 +480,77 @@ export function GameMap({ state }: { state: GameState }) {
       const op = officerWorldPos(s);
       if (op) {
         drawOfficer(ctx, op.x, op.y, s.revenue.officer.location.kind === 'edge' ? op.angle : 0);
+      }
+
+      // The goods overlay (§20.2): a stock chip at every place that holds
+      // anything, and the town's remaining appetite — bottlenecks read red.
+      if (showGoodsRef.current) {
+        const farmStore = s.stores.farm ?? {};
+        const farmCount = cargoCount(farmStore);
+        const farmRows = stockRows(farmStore);
+        if (s.fleeceReady > 0 && (farmCount >= FARM_STORE_CAPACITY || farmRows.length > 0)) {
+          farmRows.push({
+            text: `+${s.fleeceReady} stuck on the sheep`,
+            color: farmCount >= FARM_STORE_CAPACITY ? '#E0837A' : undefined,
+          });
+        }
+        if (farmCount > 0 || farmRows.length > 0) {
+          const fcc = tileCenter(s.farm);
+          drawStockChip(
+            ctx,
+            fcc.x + 16,
+            fcc.y - 4,
+            {
+              text: `barn ${farmCount}/${FARM_STORE_CAPACITY}`,
+              color: FARM_STORE_CAPACITY - farmCount <= 4 ? '#E0837A' : '#CBBFA8',
+            },
+            farmRows,
+          );
+        }
+        if (s.cuttingHouse) {
+          const chStore = s.stores['cutting-house'] ?? {};
+          const chCount = cargoCount(chStore);
+          if (chCount > 0) {
+            const chc = tileCenter(s.cuttingHouse);
+            drawStockChip(
+              ctx,
+              chc.x + 16,
+              chc.y - 4,
+              {
+                text: `store ${chCount}/${CUTTING_HOUSE_STORE_CAPACITY}`,
+                color: CUTTING_HOUSE_STORE_CAPACITY - chCount <= 4 ? '#E0837A' : '#CBBFA8',
+              },
+              stockRows(chStore),
+            );
+          }
+        }
+        const shingleStore = s.stores.shingle ?? {};
+        if (cargoCount(shingleStore) > 0) {
+          const shc = tileCenter(SHINGLE);
+          drawStockChip(ctx, shc.x - 46, shc.y + 4, { text: 'open shingle — no cover', color: '#E0837A' }, stockRows(shingleStore));
+        }
+        // Ryne: what the town still buys today — wool through the book's
+        // allowance, contraband channels only for goods the player holds.
+        const rr: Array<{ text: string; color?: string }> = [];
+        const woolLeft = Math.min(
+          s.demandRemaining.fleece ?? 0,
+          Math.max(0, s.ledger.declaredYield - s.ledger.soldToday),
+        );
+        rr.push({ text: `${woolLeft} wool (the book)`, color: woolLeft === 0 ? '#E0837A' : undefined });
+        for (const g of CONTRABAND) {
+          if (g === 'jenever' || heldAnywhere(s, g) <= 0) continue;
+          const left = s.demandRemaining[g] ?? 0;
+          rr.push({ text: `${left} ${GOOD_SHORT[g]}`, color: left === 0 ? '#E0837A' : undefined });
+        }
+        if (
+          s.carts.some(
+            (c) => c.marketPatienceUntil !== undefined && c.location.kind === 'node' && c.location.nodeId === 'ryne',
+          )
+        ) {
+          rr.push({ text: 'a cart waits, exposed', color: '#E0837A' });
+        }
+        const ryc = tileCenter(RYNE_CENTRE);
+        drawStockChip(ctx, ryc.x + 14, ryc.y + 6, { text: 'Ryne buys today', color: '#CBBFA8' }, rr);
       }
 
       // Feedback motes (§20), on top of the world they comment on.
@@ -728,6 +835,17 @@ export function GameMap({ state }: { state: GameState }) {
           {showGossip ? 'gossip · on' : 'gossip'}
         </button>
       )}
+
+      <button
+        className={showGoods ? 'gossip-toggle goods on-goods' : 'gossip-toggle goods'}
+        title="What sits where, what the town still buys, and where the walls press — overlay A: what you are actually doing (§20.2)."
+        onClick={(e) => {
+          e.stopPropagation();
+          setShowGoods((v) => !v);
+        }}
+      >
+        {showGoods ? 'goods · on' : 'goods'}
+      </button>
 
       {!placing && !state.lost && (
         // Stop pointer events reaching the shell: otherwise its pointerdown

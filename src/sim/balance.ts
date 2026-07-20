@@ -267,10 +267,12 @@ export const FORT_VISIBILITY_HEAT = 1.3;
 // plays back the frame log. No dice here — combat is a pure function of the
 // setup and the player's Calls. Numbers are opening bids; §14 says tune here.
 
-/** Integration step for the Lanchester equations (§14.1). */
-export const COMBAT_DT = 0.05;
+/** Integration step for the Lanchester equations (§14.1). Tuned 0.05 → 0.01
+ *  (M5 hub polish, playtest): typical raids now resolve in §14's intended
+ *  30–50 frames instead of 3–7, so the watched battle has a story to tell. */
+export const COMBAT_DT = 0.01;
 /** Safety cap on sub-ticks; a real battle ends in rout or annihilation first. */
-export const COMBAT_MAX_FRAMES = 200;
+export const COMBAT_MAX_FRAMES = 600;
 /** Both sides start whole-hearted. */
 export const COMBAT_START_MORALE = 100;
 /**
@@ -316,6 +318,14 @@ export const LEADER_DOWN_MORALE = 25;
 export const LEADER_DOWN_THRESHOLD = 0.5;
 /** Below this many men a side is spent — annihilated (headcount is fractional). */
 export const COMBAT_MIN_STRENGTH = 0.5;
+/**
+ * §14.3 — the rout's toll: a side that *breaks* loses this fraction of its
+ * remaining men as it leaves the field — broken men are cut down running.
+ * A retreat sounded before morale collapses pays no toll; that is what the
+ * Call buys. (Without this, fine integration lets every morale-rout escape
+ * whole, and §14.6's economy goes silent.)
+ */
+export const ROUT_TOLL = 0.2;
 
 // The three Calls (spec §14.4).
 /** Fire the Engine: a one-shot spike added to the player's alpha for the rest. */
@@ -332,7 +342,9 @@ export const PAY_OFFABLE: readonly string[] = ['hawksmere', 'riding-officer'];
 export const STANDING_LOSS_PER_FRIENDLY_DEAD = 3;
 export const NATIONAL_HEAT_PER_REVENUE_DEAD = 40; // one dead officer > a year of running
 export const NATIONAL_HEAT_PER_DRAGOON_DEAD = 15; // they expect casualties; you exist
-export const DEBT_PER_GUARDIAN_FRAME = 2;
+/** Rescaled 2 → 0.4 with COMBAT_DT (0.05 → 0.01): the Guardian's price is
+ *  per unit of *fought time*, not per integration step. */
+export const DEBT_PER_GUARDIAN_FRAME = 0.4;
 /** The Revenue's own men, for the heat tally (§14.6). */
 export const REVENUE_FACTIONS: readonly string[] = ['riding-officer', 'water-guard'];
 

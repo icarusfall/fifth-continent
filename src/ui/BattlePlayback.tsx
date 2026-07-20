@@ -4,13 +4,15 @@
 // that genuinely happened.
 
 import { useEffect } from 'react';
+import type { CSSProperties } from 'react';
 import { canPayOff } from '../sim/combat';
 import { useGameStore } from '../state/store';
 
-// Every battle should take a watchable ~2–4s regardless of how many frames the
-// sim produced: a short rout plays slowly (the bars glide), a long grind fast.
-const BATTLE_TARGET_MS = 4000;
-const FRAME_MS_MIN = 100;
+// Every battle should take a watchable ~8–10s regardless of how many frames
+// the sim produced (playtest: fights ended before they could be felt): a
+// short rout plays slowly — the bars glide — and a long grind compresses.
+const BATTLE_TARGET_MS = 9000;
+const FRAME_MS_MIN = 60;
 const FRAME_MS_MAX = 800;
 
 const FACTION_COLOR: Record<string, string> = {
@@ -78,6 +80,7 @@ export function BattlePlayback() {
   if (!battle) return null;
   const { setup, log, frame, callsLeft } = battle;
   const f = log.frames[frame];
+  const prev = log.frames[Math.max(0, frame - 1)];
   const attFaction = setup.attacker.faction;
   const attStart = setup.attacker.strength + (setup.attacker.reserve ?? 0);
   const defStart = setup.defender.strength + (setup.defender.reserve ?? 0);
@@ -88,13 +91,35 @@ export function BattlePlayback() {
   const canRetreat = callsLeft > 0;
   const canPay = callsLeft > 0 && canPayOff(attFaction);
 
+  // The volley: musket flashes each frame, as many as the moment is bloody —
+  // positions pseudo-random from the frame index, so playback stays steady.
+  const lossRate = Math.max(0, prev.attackers - f.attackers) + Math.max(0, prev.defenders - f.defenders);
+  const flashes = Math.min(7, Math.ceil(lossRate * 6));
+
   return (
     <div className="event-scrim">
-      <div className="battle-card">
+      <div
+        className="battle-card"
+        style={{ '--frame-ms': `${Math.round(frameMs)}ms` } as CSSProperties}
+      >
         <h2>{battle.targetName} — the wall</h2>
         <p className="battle-law">
           Open ground · square law · numbers tell{dragoons ? ' · they do not rout' : ''}
         </p>
+
+        <div className="battle-field" key={frame}>
+          {Array.from({ length: flashes }, (_, i) => (
+            <span
+              key={i}
+              className="battle-flash"
+              style={{
+                left: `${(frame * 37 + i * 53) % 96}%`,
+                top: `${(frame * 19 + i * 29) % 80}%`,
+                animationDelay: `${((frame * 13 + i * 41) % 60) * 2}ms`,
+              }}
+            />
+          ))}
+        </div>
 
         <BattleRow
           label={FACTION_NAME[attFaction] ?? attFaction}
@@ -112,7 +137,10 @@ export function BattlePlayback() {
           max={max}
         />
 
-        <div className="battle-events">{events.join(' · ') || ' '}</div>
+        <div
+          className={events.length > 0 ? 'battle-events flash' : 'battle-events'}
+          key={`ev-${frame}`}
+        >{events.join(' · ') || ' '}</div>
 
         <div className="battle-calls">
           <span className="calls-left">
