@@ -30,6 +30,7 @@ import { simulateBattle } from './combat';
 import type { BattleSetup, CombatLog, Faction, ForceSpec, ScheduledCall } from './combat';
 import { nodeById } from './map';
 import { CONTRABAND, illicitCount, loseStanding } from './revenue';
+import { addDebt } from './wights';
 import type { GameState, NodeId, Store } from './types';
 
 const RAID_MUSTER_LEAD = RAID_MUSTER_LEAD_DAYS * TICKS_PER_DAY;
@@ -153,6 +154,7 @@ function applyRaidConsequences(state: GameState, target: NodeId, isFirst: boolea
   const c = log.consequences;
   loseStanding(state, c.standingLoss);
   state.heat.national += c.nationalHeat; // 0 against the Company, unless the engine fired
+  addDebt(state, c.debt); // §6.14 — wight-fog and the Guardian are priced in Debt
   applyGarrisonLosses(state, target, log.survivors.defenders);
   const name = nodeById(target, state.farm, state.cuttingHouse).name;
 

@@ -16,8 +16,12 @@ export const ROOF = '#A85D4A';
 export const REVENUE_BLUE = '#2E4A6B';
 export const HEAT_RED = '#C4453A';
 
-// Reserved. Do not use yet.
+// Unlocked in M5b: the wight entered the game (spec §6.14) — ichor green
+// leaves the reserve with its owner. It belongs to the marsh magic alone:
+// the sign, the stone, and the Debt.
 export const ICHOR_GREEN = '#6FBF8F';
+
+// Reserved. Do not use yet.
 export const PHLOGISTON_ORANGE = '#E09B3D';
 
 export const TERRAIN_FILL: Record<string, string> = {

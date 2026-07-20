@@ -963,10 +963,14 @@ trees read as three columns from the first time the panel opens.
 
 #### The wight — coerced, and the player goes looking
 
-The marsh notices being used. After NIGHT_MARSH_UNITS = 40 unit-tiles of goods
-have crossed marsh at night, a **wight-sign** appears on the deep-marsh tile
-nearest the most-used night crossing (event card). Trapping it is a deliberate
-verb:
+The marsh notices being used. After NIGHT_MARSH_UNITS = 1000 unit-tiles of
+goods have crossed marsh at night (retuned from the 40 opening bid when the
+tile arithmetic was done at M5b build: one full 8-load night run over the
+marsh track is ~216 unit-tiles, so 1000 ≈ five laden night runs — the wight
+is §10's rung six and follows an *established* trade, well clear of the
+Dutchman-ladder cards of the opening), a **wight-sign** appears on the
+deep-marsh tile nearest the most-used night crossing (event card; the
+crossing tally is kept per edge). Trapping it is a deliberate verb:
 
 ```
 trap = WIGHT_TRAP_IRON 20 coin (iron & salt) + bait sheep staked overnight
@@ -1049,7 +1053,12 @@ cooldown — all JSON-plain.
   proof), difficulty dial + mercy (§6.15) retrofit over rent/heat/raids, the
   shearer and the flock market (§6.16). Sim + 200-game distribution test.
 - **M5b — the wight.** Sign, trap, the three marsh tiers, Debt, tribute,
-  collection. Sim + test.
+  collection. Sim + test. **BUILT** (2026-07: NIGHT_MARSH_UNITS retuned to
+  1000 unit-tiles ≈ five laden night runs; the hollow way charges every
+  crossing, laden or empty — the way itself is the favour; collection
+  respects §6.15's crisis spacing, deferring, never forgiving; the stone is
+  fixed where the first binding was made and is a map site with no edges —
+  the Revenue cannot reach what it cannot know).
 - **M5c — Leiden.** Arrival, the workshop, Publication and the floor, the
   three tiers, the telegraph UI.
 

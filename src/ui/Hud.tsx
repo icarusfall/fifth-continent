@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import {
+  BINDING_CAPACITY,
   DIFFICULTY_ORDER,
   DRAGOON_HEAT,
   FLOCK_CAP,
@@ -20,7 +21,7 @@ import {
 } from '../sim/time';
 import type { GameState } from '../sim/types';
 import { useGameStore } from '../state/store';
-import { DYKE, HEAT_RED, LIMEWASH, REVENUE_BLUE, ROOF, SEA } from './palette';
+import { DYKE, HEAT_RED, ICHOR_GREEN, LIMEWASH, REVENUE_BLUE, ROOF, SEA } from './palette';
 
 import { spanOf } from './format';
 
@@ -220,6 +221,38 @@ export function Hud({ state }: { state: GameState }) {
 
       {(state.heat.regional >= 0.5 || state.revenue.officer.arrived) && (
         <HeatGauges state={state} day={clock.day} />
+      )}
+
+      {(state.boundWights > 0 || state.debt > 0) && (
+        <div className="hud-block">
+          <span className="hud-label" style={{ color: ICHOR_GREEN }}>
+            Debt
+          </span>
+          <div
+            className="heat-gauge"
+            title={`The marsh's account: ${Math.ceil(state.debt)} owed against ${
+              state.boundWights * BINDING_CAPACITY
+            } the bound will carry. It never decays. Let it outrun the bound and they collect — in people.`}
+          >
+            <div
+              className={
+                state.debt > state.boundWights * BINDING_CAPACITY
+                  ? 'heat-fill heat-boil'
+                  : 'heat-fill'
+              }
+              style={{
+                width: `${Math.min(1, state.debt / Math.max(state.boundWights * BINDING_CAPACITY, 1)) * 100}%`,
+                background: ICHOR_GREEN,
+              }}
+            />
+          </div>
+          <span className="hud-note">
+            {state.boundWights} bound
+            {state.collection !== null
+              ? ` · they collect in ${state.collection.graceDawnsLeft} dawn${state.collection.graceDawnsLeft === 1 ? '' : 's'}`
+              : ''}
+          </span>
+        </div>
       )}
     </div>
   );

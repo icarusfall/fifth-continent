@@ -41,6 +41,9 @@ import {
   SHEEP_PRICE_BUY,
   SHEEP_PRICE_SELL,
   TICKS_PER_DAY,
+  TRIBUTE_RELIEF,
+  WIGHT_TRAP_IRON,
+  BINDING_CAPACITY,
   WOOL_PRICE_DOMESTIC,
 } from '../sim/balance';
 import {
@@ -56,6 +59,7 @@ import {
 } from '../sim/map';
 import { dayPhaseOf, isFlooded, ticksUntilTideTurn } from '../sim/time';
 import { carterWageOf } from '../sim/tick';
+import { HEAT_RED } from './palette';
 import { CONTRABAND, coverOf, fortVisibility, illicitAnywhere, illicitCount } from '../sim/revenue';
 import { GOOD_LABEL, spanOf, storeSummary } from './format';
 import type { Action, Cart, CutDepth, EdgeId, GameState, Good, NodeId } from '../sim/types';
@@ -82,6 +86,8 @@ import {
   drawShingle,
   drawStockChip,
   drawTileHighlight,
+  drawWightSign,
+  drawWightStone,
   drawWoolMote,
 } from './sprites';
 
@@ -91,6 +97,8 @@ type Selection =
   | 'customs'
   | 'shingle'
   | 'cutting-house'
+  | 'wight-sign'
+  | 'wight-stone'
   | 'officer'
   | `cart:${string}`
   | null;
@@ -328,6 +336,10 @@ function anchorWorld(sel: Selection, state: GameState): { x: number; y: number }
       return tileCenter(SHINGLE);
     case 'cutting-house':
       return state.cuttingHouse ? tileCenter(state.cuttingHouse) : null;
+    case 'wight-sign':
+      return state.wights.sign ? tileCenter(state.wights.sign) : null;
+    case 'wight-stone':
+      return state.wights.stone ? tileCenter(state.wights.stone) : null;
     case 'officer':
       return officerWorldPos(state);
     default:
@@ -473,6 +485,15 @@ export function GameMap({ state }: { state: GameState }) {
         }
         const cc = tileCenter(s.cuttingHouse);
         drawLabel(ctx, 'Cutting House', cc.x, cc.y - 12);
+      }
+
+      // §6.14 — the marsh's own marks: the sign, and the stone once bound.
+      const wightPhase = (performance.now() / 2600) % 1;
+      if (s.wights.sign) drawWightSign(ctx, s.wights.sign, wightPhase);
+      if (s.wights.stone) {
+        drawWightStone(ctx, s.wights.stone, wightPhase);
+        const wc = tileCenter(s.wights.stone);
+        drawLabel(ctx, 'The Wight-Stone', wc.x, wc.y - 16);
       }
 
       // Gossip stains (spec §6.10): where the parish thinks the Revenue looks.
@@ -739,6 +760,14 @@ export function GameMap({ state }: { state: GameState }) {
       const hc = tileCenter(s.cuttingHouse);
       targets.push({ sel: 'cutting-house', x: hc.x, y: hc.y, r: 18 });
     }
+    if (s.wights.sign) {
+      const wc = tileCenter(s.wights.sign);
+      targets.push({ sel: 'wight-sign', x: wc.x, y: wc.y, r: 16 });
+    }
+    if (s.wights.stone) {
+      const wc = tileCenter(s.wights.stone);
+      targets.push({ sel: 'wight-stone', x: wc.x, y: wc.y, r: 16 });
+    }
 
     let best: { sel: Selection; d: number } | null = null;
     for (const t of targets) {
@@ -775,6 +804,8 @@ export function GameMap({ state }: { state: GameState }) {
   ];
   if (state.dutchman.unlocked) places.push({ sel: 'shingle', label: 'The Shingle' });
   if (state.cuttingHouse) places.push({ sel: 'cutting-house', label: 'Cutting House' });
+  if (state.wights.sign) places.push({ sel: 'wight-sign', label: 'A Ring of Stones' });
+  if (state.wights.stone) places.push({ sel: 'wight-stone', label: 'The Wight-Stone' });
 
   return (
     <div
@@ -933,6 +964,8 @@ export function GameMap({ state }: { state: GameState }) {
               <ShingleMenu state={state} onPlace={() => setPlacing(true)} />
             )}
             {selected === 'cutting-house' && <CuttingHouseMenu state={state} />}
+            {selected === 'wight-sign' && <SignMenu state={state} />}
+            {selected === 'wight-stone' && <StoneMenu state={state} />}
             {selected === 'officer' && <OfficerMenu state={state} />}
             {selected?.startsWith('cart:') && (
               <CartMenu state={state} flooded={flooded} cartId={selected.slice(5)} />
@@ -942,6 +975,175 @@ export function GameMap({ state }: { state: GameState }) {
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * §6.14 — the wight-sign: a ring of stones, and the trap as a deliberate
+ * verb. Iron and salt in coin; the bait in sheep, rising with each binding.
+ */
+function SignMenu({ state }: { state: GameState }) {
+  const enqueue = useEnqueue();
+  const bait = state.boundWights + 1;
+  const trapped = state.wights.trap !== null;
+  return (
+    <>
+      <h4>A Ring of White Stones</h4>
+      <p className="flavour">
+        The grass inside lies drowned, and the sheep will not graze within a chain of it. The old
+        people call it a wight-sign, and know better than to want one.
+      </p>
+      {trapped ? (
+        <p className="flavour">
+          The trap is staked: iron, salt, and {state.wights.trap!.bait} sheep hobbled in the ring.
+          You do not stay to watch. Dawn will tell.
+        </p>
+      ) : (
+        <div className="menu-buttons">
+          <button
+            disabled={state.coin < WIGHT_TRAP_IRON || state.flockSize < bait}
+            title={
+              state.coin < WIGHT_TRAP_IRON
+                ? `Iron and salt run ${WIGHT_TRAP_IRON} coin, and the till is short.`
+                : state.flockSize < bait
+                  ? `The trap wants ${bait} sheep staked as bait, and the flock cannot spare them.`
+                  : 'At dawn the wight is bound. No roll, no maybe — the marsh keeps bargains it did not offer.'
+            }
+            onClick={() => enqueue({ type: 'trapWight' })}
+          >
+            Stake the trap · {WIGHT_TRAP_IRON} coin of iron & salt · {bait} sheep as bait
+          </button>
+        </div>
+      )}
+      <p className="flavour">
+        Or leave it be. The ring does not fade, and the marsh does not forget being used either
+        way.
+      </p>
+    </>
+  );
+}
+
+/** §6.14 — marsh research, named for the stone's menu. */
+const MARSH_TIERS: ReadonlyArray<{ name: string; effect: string; price: string }> = [
+  {
+    name: 'Marsh-lantern haulers',
+    effect: 'night moves read a tenth as loud',
+    price: '+1 Debt each laden night run',
+  },
+  {
+    name: 'Wight-fog',
+    effect: 'a Call in battle: the raiders fight half-blind',
+    price: '+8 Debt each fog',
+  },
+  {
+    name: 'The Hollow Way',
+    effect: 'one marsh track leaves the world’s knowing',
+    price: '+1 Debt each crossing, laden or empty',
+  },
+];
+
+/**
+ * §6.14 — the wight-stone: the account read plainly, tribute paid in sheep,
+ * and the marsh tree researched where its teacher leans.
+ */
+function StoneMenu({ state }: { state: GameState }) {
+  const enqueue = useEnqueue();
+  const bindings = state.boundWights * BINDING_CAPACITY;
+  const over = state.debt > bindings;
+  const r = state.research;
+  const tier = r.completed.marsh;
+  const cost = RESEARCH_COST.marsh[tier];
+  return (
+    <>
+      <h4>The Wight-Stone</h4>
+      <p className="flavour" style={{ color: over ? HEAT_RED : undefined }}>
+        The account: <strong>{Math.ceil(state.debt)}</strong> owed against{' '}
+        <strong>{bindings}</strong> the bound will carry ({state.boundWights} wight
+        {state.boundWights === 1 ? '' : 's'} bound).
+        {over
+          ? ' The Debt outruns the bound. They are patient for three dawns, and then they are not.'
+          : ' It never decays. Nothing about it decays.'}
+      </p>
+      <StoreFill count={Math.min(Math.ceil(state.debt), Math.max(bindings, 1))} cap={Math.max(bindings, 1)} />
+      <div className="menu-buttons">
+        <button
+          disabled={state.flockSize < 1 || state.debt <= 0}
+          title={
+            state.debt <= 0
+              ? 'The account stands at nothing.'
+              : state.flockSize < 1
+                ? 'The tribute is a sheep, and there are none to give.'
+                : 'Hobbled at the stone tonight; gone by morning. It is always gone by morning.'
+          }
+          onClick={() => enqueue({ type: 'payTribute' })}
+        >
+          Leave a sheep in tribute · forgives {TRIBUTE_RELIEF}
+        </button>
+      </div>
+
+      <h5>what the stone teaches</h5>
+      {r.active?.tree === 'marsh' ? (
+        <p className="flavour">
+          The teaching is under way. Done in about{' '}
+          {Math.max(1, Math.ceil((r.active.doneTick - state.tick) / TICKS_PER_DAY))} day
+          {Math.ceil((r.active.doneTick - state.tick) / TICKS_PER_DAY) === 1 ? '' : 's'}.
+        </p>
+      ) : tier >= MARSH_TIERS.length ? (
+        <p className="flavour">The stone has taught all it will — for now.</p>
+      ) : (
+        <div className="menu-buttons">
+          <button
+            disabled={r.active !== null || state.coin < cost}
+            title={
+              r.active !== null
+                ? 'The bench holds one project at a time.'
+                : state.coin < cost
+                  ? `The work wants ${cost} coin up front, and the till is short.`
+                  : `${MARSH_TIERS[tier].effect} — ${MARSH_TIERS[tier].price}. Coin is the least of what this costs.`
+            }
+            onClick={() => enqueue({ type: 'startResearch', tree: 'marsh' })}
+          >
+            Learn: {MARSH_TIERS[tier].name} · {cost} coin · {RESEARCH_DAYS.marsh[tier]} days
+          </button>
+        </div>
+      )}
+      {tier >= 1 && (
+        <p className="flavour">
+          Learned:{' '}
+          {MARSH_TIERS.slice(0, tier)
+            .map((t) => t.name)
+            .join(' · ')}
+          .
+        </p>
+      )}
+      {tier >= 3 && state.wights.hollowWay === null && (
+        <>
+          <h5>the way that is not there</h5>
+          <div className="menu-buttons">
+            {edgesFor(state.farm, state.cuttingHouse)
+              .filter((e) => e.id === 'marsh-track' || e.id.startsWith('cut-'))
+              .map((e) => (
+                <button
+                  key={e.id}
+                  title="Exposure nothing; the blue coat never sees it; every laden crossing owes a favour."
+                  onClick={() => enqueue({ type: 'designateHollowWay', edgeId: e.id })}
+                >
+                  Open the hollow way through {e.name.toLowerCase()}
+                </button>
+              ))}
+          </div>
+        </>
+      )}
+      {state.wights.hollowWay !== null && (
+        <p className="flavour">
+          The hollow way runs where{' '}
+          {edgesFor(state.farm, state.cuttingHouse)
+            .find((e) => e.id === state.wights.hollowWay)
+            ?.name.toLowerCase() ?? 'a track'}{' '}
+          used to. Nobody watches it, and it is never free.
+        </p>
+      )}
+    </>
   );
 }
 

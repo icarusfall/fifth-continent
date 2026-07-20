@@ -401,6 +401,37 @@ export const FLOCK_CAP = 24; // Walland's pasture holds what it holds (dykes rai
  *  dawn on or after this day: before the first rent, as the carter comes into view. */
 export const FLOCK_SPOTLIGHT_DAY = 4;
 
+// ---- M5b: the wight (spec §6.14) ----
+// The marsh notices being used. Unit-tiles of goods crossing marsh at night
+// before the first sign; ~216 per full 8-load marsh-track run, so 1000 ≈
+// five laden night runs — the wight follows an *established* trade (§10).
+export const NIGHT_MARSH_UNITS = 1000;
+/** Days between signs, while marsh powers see use and no sign stands. */
+export const SIGN_RECURRENCE_DAYS = 8;
+/** Iron & salt for the trap, coin. The bait is sheep: 1 + boundWights each. */
+export const WIGHT_TRAP_IRON = 20;
+/** Debt a single bound wight can carry before the account is breached. */
+export const BINDING_CAPACITY = 60;
+/** Debt one sheep, given at the stone, forgives. They take no coin, ever. */
+export const TRIBUTE_RELIEF = 12;
+/** Dawns of grace after a breach: tribute down, bind another, or they collect. */
+export const COLLECTION_GRACE_DAYS = 3;
+/** Debt one taken person forgives. Collection is not a combat (§9). */
+export const PERSON_DEBT = 40;
+
+// The three marsh tiers (§6.14) — power priced in Debt, per use.
+/** Marsh 1 — night moves over marsh read a tenth as loud… */
+export const MARSH_LANTERN_EXPOSURE_MULT = 0.1;
+/** …and each laden night run owes the marsh one. */
+export const MARSH_LANTERN_DEBT = 1;
+/** Marsh 2 — Wight-fog, a Call: the raiders fight half-blind that battle… */
+export const WIGHT_FOG_ALPHA_MULT = 0.5;
+/** …at eight Debt the invocation. */
+export const WIGHT_FOG_DEBT = 8;
+/** Marsh 3 — every crossing of the hollow way owes one, laden or empty:
+ *  the way itself is the favour, whatever you carry. */
+export const HOLLOW_WAY_DEBT = 1;
+
 // ---- M5a: the research bench (spec §6.14) ----
 // Coin is nominal everywhere in research — the real price is always a meter
 // (Debt, the Heat floor, Standing). Trade costs only coin: safe, and weak.

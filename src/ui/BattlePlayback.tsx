@@ -36,6 +36,7 @@ const EVENT_TEXT: Record<string, string> = {
   rout: 'They break',
   reserve_committed: 'The reserve is in',
   engine_fired: 'The engine roars',
+  fog_called: 'The fog comes up off the dykes',
 };
 
 interface RowProps {
@@ -67,6 +68,7 @@ function BattleRow({ label, count, morale, color, max, fog }: RowProps) {
 export function BattlePlayback() {
   const battle = useGameStore((s) => s.battle);
   const soundCall = useGameStore((s) => s.soundCall);
+  const marshTier = useGameStore((s) => s.state.research.completed.marsh);
   const active = battle !== null;
   const frameCount = battle?.log.frames.length ?? 1;
   const frameMs = Math.max(FRAME_MS_MIN, Math.min(FRAME_MS_MAX, BATTLE_TARGET_MS / frameCount));
@@ -151,6 +153,17 @@ export function BattlePlayback() {
           </button>
           <button disabled title="No engine — that is Leiden's work">
             Fire the engine
+          </button>
+          <button
+            disabled={!(marshTier >= 2 && callsLeft > 0 && !battle.calls.some((c) => c.call === 'wightFog'))}
+            title={
+              marshTier >= 2
+                ? 'The raiders fight half-blind for the rest of it — 8 Debt, owed to the stone.'
+                : 'The stone has not taught the fog.'
+            }
+            onClick={() => soundCall('wightFog')}
+          >
+            Call the wight-fog
           </button>
           <button disabled={!canRetreat} onClick={() => soundCall('soundRetreat')}>
             Sound the retreat

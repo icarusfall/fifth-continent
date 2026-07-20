@@ -12,6 +12,8 @@ import {
   COMBAT_MAX_FRAMES,
   COMBAT_MIN_STRENGTH,
   ROUT_TOLL,
+  WIGHT_FOG_ALPHA_MULT,
+  WIGHT_FOG_DEBT,
   COMBAT_START_MORALE,
   DEBT_PER_GUARDIAN_FRAME,
   ENGINE_FIRE_HEAT,
@@ -66,6 +68,7 @@ export interface ForceSpec {
 export type Call =
   | 'commitReserve' // held-back men enter now; timing is everything
   | 'fireEngine' // one-shot Sluice-Cannon / Guardian: an alpha spike, at a price
+  | 'wightFog' // §6.14 Marsh 2: the raiders fight half-blind, at 8 Debt
   | 'soundRetreat' // rout voluntarily, before morale collapses; your people live
   | 'payOff'; // coin to end it — works on the Company and Officers, no one else
 
@@ -93,6 +96,7 @@ export interface BattleSetup {
 export type CombatEventKind =
   | 'volley'
   | 'engine_fired'
+  | 'fog_called'
   | 'leader_down'
   | 'rout'
   | 'reserve_committed';
@@ -208,6 +212,7 @@ export function simulateBattle(setup: BattleSetup): CombatLog {
   const frames: CombatFrame[] = [];
   let guardianActiveFrames = 0;
   let engineFired = false;
+  let fogCalled = false;
   let payOffCost = 0;
   let outcome: CombatOutcome | null = null;
 
@@ -227,6 +232,12 @@ export function simulateBattle(setup: BattleSetup): CombatLog {
         player.alpha += ENGINE_SPIKE_ALPHA;
         engineFired = true;
         events.push({ kind: 'engine_fired', side: sideOf(player) });
+      } else if (c.call === 'wightFog' && !fogCalled) {
+        // §6.14 Marsh 2 — the fog comes up off the dykes: the raiders swing
+        // at shapes for the rest of the battle. Priced in Debt, not coin.
+        enemy.alpha *= WIGHT_FOG_ALPHA_MULT;
+        fogCalled = true;
+        events.push({ kind: 'fog_called', side: sideOf(player) });
       } else if (c.call === 'soundRetreat') {
         player.routed = true; // walk off the field with your people alive
         events.push({ kind: 'rout', side: sideOf(player) });
@@ -320,7 +331,7 @@ export function simulateBattle(setup: BattleSetup): CombatLog {
     law: setup.law,
     fogged: setup.fog ?? false,
     playerWon,
-    consequences: tally(att, def, player, guardianActiveFrames, engineFired, payOffCost),
+    consequences: tally(att, def, player, guardianActiveFrames, engineFired, fogCalled, payOffCost),
   };
 }
 
@@ -383,6 +394,7 @@ function tally(
   player: SideRuntime,
   guardianActiveFrames: number,
   engineFired: boolean,
+  fogCalled: boolean,
   payOffCost: number,
 ): CombatConsequences {
   const enemy = player === att ? def : att;
@@ -396,7 +408,7 @@ function tally(
     revenueDead * NATIONAL_HEAT_PER_REVENUE_DEAD +
     dragoonDead * NATIONAL_HEAT_PER_DRAGOON_DEAD +
     (engineFired ? ENGINE_FIRE_HEAT : 0);
-  const debt = guardianActiveFrames * DEBT_PER_GUARDIAN_FRAME;
+  const debt = guardianActiveFrames * DEBT_PER_GUARDIAN_FRAME + (fogCalled ? WIGHT_FOG_DEBT : 0);
 
   return {
     friendlyDead,

@@ -27,6 +27,8 @@ import {
   CARTER_MARKET_PATIENCE_DAYS,
   DUTCHMAN_TRUST_JENEVER,
   DUTCHMAN_TRUST_TEA,
+  HOLLOW_WAY_DEBT,
+  MARSH_LANTERN_DEBT,
   SHEEP_PRICE_BUY,
   SHEEP_PRICE_SELL,
   FARM_STORE_CAPACITY,
@@ -67,6 +69,7 @@ import {
 import { FARM_SITE, edgeById, edgesFor, firstHop, isPlaceable, nodeById, otherEnd } from './map';
 import {
   CONTRABAND,
+  illicitCount,
   accrueDitchHeat,
   accrueMarketTattle,
   accrueRouteHeat,
@@ -76,6 +79,7 @@ import {
   officerTick,
 } from './revenue';
 import { raidTick, resolveRaid } from './raid';
+import { accrueNightMarsh, addDebt, applyPayTribute, applyTrapWight, wightsAtDawn } from './wights';
 import { seedRng } from './rng';
 import { clockOf, dayPhaseOf, isFlooded, tideIsRising } from './time';
 import type {
@@ -166,6 +170,20 @@ export function initialState(seed: number, difficulty: Difficulty = 'fair'): Gam
     distraintSheep: 0,
     hawksmere: { provoked: false, raidsSurvived: 0, nextRaidTick: 0 },
     raid: null,
+    debt: 0,
+    boundWights: 0,
+    wights: {
+      nightUnits: 0,
+      nightUnitsByEdge: {},
+      sign: null,
+      trap: null,
+      stone: null,
+      lastSignDay: -1,
+      hollowWay: null,
+    },
+    collection: null,
+    peopleCollected: 0,
+    lastCollected: null,
     carts: [
       {
         id: 'cart-1',
@@ -1059,7 +1077,7 @@ function applyAction(state: GameState, action: Action): void {
         logEvent(state, 'The bench holds one project at a time.');
         return;
       }
-      if (action.tree === 'marsh') {
+      if (action.tree === 'marsh' && state.boundWights < 1) {
         logEvent(state, 'No wight is bound. The marsh does not teach the unbound.');
         return;
       }
@@ -1086,6 +1104,39 @@ function applyAction(state: GameState, action: Action): void {
       logEvent(
         state,
         `The wheelwright takes ${cost} coin and your cart, and asks no questions about the floor.`,
+      );
+      return;
+    }
+
+    case 'trapWight': {
+      applyTrapWight(state);
+      return;
+    }
+
+    case 'payTribute': {
+      applyPayTribute(state);
+      return;
+    }
+
+    case 'designateHollowWay': {
+      // §6.14 Marsh 3 — one marsh edge that is not there. Named once.
+      if (state.research.completed.marsh < 3) {
+        logEvent(state, 'The marsh has not yet taught you the way that is not there.');
+        return;
+      }
+      if (state.wights.hollowWay !== null) {
+        logEvent(state, 'One hollow way is all the marsh will open. It is chosen.');
+        return;
+      }
+      const edge = edgesFor(state.farm, state.cuttingHouse).find((e) => e.id === action.edgeId);
+      if (!edge || !(edge.id === 'marsh-track' || edge.id.startsWith('cut-'))) {
+        logEvent(state, 'The hollow way must run through marsh. Roads are the Crown’s.');
+        return;
+      }
+      state.wights.hollowWay = edge.id;
+      logEvent(
+        state,
+        `${edge.name} sinks from the world’s knowing. Carts still cross; nobody watches; every crossing is a favour owed.`,
       );
       return;
     }
@@ -1211,6 +1262,13 @@ function researchProgress(state: GameState): void {
       state,
       'The carts come back with hollow floors. Four tubs ride under the boards now, and the road reads quieter.',
     );
+  } else if (active.tree === 'marsh') {
+    const marshDone = [
+      'The stone teaches the lantern-word. Night carts over the marsh read a tenth as loud — and every run owes the marsh one.',
+      'The stone teaches the fog. In a fight, one Call and the raiders swing at shapes — eight owed, each time.',
+      'The stone teaches the way that is not there. Choose the track at the stone; nobody will ever watch it, and it is never free.',
+    ];
+    logEvent(state, marshDone[state.research.completed.marsh - 1] ?? 'The stone falls silent.');
   } else {
     logEvent(state, 'The bench clears: the work is done.');
   }
@@ -1613,7 +1671,22 @@ function moveCarts(state: GameState): void {
 
     cart.location.progress += 1;
     accrueRouteHeat(state, cart, edge); // §6.2, consumed at last
+    accrueNightMarsh(state, cart, edge); // §6.14 — the marsh notices, too
     if (cart.location.progress >= edge.latency) {
+      // §6.14 — marsh power is priced per use, charged as the run completes.
+      // The hollow way charges EVERY crossing, laden or empty — the way
+      // itself is the favour, whatever you carry. The lanterns charge each
+      // illicit night run they quieten.
+      if (state.wights.hollowWay === edge.id) {
+        addDebt(state, HOLLOW_WAY_DEBT);
+      } else if (
+        illicitCount(cart.cargo) > 0 &&
+        state.research.completed.marsh >= 1 &&
+        (edge.id === 'marsh-track' || edge.id.startsWith('cut-')) &&
+        dayPhaseOf(state.tick) === 'night'
+      ) {
+        addDebt(state, MARSH_LANTERN_DEBT);
+      }
       const arrived = cart.location.to;
       cart.location = { kind: 'node', nodeId: arrived };
       logEvent(
@@ -1645,6 +1718,7 @@ export function tick(state: GameState, actions: Action[]): GameState {
   recoverStandingAtDawn(next);
   markRentDue(next);
   if (isDawn(next.tick)) dawnRevenue(next);
+  if (isDawn(next.tick)) wightsAtDawn(next);
   dutchmanTide(next);
   runCarters(next);
   moveCarts(next);

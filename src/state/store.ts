@@ -5,9 +5,12 @@
 
 import { create } from 'zustand';
 import {
+  BINDING_CAPACITY,
   CART_CAPACITY,
   CART_COST,
+  COLLECTION_GRACE_DAYS,
   FLOCK_CAP,
+  PERSON_DEBT,
   FLOCK_SPOTLIGHT_DAY,
   MAX_CARTS,
   MILESTONE_CARD_SPACING_DAYS,
@@ -47,7 +50,9 @@ import type { Action, ActionLog, Difficulty, GameState, NodeId } from '../sim/ty
 //      and the trust ladder that opens his hold one good at a time (§6.9).
 // v17: ledger.penTaken — the books follow the flock until the player takes
 //      the pen; honest play needs no bookkeeping at all (§6.10).
-const SAVE_KEY = 'fifth-continent-save-v17';
+// v18: M5b — debt, boundWights, the wights record (sign/trap/stone/hollow
+//      way), collection, peopleCollected/lastCollected (§6.14).
+const SAVE_KEY = 'fifth-continent-save-v18';
 const AUTOSAVE_EVERY_TICKS = 30;
 const AUTOPAY_KEY = 'fifth-continent-autopay-rent'; // a UI preference, not game state
 
@@ -144,6 +149,36 @@ function rentCard(next: GameState): EventCard {
       ? `The agent is at the door for his ${due} coin, and the purse holds it.`
       : `The agent wants ${due} coin; the purse holds ${next.coin}. Short by ${short} — his men will drive off ${Math.ceil(short / SHEEP_VALUE)} sheep for the rest.`;
   return { id: `rent-${next.rentDueTick}`, kind: 'rent', title: 'Rent day', body };
+}
+
+/** §6.14 — a wight-sign stands on the marsh: pause, and point at it. */
+function signCard(next: GameState): EventCard {
+  return {
+    id: `sign-${next.tick}`,
+    kind: 'info',
+    title: 'A ring of white stones',
+    body: 'Something has been at the sheep-walks in the night: a ring of white stones on the deep marsh, the grass inside it drowned. The old people call it a wight-sign, and they do not walk past it after dark. Iron, salt, and staked sheep would trap what made it — if you want what it can do.',
+  };
+}
+
+/** §6.14 — the breach: the account outruns the bound, and the grace begins. */
+function breachCard(next: GameState): EventCard {
+  return {
+    id: `breach-${next.tick}`,
+    kind: 'info',
+    title: 'The stones have moved',
+    body: `The Debt outruns what the bound will carry, and the drowned grass lies nearer the yard each morning. ${COLLECTION_GRACE_DAYS} dawns: tribute sheep down at the stone, or bind another wight — or they will collect, and what they take is people.`,
+  };
+}
+
+/** §6.14 — collected: a person is gone at dawn. No combat, no body, no argument. */
+function collectedCard(next: GameState): EventCard {
+  return {
+    id: `collected-${next.tick}`,
+    kind: 'info',
+    title: 'Collected',
+    body: `At dawn they have taken ${next.lastCollected ?? 'someone'}. Nobody saw anything, and nobody will speak of it — the parish knows what a drowned path means. The account is ${PERSON_DEBT} lighter, and it was not worth it.`,
+  };
 }
 
 /** §6.10 — the officer took goods: pause, and say what the cover could not hide. */
@@ -357,6 +392,14 @@ const MILESTONES: Milestone[] = [
     body: 'You are holding overproof jenever, and no honest buyer will touch a drop. Raise a cutting house on the marsh: cut it with water and burnt sugar and it sells in Ryne as brandy.',
   },
   {
+    // §6.14 (M5b) — the first binding: the stone, the account, and the rules
+    // of both, taught once at the moment they begin to exist.
+    key: 'first-binding',
+    when: (s) => s.boundWights >= 1,
+    title: 'The wight is bound',
+    body: `Where the sign was, a stone now leans — and the marsh will work for you, at a price kept in an account that never closes. Each bound wight carries ${BINDING_CAPACITY} of Debt; let the Debt outrun the bound and they collect, and what they take is people. Sheep left at the stone lighten it. Iron, salt, and the stone's own teaching wait there too.`,
+  },
+  {
     // §6.9 (M5 tutorial pass) — the fast lane, made findable: the six slow
     // days hold a thread to pull, but only if the player knows the room.
     key: 'alehouse-talks',
@@ -568,6 +611,13 @@ function loadSave(): SaveFile | null {
     )
       return null;
     if (typeof parsed.state.ledger?.penTaken !== 'boolean') return null;
+    if (
+      typeof parsed.state.debt !== 'number' ||
+      typeof parsed.state.boundWights !== 'number' ||
+      typeof parsed.state.wights?.nightUnits !== 'number' ||
+      typeof parsed.state.peopleCollected !== 'number'
+    )
+      return null;
     return parsed;
   } catch {
     return null;
@@ -627,6 +677,11 @@ export const useGameStore = create<GameStore>()((set, get) => {
       // distraint, and goods taken by the officer's hand.
       const justDistrained = next.distraintSheep > state.distraintSheep;
       const justSeized = next.goodsSeized > state.goodsSeized;
+      // §6.14 — the wights' beats: a sign standing, a breach opening, a
+      // person taken. (Loss itself is the forfeit overlay's business.)
+      const signAppeared = next.wights.sign !== null && state.wights.sign === null;
+      const breachStarted = next.collection !== null && state.collection === null;
+      const justCollected = next.peopleCollected > state.peopleCollected && !next.lost;
       // §6.9 (M5a-4): a round was stood and a rumour heard. The last rumour
       // unlocks the Dutchman, and its own milestone card owns that moment —
       // so the round card yields to it (the !unlocked guard below).
@@ -640,10 +695,16 @@ export const useGameStore = create<GameStore>()((set, get) => {
         card = vouchCard(next);
       } else if (justDistrained) {
         card = distraintCard(next, next.distraintSheep - state.distraintSheep);
+      } else if (justCollected) {
+        card = collectedCard(next);
+      } else if (breachStarted) {
+        card = breachCard(next);
       } else if (battlePending) {
         card = raidCard(next);
       } else if (musterGathered) {
         card = musterCard(next);
+      } else if (signAppeared) {
+        card = signCard(next);
       } else if (justSeized) {
         card = seizureCard(next, next.goodsSeized - state.goodsSeized);
       } else if (roundStood && !next.dutchman.unlocked) {

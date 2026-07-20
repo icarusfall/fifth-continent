@@ -6,7 +6,28 @@ A single-player, browser-based god/builder game about smuggling, logistics, and
 the two kinds of magic you can use to hide a crime. Design spec and build brief:
 [the-fifth-continent-spec.md](./the-fifth-continent-spec.md).
 
-## Status: M5 — the cutting house as a working hub ✅ (awaiting review)
+## Status: M5b — the wight ✅ (awaiting review)
+
+**M5b (spec §6.14):** the marsh notices being used. After enough goods cross
+the marsh at night a wight-sign appears near the most-used crossing — a ring
+of white stones, the grass inside drowned. Trapping it (iron & salt, plus
+staked sheep whose count rises with each binding) binds a wight at dawn,
+deterministically; the first binding raises the wight-stone, where marsh
+research and tribute live. **Debt** never decays: every use of marsh power
+accrues it, each bound wight carries 60, a sheep left at the stone forgives
+12 — and when the Debt outruns the bound, three dawns' grace, then they
+*collect*: not a raid, not a battle — a person (the wall first, then the
+payroll), gone at dawn, permanent. Nobody left to take and they take you.
+The three marsh tiers: **Marsh-lantern haulers** (night moves read a tenth
+as loud, +1 Debt a run), **Wight-fog** (a battle Call — the raiders fight
+half-blind, and it can flip a lost fight — at 8 Debt), and **the Hollow
+Way** (one marsh track leaves the world's knowing: no exposure, no
+road-stops, +1 Debt every crossing, laden or empty). Ichor green enters the
+palette with its owner. The 200-game pass plays discipline against greed:
+tribute-keepers are never collected; the greedy lose their carter around
+day 37. 276 tests green.
+
+Earlier: **M5 — the cutting house as a working hub ✅.**
 
 **M5 hub pass (spec §6.17):** the cutting house stops being a button and
 becomes a building that stores, staffs, and refines two trades at once. Its

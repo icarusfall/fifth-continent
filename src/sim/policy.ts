@@ -10,6 +10,7 @@
 // come back, a cutting house goes up, and Ryne drinks "brandy". (M2)
 
 import {
+  BINDING_CAPACITY,
   CART_CAPACITY,
   CART_COST,
   CUTTING_HOUSE_COST,
@@ -19,7 +20,10 @@ import {
   LEIDEN_PRICE_MULT,
   PLAUSIBLE_YIELD_MIN,
   RENT_AMOUNT,
+  RESEARCH_COST,
   SHEEP_PRICE_BUY,
+  TRIBUTE_RELIEF,
+  WIGHT_TRAP_IRON,
   WOOL_PRICE_DOMESTIC,
 } from './balance';
 import { isFlooded } from './time';
@@ -420,6 +424,69 @@ function runHub(state: GameState, alibi: boolean): Action[] {
         order: { from: 'cutting-house', to: 'ryne', good: 'bulked-tea' },
       });
     }
+  }
+  return actions;
+}
+
+/**
+ * marshPolicy: §6.14 lived in miniature — the hub life with the wight taken
+ * up. Every sign is trapped while the flock can bait it; the stone teaches
+ * the lanterns as soon as a wight is bound; and the account is kept a
+ * tribute's width under the line — the discipline the Debt demands.
+ */
+export function marshPolicy(state: GameState): Action[] {
+  return runMarsh(state, { tribute: true, trapAll: true, deepTiers: false });
+}
+
+/**
+ * marshDoomPolicy: the greedy read of the same power — one wight bound and
+ * never another, every tier learned, the hollow way opened, and not one
+ * sheep ever left at the stone. The account climbs past the single binding
+ * and the wights collect; the distribution test holds the game to it.
+ */
+export function marshDoomPolicy(state: GameState): Action[] {
+  return runMarsh(state, { tribute: false, trapAll: false, deepTiers: true });
+}
+
+function runMarsh(
+  state: GameState,
+  mode: { tribute: boolean; trapAll: boolean; deepTiers: boolean },
+): Action[] {
+  const actions = hubPolicy(state);
+  const bait = state.boundWights + 1;
+  // Trap the sign — every one (discipline: capacity first), or only the
+  // first (greed: the power is the point, the account an afterthought).
+  if (
+    state.wights.sign !== null &&
+    state.wights.trap === null &&
+    (mode.trapAll || state.boundWights === 0) &&
+    state.coin >= WIGHT_TRAP_IRON + RENT_AMOUNT &&
+    state.flockSize >= bait + 6 // never bait away the alibi
+  ) {
+    actions.push({ type: 'trapWight' });
+  }
+  // The stone teaches as soon as it may — the first word, or all of them.
+  const targetTier = mode.deepTiers ? 3 : 1;
+  if (
+    state.boundWights >= 1 &&
+    state.research.completed.marsh < targetTier &&
+    state.research.active === null &&
+    state.coin >= RESEARCH_COST.marsh[state.research.completed.marsh] + RENT_AMOUNT
+  ) {
+    actions.push({ type: 'startResearch', tree: 'marsh' });
+  }
+  // The hollow way, once taught: the owling track leaves the world's knowing.
+  if (state.research.completed.marsh >= 3 && state.wights.hollowWay === null) {
+    actions.push({ type: 'designateHollowWay', edgeId: 'marsh-track' });
+  }
+  // Tribute discipline: stay a tribute's width under the line.
+  if (
+    mode.tribute &&
+    state.wights.stone !== null &&
+    state.flockSize > 6 &&
+    state.debt > state.boundWights * BINDING_CAPACITY - TRIBUTE_RELIEF
+  ) {
+    actions.push({ type: 'payTribute' });
   }
   return actions;
 }

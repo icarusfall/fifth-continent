@@ -10,8 +10,10 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  BINDING_CAPACITY,
   CARTER_WAGE,
   FARM_STORE_CAPACITY,
+  SHEEP_VALUE,
   FLEECE_PER_HEAD_PER_DAY,
   FLOCK_CAP,
   RENT_AMOUNT,
@@ -23,6 +25,8 @@ import {
   delegatorPolicy,
   hubNoAlibiPolicy,
   hubPolicy,
+  marshDoomPolicy,
+  marshPolicy,
   relayPolicy,
   runPolicyGame,
   smugglerPolicy,
@@ -279,5 +283,63 @@ describe(`${GAMES} seeded games, 20 days — the relay (spec §6.11, M5a-4)`, ()
     }
 
     expect(new Set(coins).size).toBe(1); // deterministic, like everything here
+  });
+});
+
+describe(`${GAMES} seeded games, 40 days — the wight (spec §6.14, M5b)`, () => {
+  // Long enough for the full arc: the hub life first, the sign around day
+  // ten, and — for the greedy — the collection that answers it.
+  const WIGHT_DAYS = 40;
+  const WIGHT_RENTS = 6; // days 6, 12, 18, 24, 30, 36
+
+  it('discipline pays tribute and is never collected; greed loses a person', { timeout: 400_000 }, () => {
+    const marshCoins: number[] = [];
+    const doomCoins: number[] = [];
+
+    for (let seed = 1; seed <= GAMES; seed++) {
+      const marsh = runPolicyGame(seed, TICKS_PER_DAY * WIGHT_DAYS, marshPolicy);
+      const doom = runPolicyGame(seed, TICKS_PER_DAY * WIGHT_DAYS, marshDoomPolicy);
+
+      for (const s of [marsh, doom]) {
+        expect(s.lost).toBe(false);
+        // The wight's costs (iron, bait, tribute) can catch a rent day a
+        // sheep or two short — distraint is priced, not fatal (§6.8). The
+        // tenancy must survive every due all the same.
+        expect(s.rentPaid).toBeGreaterThanOrEqual(WIGHT_RENTS * RENT_AMOUNT - 2 * SHEEP_VALUE);
+        // The marsh noticed, and was answered: a wight bound, the stone up,
+        // the account open and never below nothing.
+        expect(s.boundWights).toBeGreaterThanOrEqual(1);
+        expect(s.wights.stone).not.toBeNull();
+        expect(s.research.completed.marsh).toBeGreaterThanOrEqual(1);
+        expect(s.debt).toBeGreaterThanOrEqual(0);
+        // And the trade still out-earns the lawful ceiling (§6.9) with the
+        // wight's price paid.
+        const lawfulCeiling =
+          STARTING_FLOCK * FLEECE_PER_HEAD_PER_DAY * (WIGHT_DAYS + 1) * WOOL_PRICE_DOMESTIC -
+          WIGHT_RENTS * RENT_AMOUNT;
+        expect(s.coin).toBeGreaterThan(lawfulCeiling);
+      }
+
+      // The discipline: capacity first (every sign trapped), tribute down
+      // whenever the account nears the line — and nobody is ever taken.
+      expect(marsh.boundWights).toBeGreaterThanOrEqual(2);
+      expect(marsh.debt).toBeLessThanOrEqual(marsh.boundWights * BINDING_CAPACITY);
+      expect(marsh.peopleCollected).toBe(0);
+
+      // The greed: one binding, all three tiers, the hollow way open, no
+      // tribute ever — and the wights collect. Not a raid, not a battle:
+      // a person, gone at dawn, and the game goes on around the hole.
+      expect(doom.boundWights).toBe(1);
+      expect(doom.research.completed.marsh).toBe(3);
+      expect(doom.wights.hollowWay).toBe('marsh-track');
+      expect(doom.peopleCollected).toBeGreaterThanOrEqual(1);
+      expect(doom.lastCollected).not.toBeNull();
+
+      marshCoins.push(marsh.coin);
+      doomCoins.push(doom.coin);
+    }
+
+    expect(new Set(marshCoins).size).toBe(1); // deterministic, like everything here
+    expect(new Set(doomCoins).size).toBe(1);
   });
 });

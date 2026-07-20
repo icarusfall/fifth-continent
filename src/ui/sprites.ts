@@ -4,7 +4,7 @@
 // so outlines scale with the camera as the spec asks.
 
 import { hash2, jitter, TILE, tileCenter } from './geometry';
-import { CLAY, DYKE, HEAT_RED, INK, LIMEWASH, MARSH_DARK, REVENUE_BLUE, ROOF, SEA } from './palette';
+import { CLAY, DYKE, HEAT_RED, ICHOR_GREEN, INK, LIMEWASH, MARSH_DARK, REVENUE_BLUE, ROOF, SEA } from './palette';
 import { mix } from './paint';
 
 const OUT = 1.6; // outline width at world scale
@@ -351,6 +351,81 @@ export function drawStockChip(
     ctx.fillText(r.text, x + pad, ty);
     ty += line;
   }
+}
+
+// ---- The wight (§6.14, M5b): the sign and the stone ---------------------
+// Ichor green enters the game with its owner. The sign is a ring of white
+// stones with drowned grass inside; the stone is a single leaning slab with
+// a low green breath about it. `phase` is 0..1 for the slow pulse.
+
+export function drawWightSign(
+  ctx: CanvasRenderingContext2D,
+  tile: { x: number; y: number },
+  phase: number,
+): void {
+  const c = { x: (tile.x + 0.5) * TILE, y: (tile.y + 0.5) * TILE };
+  // Drowned grass: a dark, wet disc.
+  ctx.globalAlpha = 0.5;
+  ctx.fillStyle = MARSH_DARK;
+  ctx.beginPath();
+  ctx.ellipse(c.x, c.y, 11, 7, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 0.25 + 0.15 * Math.sin(phase * Math.PI * 2);
+  ctx.fillStyle = ICHOR_GREEN;
+  ctx.beginPath();
+  ctx.ellipse(c.x, c.y, 9, 5.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  // The ring of white stones.
+  ctx.fillStyle = LIMEWASH;
+  for (let i = 0; i < 7; i++) {
+    const a = (i / 7) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.ellipse(c.x + Math.cos(a) * 10, c.y + Math.sin(a) * 6.4, 1.6, 1.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+export function drawWightStone(
+  ctx: CanvasRenderingContext2D,
+  tile: { x: number; y: number },
+  phase: number,
+): void {
+  const c = { x: (tile.x + 0.5) * TILE, y: (tile.y + 0.5) * TILE };
+  // The low green breath.
+  ctx.globalAlpha = 0.18 + 0.1 * Math.sin(phase * Math.PI * 2);
+  ctx.fillStyle = ICHOR_GREEN;
+  ctx.beginPath();
+  ctx.ellipse(c.x, c.y + 3, 13, 7, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  // The slab, leaning.
+  ctx.save();
+  ctx.translate(c.x, c.y);
+  ctx.rotate(-0.16);
+  ctx.fillStyle = '#6B6F66';
+  ctx.beginPath();
+  ctx.moveTo(-4, 4);
+  ctx.lineTo(-3, -10);
+  ctx.lineTo(2.6, -11);
+  ctx.lineTo(4.4, 4);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+  // The old lines cut into it, faintly green.
+  ctx.strokeStyle = ICHOR_GREEN;
+  ctx.globalAlpha = 0.7;
+  ctx.lineWidth = 0.7;
+  ctx.beginPath();
+  ctx.moveTo(-1.5, -8);
+  ctx.lineTo(-0.5, -3);
+  ctx.moveTo(1.5, -7);
+  ctx.lineTo(0.8, -2);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  ctx.restore();
 }
 
 // ---- Feedback motes (§20, M5 hub polish) --------------------------------

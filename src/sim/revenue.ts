@@ -8,6 +8,8 @@ import {
   COVER_CAPACITY,
   DIFFICULTY,
   DITCH_HEAT,
+  MARSH_LANTERN_EXPOSURE_MULT,
+  TIME_OF_DAY_MOD_NIGHT,
   FALSE_BOTTOM_COVER,
   FALSE_BOTTOM_EXPOSURE_MULT,
   FORT_VISIBILITY,
@@ -94,9 +96,20 @@ export function hasFalseBottom(state: GameState): boolean {
 export function accrueRouteHeat(state: GameState, cart: Cart, edge: MapEdge): void {
   const illicit = illicitCount(cart.cargo);
   if (illicit <= 0 || cart.location.kind !== 'edge') return;
+  // §6.14 Marsh 3 — the hollow way is not there: no exposure, no stain.
+  if (state.wights.hollowWay === edge.id) return;
   // §6.14: a false-bottomed cart reads quieter on the road (tech mult of §6.2).
   const techMult = hasFalseBottom(state) ? FALSE_BOTTOM_EXPOSURE_MULT : 1;
-  const amount = ((illicit * edge.exposure) / edge.latency) * timeOfDayMod(state.tick) * techMult;
+  // §6.14 Marsh 1 — lantern haulers: night moves over marsh read a tenth
+  // as loud. Passive once learned; the Debt is charged on arrival (tick.ts).
+  const lanternMult =
+    state.research.completed.marsh >= 1 &&
+    (edge.id === 'marsh-track' || edge.id.startsWith('cut-')) &&
+    timeOfDayMod(state.tick) === TIME_OF_DAY_MOD_NIGHT
+      ? MARSH_LANTERN_EXPOSURE_MULT
+      : 1;
+  const amount =
+    ((illicit * edge.exposure) / edge.latency) * timeOfDayMod(state.tick) * techMult * lanternMult;
   // The stain falls on whichever end of the road the cart is nearer.
   const nearer =
     cart.location.progress * 2 < edge.latency ? cart.location.from : cart.location.to;
@@ -384,6 +397,9 @@ export function officerTick(state: GameState): void {
  *  unless the floor is hollow (§6.14): the road-stop misses what rides under
  *  the boards. A cart searched at leisure in a yard still shows everything. */
 function stopCartsOnEdge(state: GameState, edge: MapEdge): void {
+  // §6.14 Marsh 3 — the hollow way never enters the Revenue's knowing: a
+  // cart on it shares no road with anyone, whatever the map says.
+  if (state.wights.hollowWay === edge.id) return;
   const hidden = hasFalseBottom(state) ? FALSE_BOTTOM_COVER : 0;
   for (const cart of state.carts) {
     if (cart.location.kind !== 'edge' || cart.location.edgeId !== edge.id) continue;

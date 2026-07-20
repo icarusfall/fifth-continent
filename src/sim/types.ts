@@ -301,6 +301,38 @@ export interface GameState {
   /** Spec §6.13 — the Hawksmere Company's intent, and the raid it has in the field. */
   hawksmere: Hawksmere;
   raid: Raid | null;
+  /**
+   * Spec §6.14 (M5b) — Debt: the account that never closes. Accrued by every
+   * use of marsh power, forgiven only in sheep and people, and it does not
+   * decay — that is its whole identity against Heat.
+   */
+  debt: number;
+  /** Wights bound; bindings = boundWights × BINDING_CAPACITY carry the Debt. */
+  boundWights: number;
+  /** Spec §6.14 — the marsh's notice of you, and the machinery of binding. */
+  wights: {
+    /** Cumulative unit-tiles of goods crossed over marsh at night. */
+    nightUnits: number;
+    /** The same, per edge — the sign appears near the most-used crossing. */
+    nightUnitsByEdge: Record<EdgeId, number>;
+    /** A sign stands on the marsh, waiting to be trapped — or ignored. */
+    sign: { x: number; y: number } | null;
+    /** A trap is staked at the sign: iron paid, bait gone from the flock.
+     *  Resolves at the next dawn — deterministic, no roll. */
+    trap: { bait: number } | null;
+    /** The wight-stone: fixed where the first binding was made. Marsh
+     *  research and tribute happen here. Invisible to the Revenue. */
+    stone: { x: number; y: number } | null;
+    /** Day index the last sign appeared (recurrence pacing). */
+    lastSignDay: number;
+    /** §6.14 Marsh 3 — the designated edge that is not there. */
+    hollowWay: EdgeId | null;
+  };
+  /** Spec §6.14 — a breach being collected on: dawns of grace remaining. */
+  collection: { graceDawnsLeft: number } | null;
+  /** People the wights have taken, and who the last one was (for the card). */
+  peopleCollected: number;
+  lastCollected: string | null;
   carts: Cart[];
   /** Ring buffer of recent events, oldest first. Part of state: deterministic. */
   log: GameEvent[];
@@ -341,6 +373,9 @@ export type Action =
   | { type: 'buySheep'; qty: number }
   | { type: 'sellSheep'; qty: number }
   | { type: 'startResearch'; tree: ResearchTree }
+  | { type: 'trapWight' }
+  | { type: 'payTribute' }
+  | { type: 'designateHollowWay'; edgeId: EdgeId }
   | { type: 'resolveRaid'; calls?: ScheduledCall[] };
 
 /** Actions to apply at a given tick, for replay: actionLog[tick] = Action[]. */
