@@ -7,6 +7,7 @@ import {
   CART_CAPACITY,
   CART_COST,
   CARTER_WAGE,
+  DAILY_DEMAND,
   DITCH_HEAT,
   LEIDEN_PRICE_MULT,
   MARKET_TATTLE,
@@ -465,45 +466,63 @@ describe('the book audit — the Board’s calendar bends for no stain (spec §6
   });
 });
 
-describe('the wool-stapler’s tally — lawful sales cap at the declared figure (spec §6.10, M5 hub polish)', () => {
-  /** A laden cart standing in Ryne, the books sworn as given. */
-  function cartInRyne(fleece: number, declared: number): GameState {
+describe('the wool-stapler’s tally — lawful sales cap at the page’s unsold balance (spec §6.10)', () => {
+  /** A laden cart standing in Ryne, the page holding `onBooks` unsold wool. */
+  function cartInRyne(fleece: number, onBooks: number): GameState {
     const s = initialState(3);
-    s.tick = 60; // mid-morning: a clean run at the day's page
-    s.ledger.declaredYield = declared;
+    s.tick = 60; // mid-morning: today's line is already written
+    s.ledger.penTaken = true;
+    s.ledger.openingStock = 0;
+    s.ledger.declaredToDate = onBooks;
+    s.ledger.declaredYield = 6; // tomorrow's line, when dawn writes it
     s.carts[0].cargo = { fleece };
     s.carts[0].location = { kind: 'node', nodeId: 'ryne' };
     return s;
   }
 
-  it('the town is hungry, but the book is not: sales stop at declaredYield', () => {
+  it('the town is hungry, but the book is not: sales stop at the unsold balance', () => {
     let s = cartInRyne(10, 6);
     s = tick(s, [{ type: 'sell', cartId: 'cart-1', good: 'fleece' }]);
     expect(s.carts[0].cargo.fleece).toBe(4); // 6 sold, 4 refused
     expect(s.ledger.soldToday).toBe(6);
     expect(s.coin).toBe(6 * WOOL_PRICE_DOMESTIC);
-    // A second try the same day moves nothing: the tally is full.
+    // A second try the same day moves nothing: the page stands sold out.
     s = tick(s, [{ type: 'sell', cartId: 'cart-1', good: 'fleece' }]);
     expect(s.carts[0].cargo.fleece).toBe(4);
     expect(s.log.some((e) => e.text.includes('wool-stapler'))).toBe(true);
   });
 
-  it('dawn turns the stapler’s page: the allowance refreshes with the appetite', () => {
+  it('dawn writes a new line: the balance grows by the declared figure', () => {
     let s = cartInRyne(10, 6);
     s = tick(s, [{ type: 'sell', cartId: 'cart-1', good: 'fleece' }]);
     expect(s.carts[0].cargo.fleece).toBe(4);
-    s = runTicks(s, TICKS_PER_DAY); // through the next dawn
+    s = runTicks(s, TICKS_PER_DAY); // through the next dawn: +6 to the page
     expect(s.ledger.soldToday).toBe(0);
     s = tick(s, [{ type: 'sell', cartId: 'cart-1', good: 'fleece' }]);
-    expect(s.carts[0].cargo.fleece).toBe(0); // the rest sells on the new page
+    expect(s.carts[0].cargo.fleece).toBe(0); // the rest sells on the new line
   });
 
-  it('raising the declared figure mid-day frees the rest of the load', () => {
+  it('the pen writes tomorrow’s page: raising the figure frees nothing today', () => {
     let s = cartInRyne(10, 6);
     s = tick(s, [{ type: 'sell', cartId: 'cart-1', good: 'fleece' }]);
     s = tick(s, [{ type: 'setDeclaredYield', fleecePerDay: 12 }]);
     s = tick(s, [{ type: 'sell', cartId: 'cart-1', good: 'fleece' }]);
-    expect(s.carts[0].cargo.fleece).toBe(0); // the book now admits the wool
+    expect(s.carts[0].cargo.fleece).toBe(4); // today's page is already sworn
+    s = runTicks(s, TICKS_PER_DAY); // dawn writes the fatter line
+    s = tick(s, [{ type: 'sell', cartId: 'cart-1', good: 'fleece' }]);
+    expect(s.carts[0].cargo.fleece).toBe(0);
+  });
+
+  it('going straight: a declared backlog liquidates as fast as the town will take it', () => {
+    // Twice-raided, flock down to 8 — but three honest days stand unsold on
+    // the page. The book is the thing that saves you (playtest, §6.10).
+    const s0 = cartInRyne(16, 24);
+    s0.flockSize = 8;
+    s0.ledger.declaredYield = 8;
+    const s = tick(s0, [{ type: 'sell', cartId: 'cart-1', good: 'fleece' }]);
+    // One day, 16 fleece: capped by the town's appetite, not the flock.
+    expect(s.carts[0].cargo.fleece).toBe(16 - DAILY_DEMAND.fleece);
+    expect(s.ledger.soldToday).toBe(DAILY_DEMAND.fleece);
   });
 
   it('the gunwale has no scales: undeclared wool vanishes over it uncapped', () => {

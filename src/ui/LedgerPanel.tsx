@@ -10,7 +10,7 @@ import {
   REFINER_WAGE,
   SHEARER_WAGE,
 } from '../sim/balance';
-import { carterWageOf, rentAmount } from '../sim/tick';
+import { carterWageOf, rentAmount, woolOnTheBooks } from '../sim/tick';
 import { clockOf } from '../sim/time';
 import type { GameState } from '../sim/types';
 import { useGameStore } from '../state/store';
@@ -81,7 +81,7 @@ export function LedgerPanel({ state }: { state: GameState }) {
               <div className="ledger-controls">
                 <button
                   disabled={l.declaredYield <= 0}
-                  title="Scrapie, if anyone asks. Undeclared wool never existed — and must vanish."
+                  title="Scrapie, if anyone asks — from tomorrow's page. Undeclared wool never existed, and must vanish."
                   onClick={() =>
                     enqueue({ type: 'setDeclaredYield', fleecePerDay: l.declaredYield - 1 })
                   }
@@ -91,7 +91,7 @@ export function LedgerPanel({ state }: { state: GameState }) {
                 <span>{l.declaredYield}</span>
                 <button
                   disabled={l.declaredYield >= state.flockSize}
-                  title="The book admits more of the clip. Declared wool must show at inspection."
+                  title="The book admits more of the clip from tomorrow's page. Declared wool must show at inspection."
                   onClick={() =>
                     enqueue({ type: 'setDeclaredYield', fleecePerDay: l.declaredYield + 1 })
                   }
@@ -103,9 +103,9 @@ export function LedgerPanel({ state }: { state: GameState }) {
                 this page: {Math.round(l.declaredToDate)} declared · {l.soldLawfully} sold at
                 Ryne · {l.grownToDate} grown
               </p>
-              <p title="The wool-stapler keeps his own tally against your book: lawful sales stop at the declared figure each day.">
-                today the stapler took <strong>{l.soldToday}</strong> of the{' '}
-                <strong>{l.declaredYield}</strong> the book allows
+              <p title="The wool-stapler reads the whole page: lawful sales stop when the book holds no admitted wool unsold. The pen writes tomorrow's line, never today's.">
+                on the books, unsold: <strong>{woolOnTheBooks(state)}</strong> fleece the stapler
+                will take · {l.soldToday} weighed today
               </p>
               <p className="ledger-hint">
                 {!l.penTaken

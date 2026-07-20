@@ -12,6 +12,10 @@ import {
   CARTER_DANGER_WAGE,
   CARTER_UNLOCK_FLEECE,
   CARTER_WAGE,
+  CREW_MUSTER,
+  CREW_WAGE,
+  MILITIA_MUSTER,
+  MILITIA_WAGE,
   DUTCHMAN_TRUST_JENEVER,
   DUTCHMAN_TRUST_TEA,
   CUTS,
@@ -58,7 +62,7 @@ import {
   otherEnd,
 } from '../sim/map';
 import { dayPhaseOf, isFlooded, ticksUntilTideTurn } from '../sim/time';
-import { carterWageOf } from '../sim/tick';
+import { carterWageOf, garrisonCap, woolOnTheBooks } from '../sim/tick';
 import { HEAT_RED } from './palette';
 import { CONTRABAND, coverOf, fortVisibility, illicitAnywhere, illicitCount } from '../sim/revenue';
 import { GOOD_LABEL, spanOf, storeSummary } from './format';
@@ -591,12 +595,9 @@ export function GameMap({ state }: { state: GameState }) {
           drawStockChip(ctx, shc.x - 46, shc.y + 4, { text: 'open shingle — no cover', color: '#E0837A' }, stockRows(shingleStore));
         }
         // Ryne: what the town still buys today — wool through the book's
-        // allowance, contraband channels only for goods the player holds.
+        // unsold balance (§6.10), contraband channels only for goods held.
         const rr: Array<{ text: string; color?: string }> = [];
-        const woolLeft = Math.min(
-          s.demandRemaining.fleece ?? 0,
-          Math.max(0, s.ledger.declaredYield - s.ledger.soldToday),
-        );
+        const woolLeft = Math.min(s.demandRemaining.fleece ?? 0, woolOnTheBooks(s));
         rr.push({ text: `${woolLeft} wool (the book)`, color: woolLeft === 0 ? '#E0837A' : undefined });
         for (const g of CONTRABAND) {
           if (g === 'jenever' || heldAnywhere(s, g) <= 0) continue;
@@ -760,13 +761,15 @@ export function GameMap({ state }: { state: GameState }) {
       const hc = tileCenter(s.cuttingHouse);
       targets.push({ sel: 'cutting-house', x: hc.x, y: hc.y, r: 18 });
     }
-    if (s.wights.sign) {
-      const wc = tileCenter(s.wights.sign);
-      targets.push({ sel: 'wight-sign', x: wc.x, y: wc.y, r: 16 });
-    }
+    // The stone before the sign: ties in the hit-test go to the first pushed,
+    // so a ring that stands too near can never shadow the stone's menu.
     if (s.wights.stone) {
       const wc = tileCenter(s.wights.stone);
       targets.push({ sel: 'wight-stone', x: wc.x, y: wc.y, r: 16 });
+    }
+    if (s.wights.sign) {
+      const wc = tileCenter(s.wights.sign);
+      targets.push({ sel: 'wight-sign', x: wc.x, y: wc.y, r: 16 });
     }
 
     let best: { sel: Selection; d: number } | null = null;
@@ -993,6 +996,17 @@ function SignMenu({ state }: { state: GameState }) {
         The grass inside lies drowned, and the sheep will not graze within a chain of it. The old
         people call it a wight-sign, and know better than to want one.
       </p>
+      {/* Playtest: a second ring read as the first being reset — say plainly
+          that the stone and the bound stand untouched, and this one is new. */}
+      {state.boundWights > 0 && (
+        <p className="flavour">
+          This ring is a new one. Your stone stands where it stood, and{' '}
+          {state.boundWights === 1
+            ? 'the bound wight still carries'
+            : `the ${state.boundWights} bound still carry`}{' '}
+          the account — each ring is its own wight, and each wants its own iron.
+        </p>
+      )}
       {trapped ? (
         <p className="flavour">
           The trap is staked: iron, salt, and {state.wights.trap!.bait} sheep hobbled in the ring.
@@ -1226,7 +1240,9 @@ function useEnqueue() {
 }
 
 // The Trade fortification ladder, for the menu (spec §6.12 / §22). Index = tier.
-const FORT_TIER_LABEL = ['open ground', 'dogs & hedge', 'blunderbuss men', 'gunported', 'a fortress'];
+// Tier 2 says "firing steps", not men (spec §6.12, playtest): the works are a
+// wall for §6.13's garrison to shoot from — the men are posted separately.
+const FORT_TIER_LABEL = ['open ground', 'dogs & hedge', 'bolted doors & firing steps', 'gunported', 'a fortress'];
 
 /**
  * Spec §6.12 — dig in one rung of the Trade line. The cost is coin now; the
@@ -1261,6 +1277,77 @@ function FortifyRow({ state, nodeId }: { state: GameState; nodeId: NodeId }) {
         >
           {maxed ? 'Fully fortified' : `Dig in · ${FORT_TIER_LABEL[tier + 1]} · ${cost} coin`}
         </button>
+      </div>
+    </>
+  );
+}
+
+/**
+ * Spec §6.13 — the garrison: the men behind the works. Militia are cheap and
+ * break early; crew hold. Wages fall at dawn with the carter's, and a wall
+ * that cannot be paid deserts — the row says all of it before the coin moves.
+ */
+function GarrisonRow({ state, nodeId }: { state: GameState; nodeId: NodeId }) {
+  const enqueue = useEnqueue();
+  const g = state.garrisons[nodeId] ?? { militia: 0, crew: 0 };
+  const men = g.militia + g.crew;
+  const cap = garrisonCap(state, nodeId);
+  const full = men >= cap;
+  const wageBill = g.militia * MILITIA_WAGE + g.crew * CREW_WAGE;
+  const held =
+    men === 0
+      ? 'nobody'
+      : [
+          g.militia > 0 ? `${g.militia} militia` : '',
+          g.crew > 0 ? `${g.crew} crew` : '',
+        ]
+          .filter(Boolean)
+          .join(', ');
+  return (
+    <>
+      <p className="flavour">
+        The wall: <strong>{held}</strong> ({men}/{cap} quartered).{' '}
+        {men === 0
+          ? 'Works without men stop nothing — a raid walks in over empty steps.'
+          : `Wages at dawn: ${wageBill} coin. A wall that cannot be paid deserts.`}
+      </p>
+      <div className="menu-buttons">
+        <button
+          disabled={full || state.coin < MILITIA_MUSTER}
+          title={
+            full
+              ? 'No more quarters. Dig in deeper to hold a larger garrison.'
+              : state.coin < MILITIA_MUSTER
+                ? `${MILITIA_MUSTER} coin to raise, and the till is short.`
+                : 'Fowling pieces and families: cheap, and they break early.'
+          }
+          onClick={() => enqueue({ type: 'raiseGarrison', nodeId, kind: 'militia' })}
+        >
+          Post a militiaman · {MILITIA_MUSTER} coin · {MILITIA_WAGE}/day
+        </button>
+        <button
+          disabled={full || state.coin < CREW_MUSTER}
+          title={
+            full
+              ? 'No more quarters. Dig in deeper to hold a larger garrison.'
+              : state.coin < CREW_MUSTER
+                ? `${CREW_MUSTER} coin to raise, and the till is short.`
+                : 'Armed, willing, experienced — they hold the wall.'
+          }
+          onClick={() => enqueue({ type: 'raiseGarrison', nodeId, kind: 'crew' })}
+        >
+          Post a smuggler · {CREW_MUSTER} coin · {CREW_WAGE}/day
+        </button>
+        {g.militia > 0 && (
+          <button onClick={() => enqueue({ type: 'dismissGarrison', nodeId, kind: 'militia' })}>
+            Stand a militiaman down
+          </button>
+        )}
+        {g.crew > 0 && (
+          <button onClick={() => enqueue({ type: 'dismissGarrison', nodeId, kind: 'crew' })}>
+            Stand a smuggler down
+          </button>
+        )}
       </div>
     </>
   );
@@ -1450,6 +1537,8 @@ function FarmMenu({
           <h5>works &amp; men</h5>
           {/* Fortification appears once you have something worth guarding (§10). */}
           {state.dutchman.unlocked && <FortifyRow state={state} nodeId="farm" />}
+          {/* §6.13 — the men behind the works, same gate as the works. */}
+          {state.dutchman.unlocked && <GarrisonRow state={state} nodeId="farm" />}
 
           {/* §6.16 — the hired dawn, and the flock as a stock you trade. */}
           <ShearerRow state={state} />
@@ -1684,6 +1773,7 @@ function CuttingHouseMenu({ state }: { state: GameState }) {
       <RefinerRow state={state} />
 
       <FortifyRow state={state} nodeId="cutting-house" />
+      <GarrisonRow state={state} nodeId="cutting-house" />
 
       <CartsAtNode state={state} nodeId="cutting-house" />
     </>

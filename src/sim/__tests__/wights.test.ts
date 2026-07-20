@@ -84,6 +84,27 @@ describe('the sign (spec §6.14): the marsh notices being used', () => {
     d = runTicks(d, 3);
     expect(d.wights.nightUnits).toBe(0);
   });
+
+  it('a recurring ring announces itself as another, and never rises on the stone’s tile', () => {
+    const recurring = (stone: { x: number; y: number }) =>
+      fresh((st) => {
+        st.tick = (SIGN_RECURRENCE_DAYS + 1) * TICKS_PER_DAY + 60;
+        st.boundWights = 1; // marsh powers see use: signs recur
+        st.wights.lastSignDay = 0;
+        st.wights.nightUnits = NIGHT_MARSH_UNITS;
+        st.wights.nightUnitsByEdge = { 'marsh-track': NIGHT_MARSH_UNITS };
+        st.wights.stone = stone;
+      });
+    // With the stone far off, the ring takes its preferred footing…
+    const clear = throughNextDawn(recurring({ x: 1, y: 1 }));
+    expect(clear.wights.sign).not.toBeNull();
+    expect(clear.log.some((e) => e.text.includes('Another ring'))).toBe(true);
+    // …and where that footing IS the stone, the ring steps aside: co-located,
+    // its click target shadowed the stone's menu (playtest).
+    const shadowed = throughNextDawn(recurring({ ...clear.wights.sign! }));
+    expect(shadowed.wights.sign).not.toBeNull();
+    expect(shadowed.wights.sign).not.toEqual(clear.wights.sign);
+  });
 });
 
 describe('the trap (spec §6.14): iron, salt, and a rising bait', () => {

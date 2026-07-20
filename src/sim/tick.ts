@@ -324,13 +324,10 @@ function marketSale(state: GameState, cart: Cart, good: Good): number {
   if (good === 'jenever') return 0; // no legal buyer at any price
   const held = cart.cargo[good] ?? 0;
   const appetite = state.demandRemaining[good] ?? 0;
-  // §6.10 — the wool-stapler's tally: lawful fleece sells only to the
-  // declared figure each day. Wool the ledger never grew cannot cross his
-  // scales; it moves over the gunwale or not at all.
-  const bookAllows =
-    good === 'fleece'
-      ? Math.max(0, state.ledger.declaredYield - state.ledger.soldToday)
-      : Number.MAX_SAFE_INTEGER;
+  // §6.10 — the wool-stapler reads the whole page: lawful fleece sells only
+  // against the book's unsold balance. Wool the ledger never grew cannot
+  // cross his scales; it moves over the gunwale or not at all.
+  const bookAllows = good === 'fleece' ? woolOnTheBooks(state) : Number.MAX_SAFE_INTEGER;
   const qty = Math.min(held, appetite, bookAllows);
   if (qty <= 0) return 0;
   cart.cargo[good] = held - qty;
@@ -408,6 +405,13 @@ export function garrisonCap(state: GameState, nodeId: NodeId): number {
   return GARRISON_BASE + (state.fortifications[nodeId] ?? 0) * GARRISON_PER_TIER;
 }
 
+/** §6.10 — the page's unsold balance: wool the book grew (or the officer has
+ *  counted) that no scale has yet weighed. The stapler reads the whole page. */
+export function woolOnTheBooks(state: GameState): number {
+  const l = state.ledger;
+  return Math.max(0, l.openingStock + l.declaredToDate - l.soldLawfully);
+}
+
 function garrisonWageBill(g: Garrison): number {
   return g.militia * MILITIA_WAGE + g.crew * CREW_WAGE;
 }
@@ -416,7 +420,7 @@ function garrisonWageBill(g: Garrison): number {
 const FORT_WORKS: readonly ((name: string) => string)[] = [
   () => '',
   (n) => `Dogs and a spiked hedge go up around ${n}.`,
-  (n) => `${n} gets bolted doors, and men who will point a blunderbuss.`,
+  (n) => `${n} gets bolted doors, and firing steps behind them — for whatever men you post.`,
   (n) => `Gunports are cut into the walls of ${n}.`,
   (n) => `${n} is a fortress now — crenellations, a palisade, the lot.`,
 ];
@@ -561,14 +565,11 @@ function applyAction(state: GameState, action: Action): void {
         logEvent(state, `Ryne has had its fill of ${action.good} today. Dawn brings appetite.`);
         return;
       }
-      if (
-        action.good === 'fleece' &&
-        state.ledger.declaredYield - state.ledger.soldToday <= 0
-      ) {
-        // §6.10 — the squeeze: short books cap lawful sales at the declared figure.
+      if (action.good === 'fleece' && woolOnTheBooks(state) <= 0) {
+        // §6.10 — the squeeze: short books starve the page's unsold balance.
         logEvent(
           state,
-          `The wool-stapler checks his tally against your book: ${state.ledger.declaredYield} fleece a day, and he has had them. Selling wool the ledger never grew is a confession.`,
+          'The wool-stapler reads your page against his tally: nothing on the books stands unsold. Selling wool the ledger never grew is a confession.',
         );
         return;
       }

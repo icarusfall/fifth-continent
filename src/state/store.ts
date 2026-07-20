@@ -152,13 +152,18 @@ function rentCard(next: GameState): EventCard {
   return { id: `rent-${next.rentDueTick}`, kind: 'rent', title: 'Rent day', body };
 }
 
-/** §6.14 — a wight-sign stands on the marsh: pause, and point at it. */
+/** §6.14 — a wight-sign stands on the marsh: pause, and point at it. A
+ *  recurring ring says so plainly (playtest: the first-time text re-read as
+ *  the same ring, as if the earlier staking had been undone). */
 function signCard(next: GameState): EventCard {
+  const again = next.boundWights > 0; // recurrence needs a binding first
   return {
     id: `sign-${next.tick}`,
     kind: 'info',
-    title: 'A ring of white stones',
-    body: 'Something has been at the sheep-walks in the night: a ring of white stones on the deep marsh, the grass inside it drowned. The old people call it a wight-sign, and they do not walk past it after dark. Iron, salt, and staked sheep would trap what made it — if you want what it can do.',
+    title: again ? 'Another ring of stones' : 'A ring of white stones',
+    body: again
+      ? 'Another ring of white stones stands on the deep marsh — a new wight, come to a new crossing. Your stone stands where it stood, and the bound still carry what they carry; this ring wants its own iron, salt, and bait, and the bait has risen.'
+      : 'Something has been at the sheep-walks in the night: a ring of white stones on the deep marsh, the grass inside it drowned. The old people call it a wight-sign, and they do not walk past it after dark. Iron, salt, and staked sheep would trap what made it — if you want what it can do.',
   };
 }
 
@@ -396,7 +401,7 @@ const MILESTONES: Milestone[] = [
     key: 'take-up-the-pen',
     when: (s) => s.dutchman.fleeceBought > 0 && !s.ledger.penTaken,
     title: 'Take up the pen',
-    body: 'That wool crossed the gunwale and left no trace — but the book still swears the flock’s whole clip, and sworn wool must show when the Revenue counts. In THE LEDGER you may teach the book to swear less — scrapie, if anyone asks — and owl the difference free. Mind: the wool-stapler buys in town only what the book admits each day.',
+    body: 'That wool crossed the gunwale and left no trace — but the book still swears the flock’s whole clip, and sworn wool must show when the Revenue counts. In THE LEDGER you may teach the book to swear less — scrapie, if anyone asks — and owl the difference free. Mind: the wool-stapler buys in town only wool the book has admitted and not yet sold, and the pen writes tomorrow’s page, not today’s.',
   },
   {
     key: 'cutting-house',

@@ -470,18 +470,26 @@ button it was built to be: see the blue coat on your road, tip the lot.
 grows a ledger page. The player keeps one standing number:
 ```
 declaredYield   fleece per day the books admit the flock gives, 0..flockSize,
-                changed at will; accrues declaredToDate at each dawn
+                changed at will; each dawn writes min(declaredYield, grown)
+                to the page — the pen changes tomorrow's line, never today's
 grownToDate     what the flock actually grew (accrued at dawn)
 soldLawfully    fleece sold at Ryne, accrued at sale
-soldToday       fleece sold at Ryne since dawn; resets with the town's
-                appetite (M5 hub polish — the squeeze below, finally enforced)
+soldToday       fleece sold at Ryne since dawn; a readout tally only
+                (resets with the town's appetite)
+woolOnTheBooks  openingStock + declaredToDate − soldLawfully: the page's
+                unsold balance — wool the book grew (or the officer has
+                counted, below) that no scale has yet weighed
 at Ryne         fleece sells only into min(remaining appetite,
-                declaredYield − soldToday): the wool-stapler keeps his own
-                tally against your book, and wool the ledger never grew
-                cannot cross his scales. Any hand — yours or a carter's —
-                obeys the same page; a capped carter waits out his §6.11
-                patience, then carries the surplus home. The gunwale is
-                untouched: undeclared wool has no scales to cross
+                woolOnTheBooks): the wool-stapler reads the whole page, not
+                the day's line. (Playtest, late 2026-07: under the old
+                daily cap a twice-raided player with declared wool in the
+                barn could not liquidate honestly past the day's clip —
+                the mercy here is that the honest ledger is the thing that
+                saves you.) Wool the ledger never grew still cannot cross
+                his scales. Any hand — yours or a carter's — obeys the
+                same page; a capped carter waits out his §6.11 patience,
+                then carries the surplus home. The gunwale is untouched:
+                undeclared wool has no scales to cross
 ```
 Undeclared wool does not exist and may vanish over any gunwale it likes.
 Declared wool must be accounted for. When the officer inspects the farm he
@@ -496,9 +504,13 @@ heat.regional += gap × WOOL_GAP_COEFF (1.0); the page is then initialled —
 each gap is paid for once, and the ledger reconciles to reality
 ```
 The squeeze: honest books mean every fleece must show — the Dutchman becomes
-expensive. Short books free the surplus wool but cap lawful Ryne sales at the
-declared figure, and the floor keeps half the clip on the record. Cooking
-the books is one number, and it is a real decision every rent period.
+expensive. Short books free the surplus wool but starve the page's balance —
+lawful Ryne sales stop when the book runs out of admitted wool — and the
+floor keeps half the clip on the record. Cooking the books is one number,
+and it is a real decision every rent period. Reconciling at inspection puts
+the counted stock on the record (`openingStock` := what he counted): wool
+the officer has seen and priced sells lawfully thereafter — the gap's Heat
+was its laundering fee, paid once.
 
 **Honest by default (M5 tutorial pass, playtest).** Until the player first
 sets `declaredYield` by hand (`ledger.penTaken`), the agent keeps the books
@@ -729,8 +741,9 @@ silhouette (the art is the tell, below).
 ```
 tier 0  Bare              the building as M1–M3 drew it
 tier 1  Dogs & hedge      FORT_COST[1]=40   +intelligence, not +alpha (see below)
-tier 2  Bolted doors &    FORT_COST[2]=80   the first men who shoot back
-        blunderbuss men
+tier 2  Bolted doors &    FORT_COST[2]=80   the first rung that aids the fight
+        firing steps                        — a wall for §6.13's men to shoot
+                                            from, never men itself
 tier 3  Gunported barn    FORT_COST[3]=160
 tier 4  The Fortified     FORT_COST[4]=320  a blockhouse in a smock
         Farm
@@ -1075,7 +1088,14 @@ cooldown — all JSON-plain.
   crossing, laden or empty — the way itself is the favour; collection
   respects §6.15's crisis spacing, deferring, never forgiving; the stone is
   fixed where the first binding was made and is a map site with no edges —
-  the Revenue cannot reach what it cannot know).
+  the Revenue cannot reach what it cannot know. Playtest, late 2026-07: a
+  recurring sign announces itself as *another* ring — the first-time text
+  re-used read as the player's staking being undone — and never rises on the
+  stone's or a building's tile, where its click target shadowed the stone's
+  menu. Same pass surfaced §6.13's garrison verbs in the building menus at
+  last — they had sim, tests, and no UI, so every watched raid was fought
+  against an empty wall — and renamed fort tier 2, which promised men the
+  works do not contain).
 - **M5c — Leiden.** Arrival, the workshop, Publication and the floor, the
   three tiers, the telegraph UI.
 
@@ -1392,7 +1412,7 @@ Each tree is researched, tiered (Mega-Lo-Mania style), and **each has a fortific
 ### 8.1 THE TRADE TREE (baseline — no magic)
 Available from the start. Ledgers, warehouses, pack-ponies, bribes, blunderbusses, mantraps, dogs, spiked hedges, false walls, the loyalty of the parish.
 
-*Fortification:* Dogs → Bolted doors & spiked hedge → Blunderbuss men → Gunported barn → The Fortified Farm.
+*Fortification:* Dogs → Bolted doors & spiked hedge → Firing steps → Gunported barn → The Fortified Farm.
 *Concealment:* Cellar hide → False-bottom cart → The Church Tower → Tunnels → Bought Officer.
 
 ### 8.2 MARSH MAGIC (Ichor) — **coerced**

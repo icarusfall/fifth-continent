@@ -69,6 +69,13 @@ export function accrueNightMarsh(state: GameState, cart: Cart, edge: MapEdge): v
     (state.wights.nightUnitsByEdge[edge.id] ?? 0) + units * tilesThisTick;
 }
 
+/** A tile something already stands on: the stone, a building. A sign never
+ *  rises there — co-located, its click target shadowed the stone's menu. */
+function signSiteTaken(state: GameState, x: number, y: number): boolean {
+  const standing = [state.wights.stone, state.cuttingHouse, state.farm];
+  return standing.some((s) => s !== null && s.x === x && s.y === y);
+}
+
 /** The deep-marsh tile the sign stands on: just off the midpoint of the
  *  most-used night crossing, snapped to open marsh where possible. */
 function signSite(state: GameState): { x: number; y: number } {
@@ -95,7 +102,7 @@ function signSite(state: GameState): { x: number; y: number } {
   ]) {
     const x = mid.x + dx;
     const y = mid.y + dy;
-    if (isPlaceable(x, y)) return { x, y };
+    if (isPlaceable(x, y) && !signSiteTaken(state, x, y)) return { x, y };
   }
   return { x: mid.x, y: mid.y };
 }
@@ -121,9 +128,13 @@ function signAtDawn(state: GameState): void {
   if (!firstEver && day - w.lastSignDay < SIGN_RECURRENCE_DAYS) return;
   w.sign = signSite(state);
   w.lastSignDay = day;
+  // Playtest: the recurrence must say it is *another* ring — the first-time
+  // text re-read as the same ring, as if the player's staking had been undone.
   logEvent(
     state,
-    'Something has been at the sheep-walks in the night: a ring of white stones on the deep marsh, and the grass inside it drowned. A wight-sign.',
+    firstEver
+      ? 'Something has been at the sheep-walks in the night: a ring of white stones on the deep marsh, and the grass inside it drowned. A wight-sign.'
+      : 'Another ring of white stones stands on the deep marsh by dawn. A new wight — the marsh does not send the same one twice — and it wants its own iron, salt, and bait.',
   );
 }
 

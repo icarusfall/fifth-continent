@@ -98,9 +98,9 @@ daily appetite, rent and distraint. The 200-game smuggler bot now meets the
 officer around day 10, loses the odd load to him, and still ends day 20 far
 above the lawful ceiling — crime pays, and now it costs.
 
-Not yet built (by design — see spec §12): the wight, Debt, and tribute
-(M5b), Leiden and Publication (M5c), dykes (M5½), bribes/informers/decoys,
-alliances and endings (M6), the moving-price market model (§17).
+Not yet built (by design — see spec §12): Leiden and Publication (M5c),
+dykes (M5½), bribes/informers/decoys, alliances and endings (M6), the
+moving-price market model (§17).
 
 ## Run it
 
