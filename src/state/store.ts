@@ -29,6 +29,7 @@ import { simulateBattle } from '../sim/combat';
 import type { BattleSetup, Call, CombatLog, ScheduledCall } from '../sim/combat';
 import { nodeById } from '../sim/map';
 import { raidBattleSetup } from '../sim/raid';
+import { clockOf } from '../sim/time';
 import { initialState, QUAY_RUMOURS, rentAmount, tick } from '../sim/tick';
 import type { Action, ActionLog, Difficulty, GameState, NodeId } from '../sim/types';
 
@@ -541,6 +542,12 @@ export interface GameStore {
   shownCards: Shown;
   /** Tick of the last paced (offer) milestone card — the §10 spacing latch. */
   lastPacedTick: number;
+  /**
+   * §6.9 (playtest) — "wait for the lugger": the clock runs fast until he
+   * stands off, a card interrupts, or dawn ends the vigil. UI-only pacing;
+   * the sim neither knows nor cares.
+   */
+  waitingForLugger: boolean;
   /** A raid being watched frame by frame (spec §14). Freezes the world too. */
   battle: BattlePlayback | null;
 
@@ -564,6 +571,8 @@ export interface GameStore {
   soundCall: (call: Call) => void;
   /** Remember to pay future rents automatically (dismisses the ask thereafter). */
   setAutoPayRent: (on: boolean) => void;
+  /** §6.9 — start or cancel the vigil for the lugger. */
+  setWaitingForLugger: (on: boolean) => void;
   /** Dismiss an informational card and let the world run on. */
   dismissCard: () => void;
   save: () => void;
@@ -648,6 +657,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
     autoPayRent: loadAutoPay(),
     shownCards: saved ? loadShown() : {},
     lastPacedTick: saved ? loadPacedTick() : 0,
+    waitingForLugger: false,
     battle: null,
 
     enqueue: (action) => set((s) => ({ pending: [...s.pending, action] })),
@@ -722,12 +732,32 @@ export const useGameStore = create<GameStore>()((set, get) => {
         }
       }
 
-      set({ state: next, pending: nextPending, actionLog: nextLog, activeCard: card, shownCards: shown, lastPacedTick: paced });
+      // §6.9 — the vigil ends when the lugger shows, a card interrupts, or
+      // dawn calls it off: never fast-forward past the very thing waited for.
+      const clock = clockOf(next.tick);
+      const stillWaiting =
+        get().waitingForLugger &&
+        card === null &&
+        !next.dutchman.present &&
+        !(clock.hour === 5 && clock.minute === 0);
+
+      set({
+        state: next,
+        pending: nextPending,
+        actionLog: nextLog,
+        activeCard: card,
+        shownCards: shown,
+        lastPacedTick: paced,
+        waitingForLugger: stillWaiting,
+      });
       if (next.tick % AUTOSAVE_EVERY_TICKS === 0) writeSave(next, nextLog);
     },
 
-    setPaused: (paused) => set({ paused }),
-    setSpeed: (ticksPerSecond) => set({ ticksPerSecond }),
+    // A hand on the clock cancels the vigil: the player has taken over.
+    setPaused: (paused) => set({ paused, waitingForLugger: false }),
+    setSpeed: (ticksPerSecond) => set({ ticksPerSecond, waitingForLugger: false }),
+
+    setWaitingForLugger: (on) => set({ waitingForLugger: on, paused: false }),
 
     payRent: () => set((s) => ({ pending: [...s.pending, { type: 'payRent' }], activeCard: null })),
 

@@ -8,6 +8,8 @@ export function SpeedControls() {
   const setSpeed = useGameStore((s) => s.setSpeed);
   const save = useGameStore((s) => s.save);
   const requestNewGame = useGameStore((s) => s.requestNewGame);
+  const waiting = useGameStore((s) => s.waitingForLugger);
+  const setWaiting = useGameStore((s) => s.setWaitingForLugger);
 
   // Two-click confirm for New Game — no blocking window.confirm.
   const [armed, setArmed] = useState(false);
@@ -23,7 +25,7 @@ export function SpeedControls() {
       {[3, 10, 30].map((tps, i) => (
         <button
           key={tps}
-          className={speed === tps && !paused ? 'active' : ''}
+          className={speed === tps && !paused && !waiting ? 'active' : ''}
           onClick={() => {
             setSpeed(tps);
             setPaused(false);
@@ -32,6 +34,15 @@ export function SpeedControls() {
           {'▶'.repeat(i + 1)}
         </button>
       ))}
+      {waiting && (
+        <button
+          className="active"
+          title="Waiting on the lugger — the hours run. Click to call it off."
+          onClick={() => setWaiting(false)}
+        >
+          ☾…
+        </button>
+      )}
       <button onClick={save} title="Save the game">
         ⬇
       </button>

@@ -264,6 +264,11 @@ Because the tide period is deliberately not a divisor of the day (§6.7 M1),
 the night∩falling-tide window walks around the clock: some nights it is long,
 some nights it never opens. The existing tide gauge already forecasts it — a
 run to the shingle is a timed bet, like everything else on this marsh.
+**The vigil (M5b playtest):** the shingle's menu offers "wait for the
+lugger" — the clock runs fast (UI pacing only, the sim untouched) until he
+stands off, any event card interrupts, or dawn calls it off; a hand on the
+speed controls cancels it. Waiting for the tide should cost patience in the
+fiction, not at the desk.
 
 Per visit, his lugger's hold:
 ```

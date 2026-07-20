@@ -1533,6 +1533,8 @@ function RyneMenu({ state }: { state: GameState }) {
 
 function ShingleMenu({ state, onPlace }: { state: GameState; onPlace: () => void }) {
   const d = state.dutchman;
+  const waiting = useGameStore((s) => s.waitingForLugger);
+  const setWaiting = useGameStore((s) => s.setWaitingForLugger);
   const beachPrice = WOOL_PRICE_DOMESTIC * LEIDEN_PRICE_MULT;
   // The cutting house is offered when overproof jenever stands on the beach with
   // no legal buyer — any cart here holding tubs, whichever one it is.
@@ -1547,10 +1549,26 @@ function ShingleMenu({ state, onPlace }: { state: GameState; onPlace: () => void
     <>
       <h4>The Shingle</h4>
       {!d.present ? (
-        <p className="flavour">
-          Shingle and grey water. They say a lugger stands off here some nights — after dark, on a
-          falling tide, while the Customs House is counting other things.
-        </p>
+        <>
+          <p className="flavour">
+            Shingle and grey water. They say a lugger stands off here some nights — after dark, on
+            a falling tide, while the Customs House is counting other things.
+          </p>
+          <div className="menu-buttons">
+            {/* §6.9 (playtest) — no foot-tapping: run the hours until he shows,
+                a card interrupts, or dawn calls the vigil off. */}
+            <button
+              title={
+                waiting
+                  ? 'The hours are running. Any speed button also calls it off.'
+                  : 'The clock runs fast until the lugger stands off — or dawn, if he never comes. Nothing is skipped: cards still interrupt.'
+              }
+              onClick={() => setWaiting(!waiting)}
+            >
+              {waiting ? 'Waiting on the water… · call it off' : 'Wait for the lugger · let the hours run'}
+            </button>
+          </div>
+        </>
       ) : (
         <>
           <p className="flavour">
