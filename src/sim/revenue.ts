@@ -14,7 +14,10 @@ import {
   FALSE_BOTTOM_EXPOSURE_MULT,
   FORT_VISIBILITY,
   FORT_VISIBILITY_HEAT,
+  GALVANIC_VISIBILITY,
   INFORMER_COVER,
+  LEIDEN_COVER,
+  LIGHTER_EXPOSURE_MULT,
   MARKET_TATTLE,
   MAX_FORT_TIER,
   MAX_LOG_EVENTS,
@@ -70,7 +73,12 @@ export function illicitAnywhere(state: GameState): number {
  * INFORMER_COVER and every tub is visible to a search.
  */
 export function coverOf(state: GameState, nodeId: NodeId): number {
-  return state.informer ? INFORMER_COVER : (COVER_CAPACITY[nodeId] ?? 0);
+  const base = state.informer ? INFORMER_COVER : (COVER_CAPACITY[nodeId] ?? 0);
+  // §6.14 (M5c) — the philosopher is housed exactly like brandy: he, the
+  // glass, and the smell of burning air occupy LEIDEN_COVER of the hides.
+  const leidenTax =
+    state.leiden.state === 'housed' && state.leiden.node === nodeId ? LEIDEN_COVER : 0;
+  return Math.max(0, base - leidenTax);
 }
 
 // ---- Heat plumbing ----
@@ -108,8 +116,15 @@ export function accrueRouteHeat(state: GameState, cart: Cart, edge: MapEdge): vo
     timeOfDayMod(state.tick) === TIME_OF_DAY_MOD_NIGHT
       ? MARSH_LANTERN_EXPOSURE_MULT
       : 1;
+  // §6.14 (M5c) — the lighter's engine is audible over water: laden runs
+  // read the louder, day or night.
+  const lighterMult = cart.vessel ? LIGHTER_EXPOSURE_MULT : 1;
   const amount =
-    ((illicit * edge.exposure) / edge.latency) * timeOfDayMod(state.tick) * techMult * lanternMult;
+    ((illicit * edge.exposure) / edge.latency) *
+    timeOfDayMod(state.tick) *
+    techMult *
+    lanternMult *
+    lighterMult;
   // The stain falls on whichever end of the road the cart is nearer.
   const nearer =
     cart.location.progress * 2 < edge.latency ? cart.location.from : cart.location.to;
@@ -126,6 +141,15 @@ export function fortVisibility(state: GameState, nodeId: NodeId): number {
   const tier = Math.min(state.fortifications[nodeId] ?? 0, MAX_FORT_TIER);
   let v = 0;
   for (let t = 1; t <= tier; t++) v += FORT_VISIBILITY[t];
+  // §6.14 (M5c) — the galvanic fence reads from the coast road: Leiden's
+  // apparatus is enormous and visibly weird (§6.4).
+  if (
+    state.leiden.state === 'housed' &&
+    state.leiden.node === nodeId &&
+    state.research.completed.leiden >= 1
+  ) {
+    v += GALVANIC_VISIBILITY;
+  }
   return v;
 }
 
@@ -168,9 +192,14 @@ function logEvent(state: GameState, text: string): void {
 
 /** Decay, promotion, gossip, arrival, and the day's patrol plan. Dawn only. */
 export function dawnRevenue(state: GameState): void {
-  // Decay first: yesterday cools before today is planned (§6.3).
+  // Decay first: yesterday cools before today is planned (§6.3). Publication
+  // (§6.14, M5c) floors the national side: London can never entirely forget
+  // a parish the societies keep reading about.
   state.heat.regional *= REGIONAL_HEAT_DECAY;
-  state.heat.national *= NATIONAL_HEAT_DECAY;
+  state.heat.national = Math.max(
+    state.heat.national * NATIONAL_HEAT_DECAY,
+    state.nationalHeatFloor,
+  );
   for (const k of Object.keys(state.revenue.suspicion)) {
     state.revenue.suspicion[k] *= SUSPICION_DECAY;
   }

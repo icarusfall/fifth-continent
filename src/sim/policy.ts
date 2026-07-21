@@ -491,6 +491,34 @@ function runMarsh(
   return actions;
 }
 
+/**
+ * leidenPolicy (§6.14 M5c): the hub smuggler who takes the philosopher in
+ * when the sea sends him, publishes every letter, and climbs the ladder as
+ * coin allows. The distribution test holds Publication to its price: the
+ * floor rises exactly with the letters, and London never quite forgets.
+ */
+export function leidenPolicy(state: GameState): Action[] {
+  const actions = hubPolicy(state);
+  if (state.leiden.state === 'offered') {
+    // House him wherever the hides can spare him; the losing verb just logs.
+    actions.unshift({ type: 'houseLeiden', nodeId: 'farm' });
+    actions.push({ type: 'houseLeiden', nodeId: 'cutting-house' });
+  }
+  if (state.leiden.letterPending !== null) {
+    actions.unshift({ type: 'publishLetter' });
+  }
+  if (
+    state.leiden.state === 'housed' &&
+    state.leiden.letterPending === null &&
+    state.research.active === null &&
+    state.research.completed.leiden < 3 &&
+    state.coin >= RESEARCH_COST.leiden[state.research.completed.leiden] + RENT_AMOUNT
+  ) {
+    actions.push({ type: 'startResearch', tree: 'leiden' });
+  }
+  return actions;
+}
+
 /** Run one policy-driven game for `ticks` ticks. */
 export function runPolicyGame(
   seed: number,

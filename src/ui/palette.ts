@@ -21,7 +21,9 @@ export const HEAT_RED = '#C4453A';
 // the sign, the stone, and the Debt.
 export const ICHOR_GREEN = '#6FBF8F';
 
-// Reserved. Do not use yet.
+// Unlocked in M5c: the philosopher came ashore in a tub (spec §6.14) —
+// phlogiston orange leaves the reserve with its owner. It belongs to
+// Leiden's things alone: the workshop, the fence, the lighter, the letters.
 export const PHLOGISTON_ORANGE = '#E09B3D';
 
 export const TERRAIN_FILL: Record<string, string> = {

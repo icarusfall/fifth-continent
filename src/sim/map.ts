@@ -16,10 +16,13 @@ import {
   HIGH_ROAD_TICKS_PER_TILE,
   HORSE_TICKS_PER_TILE_MARSH,
   HORSE_TICKS_PER_TILE_ROAD,
+  LIGHTER_CAPACITY,
   LOW_ROAD_EXPOSURE,
   LOW_ROAD_TICKS_PER_TILE,
   MARSH_TICKS_PER_TILE,
   MARSH_TRACK_EXPOSURE,
+  SEA_LANE_EXPOSURE,
+  SEA_TICKS_PER_TILE,
 } from './balance';
 import type { MapEdge, MapNode, NodeId, EdgeId } from './types';
 
@@ -143,6 +146,17 @@ const MARSH_TRACK_WAYPOINTS = [
   { x: SHINGLE.x, y: SHINGLE.y },
 ];
 
+// §6.14 (M5c) — the sea lane: shingle to Ryne's quay, standing off the coast.
+// Water, not road: only the steam-lighter moves here, and it minds neither
+// tide nor night. Always in the edge list; the UI shows it once a hull exists.
+const SEA_LANE_WAYPOINTS = [
+  { x: SHINGLE.x, y: SHINGLE.y },
+  { x: 37, y: 12 },
+  { x: 37, y: 18 },
+  { x: 32, y: 22 },
+  { x: RYNE.x, y: RYNE.y },
+];
+
 export function pathTileLength(path: Array<{ x: number; y: number }>): number {
   let total = 0;
   for (let i = 1; i < path.length; i++) {
@@ -220,6 +234,17 @@ export function edgesFor(farm: FarmSite, cuttingHouse?: BuildingSite): MapEdge[]
       condition: 'open',
       path: marshPath,
     },
+    {
+      id: 'sea-lane',
+      name: 'The Sea Lane',
+      a: 'shingle',
+      b: 'ryne',
+      capacity: LIGHTER_CAPACITY,
+      latency: roadLatency(SEA_LANE_WAYPOINTS, SEA_TICKS_PER_TILE),
+      exposure: SEA_LANE_EXPOSURE,
+      condition: 'open', // steam minds neither tide nor night (§6.14)
+      path: SEA_LANE_WAYPOINTS,
+    },
   ];
   if (cuttingHouse) {
     // Siting the triangle IS the decision (spec §6.9): each leg's latency
@@ -292,9 +317,13 @@ export function horseLatency(edge: MapEdge): number {
   return Math.max(1, Math.round(pathTileLength(edge.path) * rate));
 }
 
-/** The edges the officer will ride: everything but the low road, plus his lane. */
+/** The edges the officer will ride: everything but the low road and the sea
+ *  (a horse does not row), plus his own lane. */
 export function officerEdgesFor(farm: FarmSite, cuttingHouse?: BuildingSite): MapEdge[] {
-  return [...edgesFor(farm, cuttingHouse).filter((e) => e.id !== 'low-road'), CUSTOMS_LANE];
+  return [
+    ...edgesFor(farm, cuttingHouse).filter((e) => e.id !== 'low-road' && e.id !== 'sea-lane'),
+    CUSTOMS_LANE,
+  ];
 }
 
 /**

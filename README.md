@@ -6,7 +6,28 @@ A single-player, browser-based god/builder game about smuggling, logistics, and
 the two kinds of magic you can use to hide a crime. Design spec and build brief:
 [the-fifth-continent-spec.md](./the-fifth-continent-spec.md).
 
-## Status: M5b — the wight ✅ (awaiting review)
+## Status: M5c — Leiden ✅ (awaiting review)
+
+**M5c (spec §6.14):** the philosopher arrives as smuggled cargo — from the
+fourth landing where coin crosses the gunwale, each departure rolls the
+seeded dice, and one night a tub is heavier than the rest, and knocking.
+House him (4 cover, permanent — he is stored exactly like brandy) and his
+building becomes the workshop. Each tier he completes seals a **letter to
+the societies**: send it and the floor under national Heat rises for ever
+(Publication — the doom clock stops forgetting); hold it in the strongbox
+for 15 Standing, at most three held before he downs tools. The tiers:
+**Galvanic fence** (the workshop's garrison kills ×1.5 the better, and the
+wired wall reads for miles), the **Steam-lighter** (the game's first hull:
+16 tubs on the new sea lane, shingle to Ryne's quay, minding neither tide
+nor night and audible to every ear on the coast), and the **Aetheric
+Telegraph** (the gossip overlay defogs: the Revenue's mind live, and where
+the officer calls next). The wights will happily take him. Phlogiston
+orange enters the palette with its owner. Save v19, migrating v18 in
+place — a family playtest is running. The 200-game pass: the sea sends him
+when it pleases, each letter prices the floor exactly, and decay never
+forgets below it. 296 tests green.
+
+Earlier: **M5b — the wight ✅.**
 
 **M5b (spec §6.14):** the marsh notices being used. After enough goods cross
 the marsh at night a wight-sign appears near the most-used crossing — a ring
@@ -98,9 +119,9 @@ daily appetite, rent and distraint. The 200-game smuggler bot now meets the
 officer around day 10, loses the odd load to him, and still ends day 20 far
 above the lawful ceiling — crime pays, and now it costs.
 
-Not yet built (by design — see spec §12): Leiden and Publication (M5c),
-dykes (M5½), bribes/informers/decoys, alliances and endings (M6), the
-moving-price market model (§17).
+Not yet built (by design — see spec §12): dykes (M5½), bribes/informers/
+decoys, alliances and endings (M6), the Bound Guardian and the Great
+Sluice-Engine (ending machinery), the moving-price market model (§17).
 
 ## Run it
 

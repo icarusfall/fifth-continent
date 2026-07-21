@@ -11,6 +11,7 @@ import {
   FACTION_BREAKPOINT,
   FIRST_RAID_SEIZE_FRAC,
   FORT_ALPHA_PER_TIER,
+  GALVANIC_ALPHA_MULT,
   HAWKSMERE_BASE,
   HAWKSMERE_FIRST_RAID,
   HAWKSMERE_FIRST_RAID_DELAY_DAYS,
@@ -30,6 +31,7 @@ import { simulateBattle } from './combat';
 import type { BattleSetup, CombatLog, Faction, ForceSpec, ScheduledCall } from './combat';
 import { nodeById } from './map';
 import { CONTRABAND, illicitCount, loseStanding } from './revenue';
+import { fenceActiveAt } from './leiden';
 import { addDebt } from './wights';
 import type { GameState, NodeId, Store } from './types';
 
@@ -102,10 +104,13 @@ export function garrisonForce(state: GameState, node: NodeId): ForceSpec {
       : FACTION_BREAKPOINT['marsh-militia'];
   const fortTier = state.fortifications[node] ?? 0;
   const fortAlpha = Math.max(0, fortTier - 1) * FORT_ALPHA_PER_TIER; // dogs give no alpha
+  // §6.14 (M5c) — the galvanic fence: the workshop's garrison kills the
+  // better. The men's alpha, not the works'.
+  const fenceMult = fenceActiveAt(state, node) ? GALVANIC_ALPHA_MULT : 1;
   return {
     faction: g.crew >= g.militia ? 'smuggler-crew' : 'marsh-militia', // names it in the readout
     strength: total,
-    alpha,
+    alpha: alpha * fenceMult,
     breakPoint,
     techAlpha: fortAlpha, // the works, minus the dogs' tier
   };

@@ -432,6 +432,33 @@ export const WIGHT_FOG_DEBT = 8;
  *  the way itself is the favour, whatever you carry. */
 export const HOLLOW_WAY_DEBT = 1;
 
+// ---- M5c: Leiden (spec §6.14) ----
+// He arrives as cargo, at random — you did not choose him, and could not have.
+/** Landings-with-purchases before the dice may put a man in a tub. */
+export const LEIDEN_ARRIVAL_MIN_RUN = 4;
+/** Per qualifying landing thereafter: the chance one tub held a philosopher. */
+export const LEIDEN_ARRIVAL_CHANCE = 0.25;
+/** Spare cover the workshop must spare him — housed exactly like brandy. */
+export const LEIDEN_COVER = 4;
+/** Each published letter raises the national-Heat floor (the §6.15 dial scales it). */
+export const PUBLICATION_HEAT: readonly number[] = [6, 10, 16];
+/** Standing each suppressed letter costs — he is well liked. */
+export const SUPPRESS_STANDING = 15;
+/** Held letters he tolerates before refusing the bench (§6.14). */
+export const MAX_SUPPRESSIONS = 3;
+/** Leiden 1 — the galvanic fence: the workshop's garrison kills the better… */
+export const GALVANIC_ALPHA_MULT = 1.5;
+/** …and the wired wall reads from the coast road. */
+export const GALVANIC_VISIBILITY = 8;
+/** Leiden 2 — the steam-lighter: one hull, sixteen tubs, no bedtime. */
+export const LIGHTER_CAPACITY = 16;
+/** The engine is audible over water: laden runs read the louder. */
+export const LIGHTER_EXPOSURE_MULT = 1.3;
+/** The sea lane: open water, watched from the coast road. */
+export const SEA_LANE_EXPOSURE = 0.8;
+/** Steam beats any cart, and the sea is flat. */
+export const SEA_TICKS_PER_TILE = 0.2;
+
 // ---- M5a: the research bench (spec §6.14) ----
 // Coin is nominal everywhere in research — the real price is always a meter
 // (Debt, the Heat floor, Standing). Trade costs only coin: safe, and weak.

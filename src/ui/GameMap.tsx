@@ -63,7 +63,7 @@ import {
 } from '../sim/map';
 import { dayPhaseOf, isFlooded, ticksUntilTideTurn } from '../sim/time';
 import { carterWageOf, garrisonCap, woolOnTheBooks } from '../sim/tick';
-import { HEAT_RED } from './palette';
+import { HEAT_RED, REVENUE_BLUE } from './palette';
 import { CONTRABAND, coverOf, fortVisibility, illicitAnywhere, illicitCount } from '../sim/revenue';
 import { GOOD_LABEL, spanOf, storeSummary } from './format';
 import type { Action, Cart, CutDepth, EdgeId, GameState, Good, NodeId } from '../sim/types';
@@ -90,9 +90,12 @@ import {
   drawShingle,
   drawStockChip,
   drawTileHighlight,
+  drawLighter,
+  drawSeaLane,
   drawWightSign,
   drawWightStone,
   drawWoolMote,
+  drawWorkshopBadge,
 } from './sprites';
 
 type Selection =
@@ -443,10 +446,15 @@ export function GameMap({ state }: { state: GameState }) {
         const visible =
           edge.id === 'marsh-track'
             ? s.dutchman.unlocked
-            : edge.id.startsWith('cut-')
-              ? true
-              : routesVisible(s);
-        if (visible) {
+            : edge.id === 'sea-lane'
+              ? s.carts.some((c) => c.vessel) // §6.14 M5c: shown once a hull exists
+              : edge.id.startsWith('cut-')
+                ? true
+                : routesVisible(s);
+        if (!visible) continue;
+        if (edge.id === 'sea-lane') {
+          drawSeaLane(ctx, pathPoints(edge, false));
+        } else {
           drawRoad(ctx, pathPoints(edge, false), edge.condition === 'tideLocked' && floodedNow);
         }
       }
@@ -500,9 +508,24 @@ export function GameMap({ state }: { state: GameState }) {
         drawLabel(ctx, 'The Wight-Stone', wc.x, wc.y - 16);
       }
 
+      // §6.14 (M5c) — the workshop's mark on its host, in the owner's orange.
+      if (s.leiden.state === 'housed' && s.leiden.node) {
+        const host = s.leiden.node === 'farm' ? s.farm : s.cuttingHouse;
+        if (host) {
+          drawWorkshopBadge(ctx, host, wightPhase);
+          const hc = tileCenter(host);
+          drawLabel(ctx, 'The Workshop', hc.x, hc.y + 22);
+        }
+      }
+
       // Gossip stains (spec §6.10): where the parish thinks the Revenue looks.
+      // §6.14 (M5c) — with the Aetheric Telegraph, the overlay defogs: live
+      // suspicion as it accrues, not yesterday's breakfast talk, and the
+      // officer's chosen target marked in the Revenue's own blue.
       if (showGossipRef.current) {
-        for (const [nodeId, strength] of Object.entries(s.revenue.gossip)) {
+        const telegraph = s.research.completed.leiden >= 3;
+        const mind = telegraph ? s.revenue.suspicion : s.revenue.gossip;
+        for (const [nodeId, strength] of Object.entries(mind)) {
           if (strength < 0.5) continue;
           if (nodeId === 'cutting-house' && !s.cuttingHouse) continue;
           try {
@@ -512,11 +535,27 @@ export function GameMap({ state }: { state: GameState }) {
             /* a stain on a node that no longer exists dries out */
           }
         }
+        if (telegraph && s.revenue.officer.targetNodeId) {
+          try {
+            const t = tileCenter(nodeById(s.revenue.officer.targetNodeId, s.farm, s.cuttingHouse));
+            ctx.strokeStyle = REVENUE_BLUE;
+            ctx.lineWidth = 1.6;
+            ctx.setLineDash([4, 4]);
+            ctx.strokeRect(t.x - 12, t.y - 12, 24, 24);
+            ctx.setLineDash([]);
+            drawLabel(ctx, 'his next call', t.x, t.y - 18);
+          } catch {
+            /* a target that no longer exists is no target */
+          }
+        }
       }
 
       for (const cart of s.carts) {
         const cp = cartWorldPosOf(s, cart);
-        if (cp) {
+        if (!cp) continue;
+        if (cart.vessel) {
+          drawLighter(ctx, cp.x, cp.y, cart.location.kind === 'edge' ? cp.angle : 0, wightPhase);
+        } else {
           drawCart(
             ctx,
             cp.x,
@@ -900,13 +939,23 @@ export function GameMap({ state }: { state: GameState }) {
       {(state.heat.regional >= 0.5 || state.revenue.officer.arrived) && (
         <button
           className={showGossip ? 'gossip-toggle on' : 'gossip-toggle'}
-          title="What the parish says the Revenue thinks. Yesterday's news, like all gossip."
+          title={
+            state.research.completed.leiden >= 3
+              ? 'The Aetheric Telegraph: the Revenue’s mind, live, and where he calls next (§6.14).'
+              : "What the parish says the Revenue thinks. Yesterday's news, like all gossip."
+          }
           onClick={(e) => {
             e.stopPropagation();
             setShowGossip((v) => !v);
           }}
         >
-          {showGossip ? 'gossip · on' : 'gossip'}
+          {state.research.completed.leiden >= 3
+            ? showGossip
+              ? 'telegraph · on'
+              : 'telegraph'
+            : showGossip
+              ? 'gossip · on'
+              : 'gossip'}
         </button>
       )}
 
@@ -1467,6 +1516,85 @@ function BenchRow({ state }: { state: GameState }) {
   );
 }
 
+// §6.14 (M5c) — the leiden ladder, for the workshop's menu. Coin is nominal;
+// the price column is the letter each tier wants sent.
+const LEIDEN_TIERS: ReadonlyArray<{ name: string; effect: string; price: string }> = [
+  {
+    name: 'Galvanic fence',
+    effect: 'the workshop’s men kill the better',
+    price: 'the wired wall reads for miles',
+  },
+  {
+    name: 'Steam-lighter',
+    effect: 'a hull, sixteen tubs, no bedtime — the sea lane opens',
+    price: 'the engine is loud over water',
+  },
+  {
+    name: 'Aetheric Telegraph',
+    effect: 'the overlay defogs — the Revenue’s mind, live',
+    price: 'the largest letter of all',
+  },
+];
+
+/**
+ * §6.14 (M5c) — the workshop: Leiden's bench, in the building that houses
+ * him. Research here, and the strongbox's held letters when there are any.
+ */
+function WorkshopRow({ state, nodeId }: { state: GameState; nodeId: NodeId }) {
+  const enqueue = useEnqueue();
+  if (state.leiden.state !== 'housed' || state.leiden.node !== nodeId) return null;
+  const r = state.research;
+  const tier = r.completed.leiden;
+  const held = state.leiden.heldLetters.length;
+  const benchBusy = r.active !== null;
+  const downedTools = held >= 3;
+  return (
+    <>
+      <h5>the workshop</h5>
+      <p className="flavour">
+        The philosopher keeps his bench behind the hides, and the room smells of storms.
+        {tier > 0 &&
+          ` Learned: ${LEIDEN_TIERS.slice(0, tier)
+            .map((t) => t.name)
+            .join(' · ')}.`}
+      </p>
+      {state.leiden.letterPending !== null && (
+        <p className="flavour">A letter sits sealed on the bench. He will not work past it.</p>
+      )}
+      {tier < LEIDEN_TIERS.length && state.leiden.letterPending === null && (
+        <div className="menu-buttons">
+          <button
+            disabled={benchBusy || downedTools || state.coin < RESEARCH_COST.leiden[tier]}
+            title={
+              benchBusy
+                ? 'The bench holds one project at a time.'
+                : downedTools
+                  ? 'Three letters sit in your strongbox. He has downed tools until one goes out.'
+                  : state.coin < RESEARCH_COST.leiden[tier]
+                    ? `The work wants ${RESEARCH_COST.leiden[tier]} coin up front, and the till is short.`
+                    : `${LEIDEN_TIERS[tier].effect} — ${LEIDEN_TIERS[tier].price}. And a letter will want sending.`
+            }
+            onClick={() => enqueue({ type: 'startResearch', tree: 'leiden' })}
+          >
+            Learn: {LEIDEN_TIERS[tier].name} · {RESEARCH_COST.leiden[tier]} coin ·{' '}
+            {RESEARCH_DAYS.leiden[tier]} days
+          </button>
+        </div>
+      )}
+      {held > 0 && (
+        <div className="menu-buttons">
+          <button
+            title="The floor rises late — late news from this parish is still news."
+            onClick={() => enqueue({ type: 'releaseLetter' })}
+          >
+            Let an old letter out of the strongbox · {held} held
+          </button>
+        </div>
+      )}
+    </>
+  );
+}
+
 function FarmMenu({
   state,
   onPlace,
@@ -1539,6 +1667,8 @@ function FarmMenu({
           {state.dutchman.unlocked && <FortifyRow state={state} nodeId="farm" />}
           {/* §6.13 — the men behind the works, same gate as the works. */}
           {state.dutchman.unlocked && <GarrisonRow state={state} nodeId="farm" />}
+          {/* §6.14 M5c — the workshop, if the philosopher is behind these hides. */}
+          <WorkshopRow state={state} nodeId="farm" />
 
           {/* §6.16 — the hired dawn, and the flock as a stock you trade. */}
           <ShearerRow state={state} />
@@ -1774,6 +1904,7 @@ function CuttingHouseMenu({ state }: { state: GameState }) {
 
       <FortifyRow state={state} nodeId="cutting-house" />
       <GarrisonRow state={state} nodeId="cutting-house" />
+      <WorkshopRow state={state} nodeId="cutting-house" />
 
       <CartsAtNode state={state} nodeId="cutting-house" />
     </>
@@ -2024,6 +2155,32 @@ function roadButtons(
   const name = cart.name.toLowerCase();
   const held = cargoCount(cart.cargo);
   const tideSpan = spanOf(ticksUntilTideTurn(state.tick));
+  // §6.14 (M5c) — the lighter answers only the sea lane: its buttons are its
+  // own, and no cart is ever offered the water.
+  if (cart.vessel) {
+    if (nodeId === 'shingle') {
+      btns.push(
+        <button
+          key="sea"
+          title="Steam minds neither tide nor night. Every ear on the coast minds the steam."
+          onClick={() => send(cart.id, 'sea-lane')}
+        >
+          Steam for Ryne&rsquo;s quay · the sea lane
+        </button>,
+      );
+    } else if (nodeId === 'ryne') {
+      btns.push(
+        <button
+          key="sea"
+          title="Steam minds neither tide nor night. Every ear on the coast minds the steam."
+          onClick={() => send(cart.id, 'sea-lane')}
+        >
+          Steam for the shingle · the sea lane
+        </button>,
+      );
+    }
+    return btns;
+  }
   switch (nodeId) {
     case 'farm': {
       if (held > 0) {

@@ -21,6 +21,7 @@ import {
   WIGHT_TRAP_IRON,
 } from './balance';
 import { edgesFor, isPlaceable, nodeById } from './map';
+import { collectLeiden } from './leiden';
 import { dayPhaseOf } from './time';
 import type { Cart, EdgeId, GameEvent, GameState, MapEdge } from './types';
 
@@ -235,6 +236,11 @@ function collectPerson(state: GameState): void {
   if (state.refiner.hired) {
     state.refiner.hired = false;
     takeAs(state, 'the refiner');
+    return;
+  }
+  // §6.14 (M5c) — the philosopher is a person in the collection sense.
+  if (collectLeiden(state)) {
+    takeAs(state, 'the philosopher — the workshop stands dark, and no letter says why');
     return;
   }
   // Nobody left on the payroll or the walls: they take you.

@@ -10,8 +10,11 @@ import {
   CART_COST,
   COLLECTION_GRACE_DAYS,
   FLOCK_CAP,
+  LEIDEN_COVER,
+  MAX_SUPPRESSIONS,
   PERSON_DEBT,
   FLOCK_SPOTLIGHT_DAY,
+  SUPPRESS_STANDING,
   MAX_CARTS,
   MILESTONE_CARD_SPACING_DAYS,
   REFINER_UNLOCK,
@@ -53,7 +56,12 @@ import type { Action, ActionLog, Difficulty, GameState, NodeId } from '../sim/ty
 //      the pen; honest play needs no bookkeeping at all (§6.10).
 // v18: M5b — debt, boundWights, the wights record (sign/trap/stone/hollow
 //      way), collection, peopleCollected/lastCollected (§6.14).
-const SAVE_KEY = 'fifth-continent-save-v18';
+// v19: M5c — the leiden record, nationalHeatFloor, and the lighter's vessel
+//      flag (§6.14). Migrates v18 in place: a family playtest is running,
+//      and mid-milestone the old abandon-silently policy would cost a live
+//      tenancy.
+const SAVE_KEY = 'fifth-continent-save-v19';
+const SAVE_KEY_V18 = 'fifth-continent-save-v18';
 const AUTOSAVE_EVERY_TICKS = 30;
 const AUTOPAY_KEY = 'fifth-continent-autopay-rent'; // a UI preference, not game state
 
@@ -64,7 +72,7 @@ const AUTOPAY_KEY = 'fifth-continent-autopay-rent'; // a UI preference, not game
  */
 export interface EventCard {
   id: string;
-  kind: 'rent' | 'info' | 'raid' | 'newGame' | 'vigil';
+  kind: 'rent' | 'info' | 'raid' | 'newGame' | 'vigil' | 'leiden' | 'letter';
   title: string;
   body: string;
   /** Optional scene-setting line shown above the body (e.g. the alehouse's
@@ -150,6 +158,29 @@ function rentCard(next: GameState): EventCard {
       ? `The agent is at the door for his ${due} coin, and the purse holds it.`
       : `The agent wants ${due} coin; the purse holds ${next.coin}. Short by ${short} — his men will drive off ${Math.ceil(short / SHEEP_VALUE)} sheep for the rest.`;
   return { id: `rent-${next.rentDueTick}`, kind: 'rent', title: 'Rent day', body };
+}
+
+/** §6.14 (M5c) — a tub is knocking: the philosopher, uninvited. Pause; he is
+ *  dripping on the shingle and the choice will not keep. */
+function leidenCard(next: GameState): EventCard {
+  return {
+    id: `leiden-${next.tick}`,
+    kind: 'leiden',
+    title: 'A tub with a man inside',
+    body: `The last tub off the lugger is heavier than the rest, and it is knocking. Inside: a natural philosopher — wet to the collar, indignant in three languages, travelling with a crate of glass and a letter of introduction nobody sent for. He asks for somewhere dry, a bench, and no questions; he needs ${LEIDEN_COVER} cover to spare, housed exactly like the brandy. He was not on your manifest. He is, however, in your boat.`,
+  };
+}
+
+/** §6.14 (M5c) — a letter sits sealed on the bench: Publication, or the
+ *  strongbox. He will not work past it. */
+function letterCard(next: GameState): EventCard {
+  const held = next.leiden.heldLetters.length;
+  return {
+    id: `letter-${next.tick}`,
+    kind: 'letter',
+    title: 'A letter to the societies',
+    body: `The work is done, written fair, and sealed for the learned societies. Send it, and your parish enters the record for good — the floor under London's memory rises, and rises for ever. Hold it in the strongbox and he is slighted before a parish that likes him: ${SUPPRESS_STANDING} Standing${held >= MAX_SUPPRESSIONS - 1 ? ' — and he will not stand another letter held after this one' : ''}.`,
+  };
 }
 
 /** §6.14 — a wight-sign stands on the marsh: pause, and point at it. A
@@ -581,6 +612,10 @@ export interface GameStore {
   requestNewGame: () => void;
   /** Begin the new tenancy at the chosen difficulty. */
   startNewGame: (difficulty: Difficulty) => void;
+  /** §6.14 M5c — answer the tub: house him at `nodeId`, or null to refuse. */
+  answerLeiden: (nodeId: NodeId | null) => void;
+  /** §6.14 M5c — answer the sealed letter: publish it, or the strongbox. */
+  answerLetter: (publish: boolean) => void;
   /** Begin watching the pending raid (§14) — the card gives way to the battle. */
   startBattle: () => void;
   /** Advance the playback one frame; ends the battle at the last frame. */
@@ -598,11 +633,36 @@ export interface GameStore {
   save: () => void;
 }
 
+/** v18 → v19 (§6.14 M5c): the philosopher has not arrived in an old save,
+ *  and the doom clock still forgets. Everything else carries over as-is. */
+function migrateV18(parsed: SaveFile): SaveFile {
+  const s = parsed.state as GameState & { leiden?: unknown; nationalHeatFloor?: unknown };
+  if (s.leiden === undefined) {
+    s.leiden = {
+      state: 'unmet',
+      node: null,
+      landingsBought: 0,
+      boughtThisVisit: false,
+      refusals: 0,
+      letterPending: null,
+      heldLetters: [],
+    };
+  }
+  if (typeof s.nationalHeatFloor !== 'number') s.nationalHeatFloor = 0;
+  return parsed;
+}
+
 function loadSave(): SaveFile | null {
   try {
-    const raw = localStorage.getItem(SAVE_KEY);
+    let raw = localStorage.getItem(SAVE_KEY);
+    let fromV18 = false;
+    if (!raw) {
+      raw = localStorage.getItem(SAVE_KEY_V18);
+      fromV18 = raw !== null;
+    }
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as SaveFile;
+    let parsed = JSON.parse(raw) as SaveFile;
+    if (fromV18) parsed = migrateV18(parsed);
     if (parsed.version !== 1 || typeof parsed.state?.tick !== 'number') return null;
     if (typeof parsed.state.farm?.x !== 'number' || typeof parsed.state.fleeceReady !== 'number')
       return null;
@@ -645,6 +705,11 @@ function loadSave(): SaveFile | null {
       typeof parsed.state.boundWights !== 'number' ||
       typeof parsed.state.wights?.nightUnits !== 'number' ||
       typeof parsed.state.peopleCollected !== 'number'
+    )
+      return null;
+    if (
+      typeof parsed.state.leiden?.state !== 'string' ||
+      typeof parsed.state.nationalHeatFloor !== 'number'
     )
       return null;
     return parsed;
@@ -716,6 +781,10 @@ export const useGameStore = create<GameStore>()((set, get) => {
       // unlocks the Dutchman, and its own milestone card owns that moment —
       // so the round card yields to it (the !unlocked guard below).
       const roundStood = next.lastRoundDay > state.lastRoundDay;
+      // §6.14 (M5c) — Leiden's beats: the tub that knocks, and the sealed letter.
+      const tubKnocks = next.leiden.state === 'offered' && state.leiden.state !== 'offered';
+      const letterSealed =
+        next.leiden.letterPending !== null && state.leiden.letterPending === null;
 
       if (rentJustDue && !autoPayRent) {
         card = rentCard(next);
@@ -733,6 +802,10 @@ export const useGameStore = create<GameStore>()((set, get) => {
         card = raidCard(next);
       } else if (musterGathered) {
         card = musterCard(next);
+      } else if (tubKnocks) {
+        card = leidenCard(next);
+      } else if (letterSealed) {
+        card = letterCard(next);
       } else if (signAppeared) {
         card = signCard(next);
       } else if (justSeized) {
@@ -782,6 +855,24 @@ export const useGameStore = create<GameStore>()((set, get) => {
     setWaitingForLugger: (on) => set({ waitingForLugger: on, paused: false }),
 
     waitAgain: () => set({ activeCard: null, waitingForLugger: true, paused: false }),
+
+    // §6.14 M5c — answer the tub: house him under a roof, or give him back
+    // to the sea. The action lands on the next tick, once the card lifts.
+    answerLeiden: (nodeId) =>
+      set((s) => ({
+        pending: [
+          ...s.pending,
+          nodeId ? { type: 'houseLeiden', nodeId } : { type: 'refuseLeiden' },
+        ],
+        activeCard: null,
+      })),
+
+    // §6.14 M5c — answer the sealed letter: the societies, or the strongbox.
+    answerLetter: (publish) =>
+      set((s) => ({
+        pending: [...s.pending, { type: publish ? 'publishLetter' : 'suppressLetter' }],
+        activeCard: null,
+      })),
 
     payRent: () => set((s) => ({ pending: [...s.pending, { type: 'payRent' }], activeCard: null })),
 

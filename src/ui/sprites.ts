@@ -4,7 +4,7 @@
 // so outlines scale with the camera as the spec asks.
 
 import { hash2, jitter, TILE, tileCenter } from './geometry';
-import { CLAY, DYKE, HEAT_RED, ICHOR_GREEN, INK, LIMEWASH, MARSH_DARK, REVENUE_BLUE, ROOF, SEA } from './palette';
+import { CLAY, DYKE, HEAT_RED, ICHOR_GREEN, INK, LIMEWASH, MARSH_DARK, PHLOGISTON_ORANGE, REVENUE_BLUE, ROOF, SEA } from './palette';
 import { mix } from './paint';
 
 const OUT = 1.6; // outline width at world scale
@@ -283,6 +283,103 @@ export function drawRoad(
   ctx.setLineDash(drowned ? [3, 7] : [9, 5]);
   trace();
   ctx.setLineDash([]);
+}
+
+/** §6.14 (M5c) — the sea lane: a wake over water, not a road. Drawn only
+ *  once a hull exists to ride it. Phlogiston orange: Leiden's things alone. */
+export function drawSeaLane(
+  ctx: CanvasRenderingContext2D,
+  pts: Array<{ x: number; y: number }>,
+): void {
+  const trace = () => {
+    ctx.beginPath();
+    pts.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+    ctx.stroke();
+  };
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = LIMEWASH;
+  ctx.globalAlpha = 0.3;
+  ctx.lineWidth = 3;
+  ctx.setLineDash([2, 8]);
+  trace();
+  ctx.strokeStyle = PHLOGISTON_ORANGE;
+  ctx.globalAlpha = 0.5;
+  ctx.lineWidth = 1.2;
+  ctx.setLineDash([6, 10]);
+  trace();
+  ctx.setLineDash([]);
+  ctx.globalAlpha = 1;
+}
+
+/** §6.14 (M5c) — the steam-lighter: a hull, a boiler, and no bedtime. */
+export function drawLighter(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  angle: number,
+  phase: number,
+): void {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  // hull
+  ctx.fillStyle = mix(INK, CLAY, 0.35);
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = OUT;
+  ctx.beginPath();
+  ctx.moveTo(-9, -3);
+  ctx.lineTo(9, -3);
+  ctx.lineTo(6, 3.5);
+  ctx.lineTo(-6, 3.5);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // funnel, banded in the owner's orange
+  ctx.fillStyle = PHLOGISTON_ORANGE;
+  ctx.fillRect(-1.4, -8, 2.8, 5);
+  ctx.strokeRect(-1.4, -8, 2.8, 5);
+  // smoke: it is always making smoke
+  ctx.fillStyle = LIMEWASH;
+  ctx.globalAlpha = 0.6;
+  for (let i = 0; i < 3; i++) {
+    const t = (phase + i / 3) % 1;
+    ctx.beginPath();
+    ctx.arc(-0.5 - t * 7, -9 - t * 5, 1.2 + t * 2.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+/** §6.14 (M5c) — the workshop's mark on its host building: a small orange
+ *  coil and the faint crackle of what the parish politely calls weather. */
+export function drawWorkshopBadge(
+  ctx: CanvasRenderingContext2D,
+  tile: { x: number; y: number },
+  phase: number,
+): void {
+  const c = { x: (tile.x + 0.5) * TILE + 10, y: (tile.y + 0.5) * TILE - 10 };
+  ctx.strokeStyle = PHLOGISTON_ORANGE;
+  ctx.lineWidth = 1.4;
+  ctx.globalAlpha = 0.85;
+  ctx.beginPath();
+  for (let i = 0; i <= 14; i++) {
+    const t = i / 14;
+    const a = t * Math.PI * 4;
+    const r = 1 + t * 4;
+    const px = c.x + Math.cos(a) * r;
+    const py = c.y + Math.sin(a) * r * 0.7;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.stroke();
+  // the crackle, breathing
+  ctx.globalAlpha = 0.25 + 0.2 * Math.sin(phase * Math.PI * 2);
+  ctx.beginPath();
+  ctx.arc(c.x, c.y, 7.5, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
 }
 
 /**

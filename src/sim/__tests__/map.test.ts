@@ -65,12 +65,13 @@ describe('the farm site and buildable ground', () => {
     expect(isPlaceable(5, 400)).toBe(false); // off the map
   });
 
-  it('the farm node, both roads, and the marsh track exist at the site', () => {
+  it('the farm node, both roads, the marsh track, and the sea lane exist at the site', () => {
     expect(nodeById('farm', SITE)).toMatchObject({ kind: 'farm', ...SITE });
     expect(edgesFor(SITE).map((e) => e.id).sort()).toEqual([
       'high-road',
       'low-road',
       'marsh-track',
+      'sea-lane', // §6.14 M5c — always in the graph; only a hull may ride it
     ]);
   });
 });

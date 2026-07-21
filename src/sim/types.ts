@@ -120,6 +120,9 @@ export interface Cart {
    * home with the remainder. Absent when he is not waiting.
    */
   marketPatienceUntil?: number;
+  /** §6.14 (M5c) — the steam-lighter: a hull, not a cart. Moves only on the
+   *  sea lane; carts never do. Absent on every land cart. */
+  vessel?: true;
 }
 
 /** A building's posted men (spec §6.13): the two kinds of the §14.2 pair. */
@@ -336,6 +339,29 @@ export interface GameState {
   /** People the wights have taken, and who the last one was (for the card). */
   peopleCollected: number;
   lastCollected: string | null;
+  /**
+   * Spec §6.14 (M5c) — the philosopher: cargo first, then the workshop.
+   * unmet → offered (a tub held a man) → housed | gone; two refusals, or the
+   * wights collecting him, end it for good.
+   */
+  leiden: {
+    state: 'unmet' | 'offered' | 'housed' | 'gone';
+    /** The building that houses him — the workshop. Null until housed. */
+    node: NodeId | null;
+    /** Landings where goods were bought: the arrival dice roll on these. */
+    landingsBought: number;
+    /** Goods bought off the lugger this visit — the roll fires at departure. */
+    boughtThisVisit: boolean;
+    refusals: number;
+    /** A tier just completed: its index waits on publish-or-suppress.
+     *  He will not take the bench while a letter waits. */
+    letterPending: number | null;
+    /** Unscaled floor amounts of letters held back, oldest first. At
+     *  MAX_SUPPRESSIONS held he refuses the bench until one goes out. */
+    heldLetters: number[];
+  };
+  /** Spec §6.14 — Publication: decay can never take national Heat below this. */
+  nationalHeatFloor: number;
   carts: Cart[];
   /** Ring buffer of recent events, oldest first. Part of state: deterministic. */
   log: GameEvent[];
@@ -378,6 +404,11 @@ export type Action =
   | { type: 'startResearch'; tree: ResearchTree }
   | { type: 'trapWight' }
   | { type: 'payTribute' }
+  | { type: 'houseLeiden'; nodeId: NodeId }
+  | { type: 'refuseLeiden' }
+  | { type: 'publishLetter' }
+  | { type: 'suppressLetter' }
+  | { type: 'releaseLetter' }
   | { type: 'designateHollowWay'; edgeId: EdgeId }
   | { type: 'resolveRaid'; calls?: ScheduledCall[] };
 

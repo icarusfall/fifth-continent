@@ -117,6 +117,25 @@ export function LedgerPanel({ state }: { state: GameState }) {
             </section>
           )}
 
+          {(state.nationalHeatFloor > 0 || state.leiden.heldLetters.length > 0) && (
+            <section>
+              <h5>the societies</h5>
+              {state.nationalHeatFloor > 0 && (
+                <p>
+                  London&rsquo;s memory of this parish never falls below{' '}
+                  <strong>{Math.round(state.nationalHeatFloor)}</strong> now. Print is for ever.
+                </p>
+              )}
+              {state.leiden.heldLetters.length > 0 && (
+                <p className="ledger-hint">
+                  {state.leiden.heldLetters.length} letter
+                  {state.leiden.heldLetters.length === 1 ? '' : 's'} held in the strongbox — he
+                  minds, and the parish minds with him.
+                </p>
+              )}
+            </section>
+          )}
+
           <section>
             <h5>the parish</h5>
             <p>

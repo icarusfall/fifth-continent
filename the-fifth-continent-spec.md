@@ -1032,17 +1032,26 @@ is the point: the moral reserve currency of the marsh has legs and a bell.
 
 #### Leiden — courted, and you did not choose him
 
-On the LEIDEN_ARRIVAL_RUN = 6th successful landing, one tub holds a
-philosopher (event card — he is cargo, uninsured, and wet). **Housing him**
-needs a building with ≥ LEIDEN_COVER = 4 spare cover capacity; he occupies it
-permanently and it becomes the workshop. Turn him away and he is rowed back
-out; the offer recurs once (run 10), then never. He is a person in the
+From the LEIDEN_ARRIVAL_MIN_RUN = 4th successful landing onward, every
+landing where goods are bought off the lugger rolls the seeded PRNG once:
+at LEIDEN_ARRIVAL_CHANCE = 1/4, one randomly chosen tub or barrel of that
+night's purchase holds a philosopher (pause card — he is cargo, uninsured,
+and wet, and the boat has already gone). Design call (playtest, 2026-07):
+random, not scheduled — *you did not choose him, and you could not have.*
+**Housing him** needs a building with ≥ LEIDEN_COVER = 4 spare cover
+capacity; he occupies it permanently and it becomes the workshop. Turn him
+away and he is rowed back out on the next tide; the offer re-rolls on
+later landings until a second refusal, then never. He is a person in the
 collection sense: the wights will happily take him.
 
 #### Publication — the floor that rises
 
 ```
 each completed leiden tier: nationalHeatFloor += PUBLICATION_HEAT [6, 10, 16]
+                            × heatMult      // §6.15 — the dial scales the
+                                            // floor like any heat the world
+                                            // deals; the numbers stand as
+                                            // opening bids for the §13 pass
 nationalHeat = max(nationalHeat × NATIONAL_HEAT_DECAY, nationalHeatFloor)
                                             // §6.3 gains a floor; decay
                                             // can never take you below it
@@ -1070,12 +1079,31 @@ The **Bound Guardian** and the **Great Sluice-Engine** are ending machinery —
 M6. Ichor green `#6FBF8F` and Phlogiston orange `#E09B3D` leave §13's reserve
 with their owners.
 
+**The Steam-lighter, in full (M5c decision: it ships whole, not cut down).**
+The game's first water hauler: completing Leiden 2 launches one lighter at
+the shingle — the research was the purchase. It is a vessel, not a cart: it
+moves only on the **sea lane**, a new water edge shingle ↔ Ryne's quay that
+ignores tide and night both — steam cares for neither. Capacity 16, crewed
+like a cart (a boatman takes a standing order at the carter's wage + danger
+money), and loud: a laden run reads at exposure ×1.3 and the lane is always
+a known edge. The lighter automates bulk into town over water while the
+roads stay quiet — and announces itself to every ear on the coast.
+
+**The Aetheric Telegraph defogs the map itself (M5c decision: no new
+panel — §20, the map is the interface).** The gossip key stops showing
+yesterday's dawn snapshot and shows the `RevenueModel` live: true suspicion
+as it accrues, and the officer's chosen target marked. The parish gossips;
+the telegraph *knows*.
+
 #### What joins GameState (save bump)
 
 `difficulty` (§6.15), a research record (active project, completed tiers),
 `debt`, `boundWights`, wight-signs, a Leiden record (state, workshop node,
 suppressions), `nationalHeatFloor`, and §6.15's `dutchmanBook` and vouch
-cooldown — all JSON-plain.
+cooldown — all JSON-plain. M5c's additions (the Leiden record,
+`nationalHeatFloor`, the lighter) bump the save to v19 **with a v18
+migration** — a family playtest is running, and mid-milestone the old
+"abandon silently" policy would cost a live tenancy.
 
 #### Build order (stop at each, as ever)
 
@@ -1097,7 +1125,14 @@ cooldown — all JSON-plain.
   against an empty wall — and renamed fort tier 2, which promised men the
   works do not contain).
 - **M5c — Leiden.** Arrival, the workshop, Publication and the floor, the
-  three tiers, the telegraph UI.
+  three tiers, the telegraph UI. **BUILT** (2026-07: the arrival went
+  random per the playtest decision — a seeded roll per landing-with-a-
+  purchase from the fourth on, any hand at the gunwale counting, the
+  carter's backhaul included; the letter is a pause card at each tier, the
+  strongbox holds at most three; the lighter ships whole — sea lane
+  shingle ↔ quay, hulls and wheels never sharing a way, the officer's
+  horse does not row; the telegraph defogs the existing overlay rather
+  than adding a panel; save v19 migrates v18 in place).
 
 ### 6.15 M5 — difficulty & mercy (a squeeze, not a wall)
 

@@ -56,6 +56,7 @@ import {
   MAX_CARTS,
   MAX_FORT_TIER,
   MAX_LOG_EVENTS,
+  MAX_SUPPRESSIONS,
   RENT_AMOUNT,
   RENT_PERIOD_DAYS,
   RYNE_PRICE,
@@ -74,12 +75,22 @@ import {
   accrueMarketTattle,
   accrueRouteHeat,
   accrueStorageHeat,
+  coverOf,
   dawnRevenue,
   loseStanding,
   officerTick,
 } from './revenue';
 import { raidTick, resolveRaid } from './raid';
 import { accrueNightMarsh, addDebt, applyPayTribute, applyTrapWight, wightsAtDawn } from './wights';
+import {
+  applyHouseLeiden,
+  applyPublishLetter,
+  applyRefuseLeiden,
+  applyReleaseLetter,
+  applySuppressLetter,
+  leidenAtDeparture,
+  leidenTierCompleted,
+} from './leiden';
 import { seedRng } from './rng';
 import { clockOf, dayPhaseOf, isFlooded, tideIsRising } from './time';
 import type {
@@ -184,6 +195,17 @@ export function initialState(seed: number, difficulty: Difficulty = 'fair'): Gam
     collection: null,
     peopleCollected: 0,
     lastCollected: null,
+    // §6.14 (M5c) — nobody has come ashore yet, and the doom clock still forgets.
+    leiden: {
+      state: 'unmet',
+      node: null,
+      landingsBought: 0,
+      boughtThisVisit: false,
+      refusals: 0,
+      letterPending: null,
+      heldLetters: [],
+    },
+    nationalHeatFloor: 0,
     carts: [
       {
         id: 'cart-1',
@@ -531,6 +553,16 @@ function applyAction(state: GameState, action: Action): void {
         logEvent(state, `${edge.name} does not start here.`);
         return;
       }
+      // §6.14 (M5c) — hulls and wheels never share a way.
+      if ((edge.id === 'sea-lane') !== (cart.vessel === true)) {
+        logEvent(
+          state,
+          cart.vessel
+            ? 'The lighter answers only the sea lane. Steam does not climb mud.'
+            : 'No cart swims. The sea lane is the lighter’s alone.',
+        );
+        return;
+      }
       if (edge.condition === 'tideLocked' && isFlooded(state.tick)) {
         logEvent(state, `${edge.name} is under the tide. The cart waits.`);
         return;
@@ -649,6 +681,7 @@ function applyAction(state: GameState, action: Action): void {
       state.dutchman.hold[action.good] = stocked - qty;
       state.coin -= qty * price;
       state.dutchman.met = true; // §6.9 — coin across the gunwale, either way
+      state.leiden.boughtThisVisit = true; // §6.14 M5c — a tub could hold anything
       addToStore(cart.cargo, action.good, qty);
       logEvent(state, `Bought ${qty} ${action.good} off the lugger for ${qty * price} coin.`);
       return;
@@ -765,7 +798,9 @@ function applyAction(state: GameState, action: Action): void {
     }
 
     case 'buyCart': {
-      if (state.carts.length >= MAX_CARTS) {
+      // §6.14 (M5c) — the lighter is a hull, not a stall: it never counts
+      // against the yard.
+      if (state.carts.filter((c) => !c.vessel).length >= MAX_CARTS) {
         logEvent(state, 'The yard holds three carts and no more.');
         return;
       }
@@ -797,7 +832,11 @@ function applyAction(state: GameState, action: Action): void {
       // carterless cart standing in the farmyard, and never the last one.
       const cart = findCart(state, action.cartId);
       if (!cart) return;
-      if (state.carts.length <= 1) {
+      if (cart.vessel) {
+        logEvent(state, 'The wheelwright wants nothing to do with a boiler. The lighter stays.');
+        return;
+      }
+      if (state.carts.filter((c) => !c.vessel).length <= 1) {
         logEvent(state, 'Sell the only cart and the wool walks to Ryne on its own feet. No.');
         return;
       }
@@ -1088,8 +1127,16 @@ function applyAction(state: GameState, action: Action): void {
         logEvent(state, 'No wight is bound. The marsh does not teach the unbound.');
         return;
       }
-      if (action.tree === 'leiden') {
+      if (action.tree === 'leiden' && state.leiden.state !== 'housed') {
         logEvent(state, 'No philosopher under your roof. His kind arrive by sea, uninvited.');
+        return;
+      }
+      if (action.tree === 'leiden' && state.leiden.letterPending !== null) {
+        logEvent(state, 'A letter waits sealed on the bench. He will not work past it.');
+        return;
+      }
+      if (action.tree === 'leiden' && state.leiden.heldLetters.length >= MAX_SUPPRESSIONS) {
+        logEvent(state, 'Three letters sit in your strongbox. He has downed tools until one goes out.');
         return;
       }
       const tier = state.research.completed[action.tree];
@@ -1122,6 +1169,31 @@ function applyAction(state: GameState, action: Action): void {
 
     case 'payTribute': {
       applyPayTribute(state);
+      return;
+    }
+
+    case 'houseLeiden': {
+      applyHouseLeiden(state, action.nodeId, coverOf(state, action.nodeId));
+      return;
+    }
+
+    case 'refuseLeiden': {
+      applyRefuseLeiden(state);
+      return;
+    }
+
+    case 'publishLetter': {
+      applyPublishLetter(state);
+      return;
+    }
+
+    case 'suppressLetter': {
+      applySuppressLetter(state);
+      return;
+    }
+
+    case 'releaseLetter': {
+      applyReleaseLetter(state);
       return;
     }
 
@@ -1276,6 +1348,8 @@ function researchProgress(state: GameState): void {
       'The stone teaches the way that is not there. Choose the track at the stone; nobody will ever watch it, and it is never free.',
     ];
     logEvent(state, marshDone[state.research.completed.marsh - 1] ?? 'The stone falls silent.');
+  } else if (active.tree === 'leiden') {
+    leidenTierCompleted(state); // §6.14 M5c — the work, the letter, the lighter
   } else {
     logEvent(state, 'The bench clears: the work is done.');
   }
@@ -1349,9 +1423,12 @@ export const QUAY_RUMOURS: readonly string[] = [
 function carterDispatch(state: GameState, cart: Cart, target: NodeId): void {
   if (cart.location.kind !== 'node' || cart.location.nodeId === target) return;
   const from = cart.location.nodeId;
-  const hop = firstHop(from, target, edgesFor(state.farm, state.cuttingHouse), (e) =>
-    e.condition === 'tideLocked' && isFlooded(state.tick) ? Infinity : e.latency,
-  );
+  const hop = firstHop(from, target, edgesFor(state.farm, state.cuttingHouse), (e) => {
+    // §6.14 (M5c) — hulls and wheels never share a way: the lighter answers
+    // only the sea lane, and no cart swims.
+    if ((e.id === 'sea-lane') !== (cart.vessel === true)) return Infinity;
+    return e.condition === 'tideLocked' && isFlooded(state.tick) ? Infinity : e.latency;
+  });
   if (!hop) return; // no open road: he waits for the tide like anyone
   cart.location = { kind: 'edge', edgeId: hop.id, from, to: otherEnd(hop, from), progress: 0 };
 }
@@ -1377,6 +1454,7 @@ function carterBackload(state: GameState, cart: Cart, order: CarterOrder): void 
     if (qty <= 0) return;
     state.dutchman.hold[back] = stocked - qty;
     state.coin -= qty * price;
+    state.leiden.boughtThisVisit = true; // §6.14 M5c — any hand at the gunwale
     addToStore(cart.cargo, back, qty);
     logEvent(
       state,
@@ -1594,6 +1672,7 @@ function dutchmanTide(state: GameState): void {
       state,
       state.dutchman.met ? 'The lugger slips out with the tide.' : 'At first light the lugger slips away, unmet.',
     );
+    leidenAtDeparture(state); // §6.14 M5c — was there a man in one of those tubs?
   }
   state.dutchman.present = here;
 }
