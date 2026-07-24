@@ -2356,6 +2356,8 @@ function CartsAtNode({
     max?: number;
     to?: NodeId;
     back?: Good;
+    /** §6.11 (M5c playtest) — the fence takes what Ryne's appetite leaves. */
+    fenceRest?: boolean;
   } | null>(null);
   const carts = stable
     ? state.carts
@@ -2369,6 +2371,7 @@ function CartsAtNode({
     good: Good,
     back?: Good,
     backTo?: NodeId,
+    fenceRest?: boolean,
   ) => {
     const maxLoad = hiring?.max && hiring.max > 0 ? hiring.max : undefined;
     enqueue({
@@ -2381,6 +2384,7 @@ function CartsAtNode({
         ...(maxLoad ? { maxLoad } : {}),
         ...(back ? { back } : {}),
         ...(backTo ? { backTo } : {}),
+        ...((fenceRest ?? hiring?.fenceRest) ? { fenceRest: true } : {}),
       },
     });
     setHiring(null);
@@ -2447,7 +2451,7 @@ function CartsAtNode({
               {cart.carter
                 ? ` · standing order: ${GOOD_LABEL[cart.carter.good]}${
                     cart.carter.maxLoad !== undefined ? ` (up to ${cart.carter.maxLoad} a run)` : ''
-                  } → ${
+                  }${cart.carter.fenceRest ? ' (fence takes the remainder)' : ''} → ${
                     nodeById(cart.carter.to, state.farm, state.cuttingHouse).name
                   }${
                     cart.carter.back
@@ -2538,6 +2542,25 @@ function CartsAtNode({
                             }${to === 'shingle' ? ' · danger money' : ''}`}
                       </button>
                     ))}
+                    {/* §6.11 (M5c playtest) — the glut valve: sell into the
+                        appetite, and the fence takes the remainder the same
+                        visit. Offered only where the fence deals. */}
+                    {destinationsFrom(hiring.from).includes('ryne') &&
+                      CONTRABAND.includes(hiring.good) &&
+                      RYNE_PRICE[hiring.good] > 0 && (
+                        <button
+                          title="What Ryne's appetite leaves, the back door takes at a 40% haircut — no waiting laden in plain view, and the town still talks."
+                          onClick={() => {
+                            const next = { ...hiring, fenceRest: true };
+                            if (backOptionsFor(state, 'ryne').length > 0)
+                              setHiring({ ...next, to: 'ryne' });
+                            else
+                              hire(cart.id, hiring.from, 'ryne', hiring.good!, undefined, undefined, true);
+                          }}
+                        >
+                          {GOOD_LABEL[hiring.good]} to Ryne — and the fence takes the remainder
+                        </button>
+                      )}
                   </>
                 ) : hiring.back === undefined ? (
                   <>

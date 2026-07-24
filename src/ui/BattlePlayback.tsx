@@ -46,7 +46,6 @@ const EVENT_TEXT: Record<string, string> = {
   fog_called: 'The fog comes up off the dykes',
 };
 
-const TAU = Math.PI * 2;
 const GOLDEN = 2.399963; // the golden angle spreads any headcount evenly
 
 /** Deterministic 0..1 from an integer — stable across replays of a frame. */

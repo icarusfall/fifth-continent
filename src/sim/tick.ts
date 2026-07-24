@@ -316,6 +316,25 @@ function isDawn(tick: number): boolean {
  * owed him, his man takes DUTCHMAN_SLICE off the top of every sale until the
  * book clears. Returns what actually reaches the purse.
  */
+/** §6.17 — the fence's take, shared by the manual verb and the carter's
+ *  "…fence the remainder" order (§6.11, M5c playtest): the whole holding of
+ *  the good, uncapped, at the haircut, with full market tattle. Priced, not
+ *  free — the cheap channel still widens the footprint. */
+function fenceTake(
+  state: GameState,
+  cart: Cart,
+  good: Good,
+): { taken: number; proceeds: number } {
+  const held = cart.cargo[good] ?? 0;
+  if (held <= 0) return { taken: 0, proceeds: 0 };
+  const price = Math.round(RYNE_PRICE[good] * FENCE_PRICE_MULT);
+  cart.cargo[good] = 0; // he takes the lot
+  const proceeds = held * price;
+  state.coin += creditProceeds(state, proceeds);
+  accrueMarketTattle(state, good, held);
+  return { taken: held, proceeds };
+}
+
 function creditProceeds(state: GameState, proceeds: number): number {
   if (state.dutchmanBook <= 0 || proceeds <= 0) return proceeds;
   const slice = Math.min(state.dutchmanBook, Math.floor(proceeds * DUTCHMAN_SLICE));
@@ -641,16 +660,11 @@ function applyAction(state: GameState, action: Action): void {
         logEvent(state, 'The fence deals in contraband, not honest goods.');
         return;
       }
-      const held = cart.cargo[action.good] ?? 0;
-      if (held <= 0) return;
-      const price = Math.round(RYNE_PRICE[action.good] * FENCE_PRICE_MULT);
-      cart.cargo[action.good] = 0; // he takes the lot
-      const proceeds = held * price;
-      state.coin += creditProceeds(state, proceeds);
-      accrueMarketTattle(state, action.good, held);
+      const { taken, proceeds } = fenceTake(state, cart, action.good);
+      if (taken <= 0) return;
       logEvent(
         state,
-        `The fence takes all ${held} ${action.good} for ${proceeds} coin — a fraction of the town price, and no waiting.`,
+        `The fence takes all ${taken} ${action.good} for ${proceeds} coin — a fraction of the town price, and no waiting.`,
       );
       return;
     }
@@ -990,11 +1004,21 @@ function applyAction(state: GameState, action: Action): void {
         order.maxLoad = Math.round(order.maxLoad);
         if (order.maxLoad <= 0 || order.maxLoad >= cart.capacity) delete order.maxLoad;
       }
+      // §6.11 (M5c playtest) — "…and fence the remainder": only meaningful
+      // where a fence stands (a market) for goods he deals in.
+      if (
+        order.fenceRest &&
+        !(to === 'ryne' && CONTRABAND.includes(order.good) && RYNE_PRICE[order.good] > 0)
+      ) {
+        delete order.fenceRest;
+      }
       cart.carter = order;
       delete cart.marketPatienceUntil; // a fresh instruction is fresh patience
       const route = `${nodeById(from, state.farm, state.cuttingHouse).name} to ${
         nodeById(to, state.farm, state.cuttingHouse).name
       }${order.maxLoad !== undefined ? `, no more than ${order.maxLoad} a run` : ''}${
+        order.fenceRest ? ', the fence takes the remainder' : ''
+      }${
         order.back
           ? `, home with ${order.back}${
               order.backTo
@@ -1569,6 +1593,19 @@ function runCarters(state: GameState): void {
               state,
               `The carter sells ${sold} ${order.good} at ${node.name} for ${sold * RYNE_PRICE[order.good]} coin.`,
             );
+          }
+          // §6.11 (M5c playtest) — "…and fence the remainder": what the
+          // town's appetite left, the back door takes at the haircut. The
+          // glut valve — a cart never waits laden in plain view under this
+          // order, and the tattle is paid in full.
+          if (order.fenceRest && (cart.cargo[order.good] ?? 0) > 0) {
+            const { taken, proceeds } = fenceTake(state, cart, order.good);
+            if (taken > 0) {
+              logEvent(
+                state,
+                `The carter walks the remainder round the back: the fence takes ${taken} ${order.good} for ${proceeds} coin.`,
+              );
+            }
           }
           // §6.11 / §6.17 — the sated market: what the town would not take he
           // no longer sloshes home. He waits for the appetite to refresh —

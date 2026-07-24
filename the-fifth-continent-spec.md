@@ -1302,6 +1302,18 @@ not worth the candle*), because an invisible mercy reads as a broken threat
 and an invisible threshold reads as a lie when crossed. Crossing back over
 the floor re-arms the world with everything it remembered.
 
+**The felt target (designer, M5c playtest — the Floor's other face):** the
+state the game is *for* is Satisfactory's flow-state — every pipeline
+between nodes humming, money pouring in with no further hand on anything,
+the player free to spend attention on the next thing to research, fortify,
+or build. Reaching that state must be the natural outcome of doing the
+obvious thing at each step — **never a combination lock of numbers where
+every wrong guess destroys you.** Pressure systems interrupt the hum and
+reprice it; they must not make the hum unreachable. When a playtest finds
+the player babysitting a stuck pipeline instead of building the next one
+(the sated-market glut, the shorted-page trap), that is a design defect in
+this section's sense, whatever the individual numbers say.
+
 **The dial** scales what the world does to you — never what your own economy
 yields. Prices, yields, and capacities are identical at every difficulty, so
 every player learns the same arithmetic; only the adversaries lean harder or
@@ -1537,15 +1549,28 @@ inspects Ryne (§6.10). The fence is the priced way not to run that risk.
 sellToFence   a back-door buyer at Ryne, uncapped by the daily appetite, pays
               FENCE_PRICE_MULT = 0.6 of the town price for any contraband —
               brandy, bulked or raw tea, lace
-manual only   the fence is the player's verb, never the carter's: automation
-              may not fence its way out of the risk it was sent into. You see
-              the stuck load and dump it cheap, or drive it home yourself, or
-              leave it to the officer
+fenceRest     (§6.11 order flag, M5c playtest — reversing the "manual only"
+              call below) a carter's order may read "…and fence the
+              remainder": what the appetite leaves, the back door takes the
+              same visit, at the haircut, tattle paid in full. The cart
+              never waits laden in plain view under this order. Offered
+              only for contraband orders into Ryne; sanitised off anything
+              else at hire.
 ```
 
-Over-supply becomes a decision made every run rather than a silent ceiling:
-wait exposed for full price, dump to the fence at a 40% haircut and roll home
-clean, or run the hot leg yourself and be gone before the blue coat. The
+*(Design call reversed, M5c playtest: the fence was "manual only — automation
+may not fence its way out of the risk it was sent into." That rule predates
+the sated-market glut the hub actually produces: refined goods pool at the
+cutting house faster than Ryne's appetite drains them, and the player's only
+verb was babysitting a stuck cart — a chore, not a decision. Under §6.16's
+own principle — automation is the reward for a mastered chore — the standing
+order is the mastered form, and it stays priced: the 40% haircut and the full
+market tattle are the same price the hand-dump paid. The un-flagged order
+still waits on the appetite; choosing between them is the decision.)*
+
+Over-supply becomes a decision made at hire rather than a silent ceiling:
+wait exposed for full price, fence the remainder at a 40% haircut and roll
+home clean, or run the hot leg yourself and be gone before the blue coat. The
 confiscation risk is real (§6.11); the fence is how you buy out of it, with
 margin — the game's only honest currency.
 

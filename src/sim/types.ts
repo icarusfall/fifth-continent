@@ -102,6 +102,10 @@ export interface CarterOrder {
   /** §6.11 (M5b playtest) — load at most this much of `good` per run;
    *  absent = fill the cart. The wool-split lever. */
   maxLoad?: number;
+  /** §6.11 (M5c playtest) — what the town's appetite leaves, the fence takes
+   *  at the haircut, same visit: the glut valve. Only meaningful on a
+   *  contraband order into the market; the tattle is paid in full. */
+  fenceRest?: boolean;
   back?: Good;
   backTo?: NodeId;
 }

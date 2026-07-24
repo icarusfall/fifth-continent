@@ -363,6 +363,68 @@ describe('bought carts and the hired carter (spec §6.11)', () => {
     expect(s.carts[0].location).toEqual({ kind: 'node', nodeId: 'farm' });
   });
 
+  it('"…and fence the remainder" (§6.11, M5c playtest): the glut valve clears the run', () => {
+    const s0 = initialState(1);
+    s0.coin = 0;
+    s0.cuttingHouse = { x: 24, y: 12 };
+    s0.stores['cutting-house'] = { 'brandy-fair': 20 }; // Ryne takes 6 a day
+    s0.carts[0].location = { kind: 'node', nodeId: 'cutting-house' };
+    const s = runTicks(s0, 90, {
+      0: [
+        {
+          type: 'hireCarter',
+          cartId: 'cart-1',
+          order: { from: 'cutting-house', to: 'ryne', good: 'brandy-fair', fenceRest: true },
+        },
+      ],
+    });
+    // Each 8-cask visit: the appetite takes its share at full price, the
+    // fence the rest at the haircut — and no laden wait in plain view.
+    expect(s.log.some((e) => /sells \d+ brandy-fair/.test(e.text))).toBe(true);
+    expect(s.log.some((e) => /the fence takes \d+ brandy-fair/.test(e.text))).toBe(true);
+    expect(s.carts[0].marketPatienceUntil).toBeUndefined();
+    const moved = 20 - (s.stores['cutting-house']?.['brandy-fair'] ?? 0) - (s.carts[0].cargo['brandy-fair'] ?? 0);
+    expect(s.contrabandSold).toBe(moved); // the tattle is paid in full either way
+  });
+
+  it('the fence flag is sanitised off orders it means nothing to', () => {
+    const s0 = initialState(1);
+    s0.stores.farm = { fleece: 12 };
+    const s = tick(s0, [
+      {
+        type: 'hireCarter',
+        cartId: 'cart-1',
+        order: { from: 'farm', to: 'ryne', good: 'fleece', fenceRest: true },
+      },
+    ]);
+    expect(s.carts[0].carter?.fenceRest).toBeUndefined(); // wool has no fence
+  });
+
+  // House rule 5: the glut valve across 200 seeded games — the sated-market
+  // pile-up the M5c playtest reported must drain under the standing order.
+  it('200 seeds: the fence order drains a 40-cask glut and never waits laden', { timeout: 120_000 }, () => {
+    for (let seed = 1; seed <= 200; seed++) {
+      const s0 = initialState(seed);
+      s0.coin = 0;
+      s0.cuttingHouse = { x: 24, y: 12 };
+      s0.stores['cutting-house'] = { 'brandy-fair': 40 };
+      s0.carts[0].location = { kind: 'node', nodeId: 'cutting-house' };
+      const s = runTicks(s0, TICKS_PER_DAY * 4, {
+        0: [
+          {
+            type: 'hireCarter',
+            cartId: 'cart-1',
+            order: { from: 'cutting-house', to: 'ryne', good: 'brandy-fair', fenceRest: true },
+          },
+        ],
+      });
+      expect(s.stores['cutting-house']?.['brandy-fair'] ?? 0).toBe(0); // the glut drained
+      expect(s.carts[0].marketPatienceUntil).toBeUndefined(); // never sat laden in town
+      expect(s.coin).toBeGreaterThan(0);
+      expect(s.lost).toBe(false);
+    }
+  });
+
   it('a crewed cart refuses the player’s reins', () => {
     const s0 = initialState(1);
     s0.stores.farm = { fleece: 12 };
