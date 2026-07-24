@@ -6,12 +6,13 @@ import {
   FLOCK_CAP,
   LONDON_GAUGE_CEILING,
   OFFICER_ARRIVAL_HEAT,
+  PAUPER_FLOOR,
   PROMOTION_THRESHOLD,
   REGIONAL_HEAT_DECAY,
   TICKS_PER_HOUR,
   WATER_GUARD_HEAT,
 } from '../sim/balance';
-import { standingDawnHeat } from '../sim/revenue';
+import { standingDawnHeat, underTheCandle } from '../sim/revenue';
 import { rentAmount } from '../sim/tick';
 import {
   clockOf,
@@ -192,6 +193,17 @@ export function Hud({ state }: { state: GameState }) {
       <div className="hud-block">
         <span className="hud-label">Coin</span>
         <span className="hud-coin">{state.coin}</span>
+        {/* §6.15 — the Floor must be visible while it holds: an invisible
+            mercy reads as a broken threat, and an invisible threshold reads
+            as a lie when crossed. */}
+        {underTheCandle(state) && (
+          <span
+            className="hud-note"
+            title={`Coin and contraband together are worth under ${PAUPER_FLOOR}. The Board does not spend ink, and the Company does not spend men, on a pauper: no seizures, no audit charges, no raids — until you are worth the candle again. The world still keeps score.`}
+          >
+            a pauper&rsquo;s till · not worth the candle
+          </span>
+        )}
       </div>
 
       <div className="hud-block">

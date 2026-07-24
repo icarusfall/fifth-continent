@@ -10,6 +10,7 @@ import {
   REFINER_WAGE,
   SHEARER_WAGE,
 } from '../sim/balance';
+import { auditGapNow } from '../sim/revenue';
 import { carterWageOf, rentAmount, woolOnTheBooks } from '../sim/tick';
 import { clockOf } from '../sim/time';
 import type { GameState } from '../sim/types';
@@ -114,6 +115,27 @@ export function LedgerPanel({ state }: { state: GameState }) {
                     ? 'An honest page. Every fleece the lugger swallows will read as a gap.'
                     : 'A shorted page. Declared wool must show; the rest never existed — get it over the gunwale.'}
               </p>
+              {/* §6.10 (M5c playtest) — the charge, read aloud BEFORE the
+                  audit: a shorted page with lawful sales is pure self-harm,
+                  and the game says so while the pen can still fix it. */}
+              {l.penTaken && auditGapNow(state) > 0.5 && (
+                <p style={{ color: HEAT_RED }}>
+                  If the stapler read this page now: ~
+                  <strong>{Math.round(auditGapNow(state))}</strong> fleece adrift — the audit
+                  will price every one of them in Heat. A shorted page only pays when the
+                  surplus goes over the gunwale.
+                </p>
+              )}
+              {l.penTaken && (
+                <div className="menu-buttons">
+                  <button
+                    title="The agent resumes keeping the book square with the flock. An honest page needs no bookkeeping — and prices no gap."
+                    onClick={() => enqueue({ type: 'returnPen' })}
+                  >
+                    Hand the pen back — let the agent keep it square
+                  </button>
+                </div>
+              )}
             </section>
           )}
 

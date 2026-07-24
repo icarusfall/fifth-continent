@@ -182,6 +182,7 @@ describe('the Riding Officer (spec §6.10)', () => {
 
   function officerBoundFor(target: string, mutate?: (s: GameState) => void): GameState {
     const s0 = initialState(1);
+    s0.coin = 400; // §6.15 — worth the candle: enforcement fixtures must be worth pouncing on
     s0.revenue.officer.arrived = true;
     s0.revenue.officer.location = { kind: 'node', nodeId: 'customs' };
     s0.revenue.officer.targetNodeId = target;
@@ -258,6 +259,7 @@ describe('the Riding Officer (spec §6.10)', () => {
 describe('the books (spec §6.10 / §19.2)', () => {
   function inspectionAt(mutate: (s: GameState) => void): { before: GameState; after: GameState } {
     const before = initialState(1);
+    before.coin = 400; // §6.15 — worth the candle: the gap only charges the solvent
     before.fleeceReady = 0; // these tests set on-hand wool via the stores below
     before.revenue.officer.arrived = true;
     before.revenue.officer.location = { kind: 'node', nodeId: 'farm' };

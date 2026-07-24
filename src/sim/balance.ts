@@ -143,6 +143,14 @@ export const COVER_CAPACITY: Partial<Record<string, number>> = {
   'cutting-house': 6,
 };
 
+/**
+ * §6.15 — the Floor's first mechanic (M5c playtest): under this condemnable
+ * worth (coin + contraband at Ryne prices) the world notes but does not
+ * pounce — no seizures, no audit charge, no raid musters. An officer's pay
+ * was a share of what he condemned; nobody rides for a pauper's tubs.
+ */
+export const PAUPER_FLOOR = 300;
+
 // ---- M3: the Riding Officer (spec §6.10) ----
 export const OFFICER_ARRIVAL_HEAT = 30; // first dawn regional at or above this, he comes
 /** §20.2 — the London gauge's display ceiling (the doom dial reads full here).

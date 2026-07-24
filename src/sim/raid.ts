@@ -30,7 +30,7 @@ import {
 import { simulateBattle } from './combat';
 import type { BattleSetup, CombatLog, Faction, ForceSpec, ScheduledCall } from './combat';
 import { nodeById } from './map';
-import { CONTRABAND, goodsSummary, illicitCount, loseStanding } from './revenue';
+import { CONTRABAND, goodsSummary, illicitCount, loseStanding, underTheCandle } from './revenue';
 import { fenceActiveAt } from './leiden';
 import { addDebt } from './wights';
 import type { GameState, NodeId, Store } from './types';
@@ -237,6 +237,9 @@ export function raidTick(state: GameState): void {
       const spacing = DIFFICULTY[state.difficulty].crisisSpacingDays * TICKS_PER_DAY;
       const earliest = state.lastCrisisTick + spacing;
       if (state.tick < earliest - RAID_MUSTER_LEAD) return;
+      // §6.15 — under the candle nobody musters, Company or Crown: a pauper
+      // is not worth the men. Deferred like the spacing, never cancelled.
+      if (underTheCandle(state)) return;
       const target = raidTarget(state);
       const faction = raidFaction(state);
       const battleTick = Math.max(hw.nextRaidTick, state.tick + 1, earliest);

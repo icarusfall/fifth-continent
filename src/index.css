@@ -620,48 +620,9 @@ button.danger {
   opacity: 0.7;
 }
 
-.battle-row {
-  margin-bottom: 14px;
-}
-
-.battle-row-head {
-  display: flex;
-  justify-content: space-between;
-  font-size: 13px;
-  margin-bottom: 3px;
-}
-
 .battle-count {
   font-weight: bold;
   font-variant-numeric: tabular-nums;
-}
-
-.battle-bar {
-  height: 16px;
-  background: rgba(232, 225, 210, 0.1);
-  border: 1px solid rgba(155, 130, 101, 0.4);
-  border-radius: 2px;
-  overflow: hidden;
-}
-
-.battle-bar > div {
-  height: 100%;
-  /* Glide at the playback's own cadence, so attrition reads as a tide. */
-  transition: width var(--frame-ms, 140ms) linear;
-}
-
-.battle-morale {
-  height: 4px;
-  margin-top: 2px;
-  background: rgba(232, 225, 210, 0.08);
-  border-radius: 2px;
-  overflow: hidden;
-}
-
-.battle-morale > div {
-  height: 100%;
-  background: var(--marsh);
-  transition: width var(--frame-ms, 140ms) linear;
 }
 
 .battle-events {
@@ -687,6 +648,74 @@ button.danger {
     radial-gradient(ellipse at 75% -20%, rgba(46, 74, 107, 0.25), transparent 55%),
     rgba(16, 12, 10, 0.6);
   overflow: hidden;
+}
+
+/* §6.13 (M5c playtest) — men, not meters: the field is the whole show. */
+.battle-field.dots {
+  height: 210px;
+  margin: 8px 0 8px;
+}
+
+.battle-line {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  margin: 2px 0;
+}
+
+.battle-dot {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1px solid rgba(12, 9, 7, 0.6); /* ink outline — §15.3's register */
+  transform: translate(-50%, -50%);
+  /* Glide at the playback's own cadence, so the skirmish reads as motion. */
+  transition:
+    left var(--frame-ms, 140ms) linear,
+    top var(--frame-ms, 140ms) linear,
+    opacity 300ms ease-out;
+}
+
+.battle-dot.fallen {
+  opacity: 0.28;
+  transform: translate(-50%, -50%) scale(0.7);
+  filter: saturate(0.3) brightness(0.6);
+  transition: none; /* the dead do not glide */
+}
+
+.battle-dot.fleeing {
+  opacity: 0.55;
+}
+
+.battle-dot.fogged {
+  opacity: 0.4;
+  filter: blur(1px);
+}
+
+/* The building they came for: a flat-filled, ink-lined gable (§15.3). */
+.battle-building {
+  position: absolute;
+  left: 50%;
+  top: 55%;
+  width: 30px;
+  height: 20px;
+  transform: translate(-50%, -35%);
+  background: #4a3a30;
+  border: 1px solid rgba(12, 9, 7, 0.8);
+  border-radius: 1px;
+}
+
+.battle-building::before {
+  content: '';
+  position: absolute;
+  left: -1px;
+  top: -12px;
+  width: 0;
+  height: 0;
+  border-left: 15px solid transparent;
+  border-right: 15px solid transparent;
+  border-bottom: 12px solid #6b4a38;
 }
 
 .battle-flash {

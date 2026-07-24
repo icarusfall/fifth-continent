@@ -30,6 +30,7 @@ import type { Action, GameState } from '../types';
 function primed(mutate?: (s: GameState) => void): GameState {
   const s = initialState(1);
   s.dutchman.unlocked = true;
+  s.coin = 400; // §6.15 — worth the candle: nobody musters against a pauper
   s.cuttingHouse = { x: 24, y: 12 };
   s.stores['cutting-house'] = { 'brandy-fair': 12 };
   s.hawksmere = { provoked: true, raidsSurvived: 0, nextRaidTick: 1000 };

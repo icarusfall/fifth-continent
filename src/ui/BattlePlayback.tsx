@@ -2,15 +2,22 @@
 // deterministically whenever a Call is sounded); this overlay plays it back a
 // frame at a time, and offers the three Calls. The player watches something
 // that genuinely happened.
+//
+// §6.13 (M5c playtest) — the playback is men, not meters: one dot per whole
+// man, defenders ringed at the building, attackers pressing in, dots winking
+// out as strength falls and streaming off the field on a rout. The count IS
+// the battle. All per-dot randomness is deterministic off the dot index and
+// frame (§15.1 owns it; the sim's dice are never touched).
 
 import { useEffect } from 'react';
 import type { CSSProperties } from 'react';
 import { canPayOff } from '../sim/combat';
+import type { CombatLog } from '../sim/combat';
 import { useGameStore } from '../state/store';
 
 // Every battle should take a watchable ~8–10s regardless of how many frames
 // the sim produced (playtest: fights ended before they could be felt): a
-// short rout plays slowly — the bars glide — and a long grind compresses.
+// short rout plays slowly — the field glides — and a long grind compresses.
 const BATTLE_TARGET_MS = 9000;
 const FRAME_MS_MIN = 60;
 const FRAME_MS_MAX = 800;
@@ -39,30 +46,77 @@ const EVENT_TEXT: Record<string, string> = {
   fog_called: 'The fog comes up off the dykes',
 };
 
-interface RowProps {
-  label: string;
-  count: number;
-  morale: number;
-  color: string;
-  max: number;
-  fog?: boolean;
+const TAU = Math.PI * 2;
+const GOLDEN = 2.399963; // the golden angle spreads any headcount evenly
+
+/** Deterministic 0..1 from an integer — stable across replays of a frame. */
+function hash01(n: number): number {
+  const x = Math.sin(n * 127.1 + 311.7) * 43758.5453;
+  return x - Math.floor(x);
 }
 
-function BattleRow({ label, count, morale, color, max, fog }: RowProps) {
-  return (
-    <div className="battle-row">
-      <div className="battle-row-head">
-        <span>{label}</span>
-        <span className="battle-count">{fog ? '?' : count}</span>
-      </div>
-      <div className="battle-bar">
-        <div style={{ width: `${Math.max(0, (count / max) * 100)}%`, background: color }} />
-      </div>
-      <div className="battle-morale">
-        <div style={{ width: `${Math.max(0, Math.min(100, morale))}%` }} />
-      </div>
-    </div>
-  );
+/** The first frame at which a side broke, if it has (§14.3). */
+function routFrameOf(log: CombatLog, upTo: number, side: 'attacker' | 'defender'): number | null {
+  for (let i = 0; i <= upTo && i < log.frames.length; i++) {
+    if (log.frames[i].events.some((e) => e.kind === 'rout' && e.side === side)) return i;
+  }
+  return null;
+}
+
+interface DotSpec {
+  left: number; // percent
+  top: number; // percent
+  state: 'fighting' | 'fallen' | 'fleeing';
+}
+
+/**
+ * Every man of one side, placed: the living ringed and skirmishing, the
+ * fallen lying where they stood, the broken streaming off the field. The
+ * field is wider than tall, so x-radii stretch by the aspect.
+ */
+function sideDots(opts: {
+  side: 'attacker' | 'defender';
+  start: number;
+  count: number;
+  frame: number;
+  totalFrames: number;
+  routFrame: number | null;
+}): DotSpec[] {
+  const { side, start, count, frame, totalFrames, routFrame } = opts;
+  const dots: DotSpec[] = [];
+  const salt = side === 'attacker' ? 900 : 100;
+  // Attackers press from a wide ring to musket range over the opening frames.
+  const approach = side === 'attacker' ? Math.min(1, frame / Math.max(3, totalFrames * 0.2)) : 1;
+
+  for (let i = 0; i < start; i++) {
+    const angle = i * GOLDEN + (side === 'attacker' ? 0.4 : 0) + hash01(i + salt) * 0.5;
+    const baseR =
+      side === 'defender'
+        ? 13 + hash01(i + salt + 1) * 7
+        : 44 - 22 * approach + hash01(i + salt + 1) * 6;
+    const fallen = i >= count;
+    const fleeing = !fallen && routFrame !== null && frame > routFrame;
+    // The living skirmish in place; the fallen lie still; the broken run.
+    const wiggleX = fallen ? 0 : Math.sin(frame * 0.7 + i * 2.4) * 1.8;
+    const wiggleY = fallen ? 0 : Math.cos(frame * 0.6 + i * 1.7) * 1.4;
+    const flee = fleeing ? (frame - (routFrame ?? 0)) * 4.5 : 0;
+    const r = baseR + flee;
+    dots.push({
+      left: 50 + Math.cos(angle) * r * 1.35 + wiggleX,
+      top: 55 + Math.sin(angle) * r + wiggleY,
+      state: fallen ? 'fallen' : fleeing ? 'fleeing' : 'fighting',
+    });
+  }
+  return dots;
+}
+
+/** The count is the battle; the word under it is the stomach for it. */
+function moraleWord(morale: number, broke: boolean, unbreaking: boolean): string {
+  if (broke) return 'broken — running';
+  if (unbreaking) return 'they do not rout';
+  if (morale > 66) return 'steady';
+  if (morale > 33) return 'wavering';
+  return 'breaking';
 }
 
 export function BattlePlayback() {
@@ -86,12 +140,31 @@ export function BattlePlayback() {
   const attFaction = setup.attacker.faction;
   const attStart = setup.attacker.strength + (setup.attacker.reserve ?? 0);
   const defStart = setup.defender.strength + (setup.defender.reserve ?? 0);
-  const max = Math.max(attStart, defStart, 1);
 
   const events = f.events.map((e) => EVENT_TEXT[e.kind]).filter(Boolean);
   const dragoons = attFaction === 'dragoons';
   const canRetreat = callsLeft > 0;
   const canPay = callsLeft > 0 && canPayOff(attFaction);
+
+  const attRout = routFrameOf(log, frame, 'attacker');
+  const defRout = routFrameOf(log, frame, 'defender');
+  const attackers = sideDots({
+    side: 'attacker',
+    start: Math.round(attStart),
+    count: Math.max(0, Math.round(f.attackers)),
+    frame,
+    totalFrames: frameCount,
+    routFrame: attRout,
+  });
+  const defenders = sideDots({
+    side: 'defender',
+    start: Math.round(defStart),
+    count: Math.max(0, Math.round(f.defenders)),
+    frame,
+    totalFrames: frameCount,
+    routFrame: defRout,
+  });
+  const attColor = FACTION_COLOR[attFaction] ?? '#7A3B32';
 
   // The volley: musket flashes each frame, as many as the moment is bloody —
   // positions pseudo-random from the frame index, so playback stays steady.
@@ -109,40 +182,57 @@ export function BattlePlayback() {
           Open ground · square law · numbers tell{dragoons ? ' · they do not rout' : ''}
         </p>
 
-        <div className="battle-field" key={frame}>
+        <div className="battle-line">
+          <span style={{ color: attColor }}>{FACTION_NAME[attFaction] ?? attFaction}</span>
+          <span className="battle-count">
+            {setup.fog ? '?' : Math.round(f.attackers)} men ·{' '}
+            {setup.fog && attRout === null
+              ? 'shapes in the fog'
+              : moraleWord(f.attackerMorale, attRout !== null, dragoons)}
+          </span>
+        </div>
+
+        <div className="battle-field dots">
+          {/* The building they came for — the fight has an address. */}
+          <div className="battle-building" title={battle.targetName} />
+          {attackers.map((d, i) => (
+            <span
+              key={`a${i}`}
+              className={`battle-dot ${d.state}${setup.fog ? ' fogged' : ''}`}
+              style={{ left: `${d.left}%`, top: `${d.top}%`, background: attColor }}
+            />
+          ))}
+          {defenders.map((d, i) => (
+            <span
+              key={`d${i}`}
+              className={`battle-dot ${d.state}`}
+              style={{ left: `${d.left}%`, top: `${d.top}%`, background: '#E8E1D2' }}
+            />
+          ))}
           {Array.from({ length: flashes }, (_, i) => (
             <span
-              key={i}
+              key={`f${frame}-${i}`}
               className="battle-flash"
               style={{
-                left: `${(frame * 37 + i * 53) % 96}%`,
-                top: `${(frame * 19 + i * 29) % 80}%`,
+                left: `${20 + ((frame * 37 + i * 53) % 60)}%`,
+                top: `${25 + ((frame * 19 + i * 29) % 55)}%`,
                 animationDelay: `${((frame * 13 + i * 41) % 60) * 2}ms`,
               }}
             />
           ))}
         </div>
 
-        <BattleRow
-          label={FACTION_NAME[attFaction] ?? attFaction}
-          count={Math.round(f.attackers)}
-          morale={f.attackerMorale}
-          color={FACTION_COLOR[attFaction] ?? '#7A3B32'}
-          max={max}
-          fog={setup.fog}
-        />
-        <BattleRow
-          label="Your men"
-          count={Math.round(f.defenders)}
-          morale={f.defenderMorale}
-          color="#E8E1D2"
-          max={max}
-        />
+        <div className="battle-line">
+          <span>Your men</span>
+          <span className="battle-count">
+            {Math.round(f.defenders)} men · {moraleWord(f.defenderMorale, defRout !== null, false)}
+          </span>
+        </div>
 
         <div
           className={events.length > 0 ? 'battle-events flash' : 'battle-events'}
           key={`ev-${frame}`}
-        >{events.join(' · ') || ' '}</div>
+        >{events.join(' · ') || ' '}</div>
 
         <div className="battle-calls">
           <span className="calls-left">

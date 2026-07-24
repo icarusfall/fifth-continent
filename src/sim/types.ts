@@ -395,6 +395,7 @@ export type Action =
   | { type: 'hireCarter'; cartId: CartId; order: CarterOrder }
   | { type: 'dismissCarter'; cartId: CartId }
   | { type: 'setDeclaredYield'; fleecePerDay: number }
+  | { type: 'returnPen' }
   | { type: 'payRent' }
   | { type: 'takeDutchmanLoan' }
   | { type: 'setDifficulty'; difficulty: Difficulty }

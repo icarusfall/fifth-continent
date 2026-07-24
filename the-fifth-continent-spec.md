@@ -487,6 +487,15 @@ soldToday       fleece sold at Ryne since dawn; a readout tally only
 woolOnTheBooks  openingStock + declaredToDate − soldLawfully: the page's
                 unsold balance — wool the book grew (or the officer has
                 counted, below) that no scale has yet weighed
+auditGapNow     the gap checkBooks would price at this instant, computed
+                pure and shown LIVE on the ledger page (M5c playtest — the
+                read-the-charge rule): a player who shorts the page while
+                selling lawfully is doing pure self-harm, and the game must
+                say so before the audit does, not after. The page also
+                offers the pen BACK (returnPen): the agent resumes keeping
+                the books square with the flock, declaredYield follows the
+                clip again, and honest play goes back to needing no
+                bookkeeping at all (§6.10's founding promise).
 at Ryne         fleece sells only into min(remaining appetite,
                 woolOnTheBooks): the wool-stapler reads the whole page, not
                 the day's line. (Playtest, late 2026-07: under the old
@@ -1012,6 +1021,17 @@ actions queued into `simulateBattle`, so replay stays byte-identical.
   national Heat; the raid drawn on the map, the `CombatLog` played back, the
   three-Call UI, and the pause card.
 
+**The playback is men, not meters (M5c playtest).** Strength bars draining
+read as a spreadsheet; the fight renders as **dots** — one per whole man of
+each side, defenders ringed at the building, attackers pressing in from
+their approach — skirmishing in place (deterministic per-dot jitter off the
+frame index; §15.1 owns this randomness, never the sim's), winking out as
+their side's `strength` falls, and streaming away from the field on a rout
+(the §14.3 distinction drawn literally: the broken *flee*, the dead just
+stop). Bad North is the register (§15): flat-filled figures small enough to
+be counted at a glance, because the count IS the battle. The summary card
+after keeps the arithmetic; the meters go.
+
 #### Decisions taken (2026-07-16 design pass)
 
 1. **Two meters, orthogonal.** Hawksmere is provoked by your market footprint
@@ -1245,6 +1265,42 @@ retires the last hard-loss instinct: even rent forfeiture must pass through
 the whole mercy chain (distraint → the Dutchman's book → the parish vouch)
 before it can end a game, and the concrete floor mechanics get their own
 design pass (they are not built by tightening the retune's numbers further).
+
+**Not worth the candle (the Floor's first mechanic, M5c playtest).** A
+Riding Officer's pay was a share of the goods he condemned; the Board does
+not spend ink, and the Company does not spend men, on a pauper. Diegetic,
+visible, and priced — never a hidden threshold:
+
+```
+worth        = coin + Σ contraband (stores + carts) × RYNE_PRICE[good]
+               // condemnable value: what a seizure would actually be worth.
+               // Overproof jenever prices at 0 — no legal buyer, the Board
+               // would pour it in a ditch. Lawful assets (flock, fleece)
+               // never make you worth pouncing on: the go-straight recovery
+               // path stays under the candle however large the flock.
+PAUPER_FLOOR = 300
+
+while worth < PAUPER_FLOOR ("under the candle"):
+  searches & road stops   run as ever, and the officer NOTES — suspicion
+                          stains accrue in full — but he seizes nothing and
+                          the event charges no heat ("He looks over the
+                          till and puts the notebook away")
+  book audits             read and initial the page as ever; the gap goes
+                          uncharged ("nothing here worth the Board's ink")
+  raid musters            do not fire — Hawksmere and the Crown alike;
+                          deferred like crisis spacing, never cancelled
+  everything else         unchanged: your own acts still make heat (routes,
+                          tattle, storage, the fort-tell), the officer still
+                          arrives, provocation still marks you — the world
+                          keeps score, it just does not pounce. Run crime as
+                          a pauper and the bill waits for the day you are
+                          worth presenting it to.
+```
+
+The HUD says so while it holds (a note under the coin: *a pauper's till —
+not worth the candle*), because an invisible mercy reads as a broken threat
+and an invisible threshold reads as a lie when crossed. Crossing back over
+the floor re-arms the world with everything it remembered.
 
 **The dial** scales what the world does to you — never what your own economy
 yields. Prices, yields, and capacities are identical at every difficulty, so

@@ -1238,6 +1238,19 @@ function applyAction(state: GameState, action: Action): void {
       return;
     }
 
+    case 'returnPen': {
+      // §6.10 (M5c playtest) — hand the pen back: the agent resumes keeping
+      // the books square with the flock. Honest play needs no bookkeeping.
+      if (!state.ledger.penTaken) return;
+      state.ledger.penTaken = false;
+      state.ledger.declaredYield = state.flockSize * FLEECE_PER_HEAD_PER_DAY;
+      logEvent(
+        state,
+        'You hand the pen back. The agent keeps the book square with the flock from here — an honest page, and no arithmetic of yours to defend.',
+      );
+      return;
+    }
+
     case 'setDeclaredYield': {
       const declared = Math.max(0, Math.min(state.flockSize, Math.round(action.fleecePerDay)));
       state.ledger.declaredYield = declared;

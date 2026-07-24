@@ -25,7 +25,9 @@ import {
   NATIONAL_HEAT_DECAY,
   OFFICER_ARRIVAL_HEAT,
   PATROL_THRESHOLD,
+  PAUPER_FLOOR,
   PLAUSIBLE_YIELD_MIN,
+  RYNE_PRICE,
   PROMOTION_RATE,
   PROMOTION_THRESHOLD,
   REGIONAL_HEAT_DECAY,
@@ -79,6 +81,28 @@ export function goodsSummary(taken: Store): string {
     .filter(([, n]) => n > 0)
     .map(([g, n]) => `${n} ${GOOD_LABEL[g]}`);
   return parts.join(', ');
+}
+
+/**
+ * §6.15 — condemnable worth: coin plus contraband at Ryne prices, everywhere
+ * it sits. Overproof jenever prices at 0 (no legal buyer — the Board would
+ * pour it in a ditch); lawful assets never make you worth pouncing on, so
+ * the go-straight recovery path stays under the candle at any flock size.
+ */
+export function worthOf(state: GameState): number {
+  let goods = 0;
+  for (const nodeId of Object.keys(state.stores)) {
+    for (const g of CONTRABAND) goods += (state.stores[nodeId][g] ?? 0) * RYNE_PRICE[g];
+  }
+  for (const cart of state.carts) {
+    for (const g of CONTRABAND) goods += (cart.cargo[g] ?? 0) * RYNE_PRICE[g];
+  }
+  return state.coin + goods;
+}
+
+/** §6.15 — the Floor: nobody spends ink or men on a pauper. */
+export function underTheCandle(state: GameState): boolean {
+  return worthOf(state) < PAUPER_FLOOR;
 }
 
 /** Contraband held anywhere — every store and every cart. Zero means the
@@ -395,6 +419,16 @@ function searchNode(state: GameState, nodeId: NodeId): void {
     return;
   }
 
+  // §6.15 — under the candle: he counts, he notes, he does not condemn. No
+  // seizure, no heat, no card — the Board does not send men for a pauper.
+  if (underTheCandle(state)) {
+    logEvent(
+      state,
+      `The officer turns over ${name}, counts what he finds, and puts the notebook away. The Board does not spend ink on a pauper's tubs.`,
+    );
+    return;
+  }
+
   const taken: Store = {};
   let remaining = found - seizeFrom(store, Math.max(0, inStore - cover), taken);
   let offCarts = 0;
@@ -418,19 +452,44 @@ function searchNode(state: GameState, nodeId: NodeId): void {
   );
 }
 
+/** Every fleece not yet weighed, wherever it sits — barn, boards, or backs. */
+function fleeceOnHand(state: GameState): number {
+  return (
+    (state.stores.farm?.fleece ?? 0) +
+    state.carts.reduce((sum, c) => sum + (c.cargo.fleece ?? 0), 0) +
+    state.fleeceReady
+  );
+}
+
+/**
+ * §6.10 (M5c playtest) — the gap checkBooks would price at this instant,
+ * computed pure so the ledger page can read the charge aloud BEFORE the
+ * audit does: a shorted page with lawful sales is pure self-harm, and the
+ * game must say so while the pen can still fix it.
+ */
+export function auditGapNow(state: GameState): number {
+  const l = state.ledger;
+  const accounted = l.soldLawfully + Math.max(0, fleeceOnHand(state) - l.openingStock);
+  return (
+    Math.abs(l.declaredToDate - accounted) +
+    Math.max(0, l.grownToDate * PLAUSIBLE_YIELD_MIN - l.declaredToDate)
+  );
+}
+
 /** The farm inspection reads the books as well (§6.10 / §19.2). */
 function checkBooks(state: GameState): void {
   const l = state.ledger;
-  const onHand =
-    (state.stores.farm?.fleece ?? 0) +
-    state.carts.reduce((sum, c) => sum + (c.cargo.fleece ?? 0), 0) +
-    state.fleeceReady;
-  const accounted = l.soldLawfully + Math.max(0, onHand - l.openingStock);
-  const gap =
-    Math.abs(l.declaredToDate - accounted) +
-    Math.max(0, l.grownToDate * PLAUSIBLE_YIELD_MIN - l.declaredToDate);
+  const gap = auditGapNow(state);
 
-  if (gap > 0) {
+  if (gap > 0 && underTheCandle(state)) {
+    // §6.15 — read, adrift, and closed uncharged: nothing worth the ink.
+    logEvent(
+      state,
+      `He counts the sheep, reads the book, and the arithmetic is ${
+        Math.round(gap * 10) / 10
+      } fleece adrift. He closes it. There is nothing here worth the Board's ink.`,
+    );
+  } else if (gap > 0) {
     addHeat(state, gap * WOOL_GAP_COEFF, 'farm');
     logEvent(
       state,
@@ -446,7 +505,7 @@ function checkBooks(state: GameState): void {
   l.declaredToDate = 0;
   l.grownToDate = 0;
   l.soldLawfully = 0;
-  l.openingStock = onHand;
+  l.openingStock = fleeceOnHand(state);
 }
 
 /** One tick of the officer's ride: move, stop carts he passes, inspect. */
@@ -509,6 +568,14 @@ function stopCartsOnEdge(state: GameState, edge: MapEdge): void {
     const aboard = illicitCount(cart.cargo);
     const found = Math.max(0, aboard - hidden);
     if (found <= 0) continue; // honest wool is waved on, silently
+    // §6.15 — under the candle: counted, noted, waved on.
+    if (underTheCandle(state)) {
+      logEvent(
+        state,
+        `The officer stops ${cart.name} on ${edge.name.toLowerCase()}, counts the tubs, and waves it on — not worth the candle.`,
+      );
+      continue;
+    }
     const taken: Store = {};
     seizeFrom(cart.cargo, found, taken);
     state.goodsSeized += found;
