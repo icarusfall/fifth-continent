@@ -60,7 +60,10 @@ import type { Action, ActionLog, Difficulty, GameState, NodeId } from '../sim/ty
 //      flag (§6.14). Migrates v18 in place: a family playtest is running,
 //      and mid-milestone the old abandon-silently policy would cost a live
 //      tenancy.
-const SAVE_KEY = 'fifth-continent-save-v19';
+// v20: M5c playtest — wights.veil (the Reed-Veil, §6.14 Marsh 4). Migrates
+//      v19 (and v18 through it) in place: the family playtest still runs.
+const SAVE_KEY = 'fifth-continent-save-v20';
+const SAVE_KEY_V19 = 'fifth-continent-save-v19';
 const SAVE_KEY_V18 = 'fifth-continent-save-v18';
 const AUTOSAVE_EVERY_TICKS = 30;
 const AUTOPAY_KEY = 'fifth-continent-autopay-rent'; // a UI preference, not game state
@@ -652,10 +655,23 @@ function migrateV18(parsed: SaveFile): SaveFile {
   return parsed;
 }
 
+/** v19 → v20 (§6.14 Marsh 4): the reeds have not been asked to stand in an
+ *  old save. Everything else carries over as-is. */
+function migrateV19(parsed: SaveFile): SaveFile {
+  const w = parsed.state?.wights as (GameState['wights'] & { veil?: unknown }) | undefined;
+  if (w && typeof w.veil !== 'boolean') w.veil = false;
+  return parsed;
+}
+
 function loadSave(): SaveFile | null {
   try {
     let raw = localStorage.getItem(SAVE_KEY);
     let fromV18 = false;
+    let fromV19 = false;
+    if (!raw) {
+      raw = localStorage.getItem(SAVE_KEY_V19);
+      fromV19 = raw !== null;
+    }
     if (!raw) {
       raw = localStorage.getItem(SAVE_KEY_V18);
       fromV18 = raw !== null;
@@ -663,6 +679,7 @@ function loadSave(): SaveFile | null {
     if (!raw) return null;
     let parsed = JSON.parse(raw) as SaveFile;
     if (fromV18) parsed = migrateV18(parsed);
+    if (fromV18 || fromV19) parsed = migrateV19(parsed);
     if (parsed.version !== 1 || typeof parsed.state?.tick !== 'number') return null;
     if (typeof parsed.state.farm?.x !== 'number' || typeof parsed.state.fleeceReady !== 'number')
       return null;
@@ -712,6 +729,7 @@ function loadSave(): SaveFile | null {
       typeof parsed.state.nationalHeatFloor !== 'number'
     )
       return null;
+    if (typeof parsed.state.wights?.veil !== 'boolean') return null;
     return parsed;
   } catch {
     return null;

@@ -7,9 +7,11 @@ import {
   LONDON_GAUGE_CEILING,
   OFFICER_ARRIVAL_HEAT,
   PROMOTION_THRESHOLD,
+  REGIONAL_HEAT_DECAY,
   TICKS_PER_HOUR,
   WATER_GUARD_HEAT,
 } from '../sim/balance';
+import { standingDawnHeat } from '../sim/revenue';
 import { rentAmount } from '../sim/tick';
 import {
   clockOf,
@@ -74,6 +76,13 @@ function HeatGauges({ state, day }: { state: GameState; day: number }) {
   const hue = Math.round(120 * (1 - parishPct));
   const londonPct = Math.min(1, state.heat.national / LONDON_GAUGE_CEILING);
 
+  // §20.2 — the standing charge, read aloud: heat the works and stock will
+  // bring at dawn with no further crime, and where the parish settles if
+  // nothing more is committed. A pinned meter must name what pins it.
+  const standing = standingDawnHeat(state);
+  const settles = standing / (1 - REGIONAL_HEAT_DECAY);
+  const worksPinIt = standing > 0.1 && settles >= PROMOTION_THRESHOLD;
+
   return (
     <div className="hud-block">
       <span className="hud-label" style={{ color: REVENUE_BLUE }}>
@@ -94,7 +103,14 @@ function HeatGauges({ state, day }: { state: GameState; day: number }) {
           `The parish noticing (${Math.round(regional)}). It cools a little each dawn.` +
           (boiling
             ? ' Boiling over: the excess spills into London’s ear every morning.'
-            : ' The notch is where a Riding Officer takes rooms.')
+            : ' The notch is where a Riding Officer takes rooms.') +
+          (standing > 0.1
+            ? ` The works and over-full hides feed it ~${standing.toFixed(1)} a day of their own; left alone the parish settles near ${Math.round(settles)}${
+                worksPinIt
+                  ? ' — lying low will not cool this. Quiet the works themselves (the reed-veil hides them; emptied hides stop leaking).'
+                  : '.'
+              }`
+            : ' Nothing standing feeds it now: lying low cools it.')
         }
       >
         <div
@@ -126,6 +142,15 @@ function HeatGauges({ state, day }: { state: GameState; day: number }) {
       <span className="hud-note">
         London{state.revenue.officer.arrived ? ' · an officer rides the Gault' : ''}
       </span>
+      {worksPinIt && (
+        <span
+          className="hud-note"
+          style={{ color: HEAT_RED }}
+          title="The dawn tell of your visible works outruns the parish's forgetting: no amount of lying low unpins this meter. Hide the works (the wight-stone's reed-veil) or accept the boil."
+        >
+          the works keep it boiling
+        </span>
+      )}
     </div>
   );
 }

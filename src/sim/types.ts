@@ -333,6 +333,10 @@ export interface GameState {
     lastSignDay: number;
     /** §6.14 Marsh 3 — the designated edge that is not there. */
     hollowWay: EdgeId | null;
+    /** §6.14 Marsh 4 — the Reed-Veil stands: every building's visibility is
+     *  divided (§6.4), and the marsh charges per hidden building each dawn.
+     *  Raised and lowered freely at the stone once the reed-word is learned. */
+    veil: boolean;
   };
   /** Spec §6.14 — a breach being collected on: dawns of grace remaining. */
   collection: { graceDawnsLeft: number } | null;
@@ -410,6 +414,7 @@ export type Action =
   | { type: 'suppressLetter' }
   | { type: 'releaseLetter' }
   | { type: 'designateHollowWay'; edgeId: EdgeId }
+  | { type: 'setVeil'; up: boolean }
   | { type: 'resolveRaid'; calls?: ScheduledCall[] };
 
 /** Actions to apply at a given tick, for replay: actionLog[tick] = Action[]. */

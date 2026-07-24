@@ -136,7 +136,7 @@ Regional heat spilling over a threshold **promotes** into national heat. Nationa
 ```
 fortificationVisibility = Σ(tier × VISIBILITY[techType]) / concealmentOfBuilding
 ```
-Concealment tech (marsh) reduces it. Steam engines (Leiden) *increase* it substantially — Leiden's apparatus is enormous and visibly weird.
+Concealment tech (marsh) reduces it. Steam engines (Leiden) *increase* it substantially — Leiden's apparatus is enormous and visibly weird. *(Realised in M5c's playtest pass as Marsh 4, the Reed-Veil — §6.14's tier table: while the veil stands, every building's visibility sum, the galvanic apparatus included, is divided by `MARSH_VEIL_DIV`.)*
 
 ### 6.5 Conspicuous spend
 Coin spent on non-productive assets (a fine house, a carriage, a pew) raises **regional Heat** but raises **Standing with gentry buyers**. Getting rich is itself a tell.
@@ -537,9 +537,30 @@ LONDON_GAUGE_CEILING = 100 (a display scale until M6 names the ending's
 true threshold) in Revenue blue, with unlabeled marks at the Crown's
 escalations (§6.13). A dawn-over-dawn drift tick shows cooling or climbing.
 Exact values ride in the tooltips only; the raw sim numbers are uncapped
-and unchanged. Dispatch buttons carry the warning a marshman's eyes would:
+and unchanged. **The gauge reads the charge aloud (M5c playtest):** some heat
+is *standing* — the dawn tell of hard works (§6.12) and over-cover stock
+(§18) accrue with no crime committed that day, so a pinned meter can be a
+sentence the player cannot read. The HUD computes the standing dawn intake
+pure from state,
+
+```
+standingDawnHeat = Σ_buildings fortVisibility × FORT_VISIBILITY_HEAT × heatMult
+                 + Σ_sites max(0, stock − cover) × STORAGE_HEAT_COEFF
+                   × (1 + fortVisibility) × heatMult × TICKS_PER_DAY
+settlesNear      = standingDawnHeat / (1 − REGIONAL_HEAT_DECAY)   // no-spill floor
+```
+
+and the parish tooltip names it: what feeds the meter daily and where it
+settles if the player commits nothing further. When the gauge is pinned and
+`settlesNear ≥ PROMOTION_THRESHOLD`, a visible note under the gauge says the
+works themselves keep it boiling — lying low will not be enough, and the
+game must say so rather than let the player conclude the meter is broken. Dispatch buttons carry the warning a marshman's eyes would:
 when the officer is on an edge or standing at its far node, the button says
-so — *"the blue coat is on the high road."* Hired carters (§6.11) do not
+so — *"the blue coat is on the high road."* The same hand carries the
+marsh's word (M5c playtest): Marsh 1's lanterns are passive, and a passive
+power the game never shows working reads as a power that does not work —
+so a night dispatch over marsh with the lantern-word learned says
+*"lanterns lit — a tenth as loud"* on the button itself. Hired carters (§6.11) do not
 read buttons and do not heed the coat; the warning is for the hand on the
 tiller, and that difference is the point.
 
@@ -572,7 +593,12 @@ alibi and run the tubs yourself — and the moment carts move without you is
 the moment the officer starts stopping carts (§6.10).
 ```
 buyCart      CART_COST = 50 coin, at the farm; the new cart is named and
-             starts in the yard. MAX_CARTS = 3 — the yard holds three.
+             starts in the yard. MAX_CARTS = 5 — the yard holds five
+             (raised from three, M5c playtest: with the cutting house, the
+             shingle, Ryne, and the wool alibi all wanting wheels at once,
+             three stalls made routing a chore rather than a choice — §4's
+             pressure-over-chores rule decides it. The lighter is a hull,
+             not a stall, and never counts).
              Not offered until the first rent has fallen due (§10): before
              the squeeze is felt, 50 coin looks like a toy and is actually
              the rent. Pointless before a bigger flock or a second market
@@ -709,7 +735,8 @@ purse when the lugger stands off; a bad night can leave the rent short.
 That is a bet, not a bug (§6.15's mercy exists for exactly these losers).
 Hub-and-spoke is *not* hard-coded: relays emerge from orders meeting at a
 store (jenever farm → cutting house; brandy cutting house → Ryne), and
-MAX_CARTS = 3 makes the yard the real constraint.
+MAX_CARTS (§6.11 — 5 since the M5c playtest) keeps the yard the real
+constraint.
 
 Night-only orders, pack-ponies and the rest of §21's stable are deferred to
 their milestones; the hired mouth that can be *turned* joins the informer
@@ -767,7 +794,8 @@ consume `fortificationVisibility`, per §6.1 and §6.4:
 ```
 fortVisibility   = Σ(tier ≤ fortTier) VISIBILITY[tier] / concealment[building]
                    VISIBILITY = { 1: 0.1, 2: 0.3, 3: 0.6, 4: 1.0 }  // superlinear
-                   concealment = 1 until marsh tech divides it (§6.4, M5)
+                   concealment = 1, or MARSH_VEIL_DIV while the Reed-Veil
+                   stands (§6.4, §6.14 Marsh 4 — M5c playtest)
 
 // §6.1 realised on M3's cover model, not a new subsystem: the over-cover
 // storage heat the game already accrues each tick (§18, STORAGE_HEAT_COEFF)
@@ -795,6 +823,20 @@ of fresh suspicion every dawn on top — enough that the officer, who rides to
 the sorest stain (§6.10), now rides to your fort by choice. Fortifying pulls
 the Revenue toward you. That is not a bug; it is the whole trade, and M4c is
 where you make him regret the visit.
+
+**The equilibrium trap (M5c playtest).** Dawn fort heat against §6.3's 3%
+decay settles regional heat at `fortHeat / 0.03` — one tier-4 building
+(visibility 2.0) parks the parish at ~87 forever, two pin the gauge past
+PROMOTION_THRESHOLD, and a housed galvanic fence (visibility +8) pins it
+alone, permanently, with every cart hauling fleece. Going straight then
+*does nothing visible*, which reads as a broken meter and violates the
+recovery rule (§13's spirit): the price of a standing choice must be
+payable, not perpetual. Two answers ship together: the gauge reads the
+charge aloud (§20.2 note under §6.10), and the promised concealment tech
+arrives as §6.14's Marsh 4 Reed-Veil, whose divide is tuned so a veiled
+tier-4 building settles near ~22, a veiled fence near ~87 (loud, unpinned),
+and only the maximal build — fence atop a tier-4 — still boils. Hard,
+hidden, or electric: any two, never all three.
 
 **Art — the silhouette is the tell (§15.3).** The five tiers are five
 escalating silhouettes, flat-filled and ink-outlined: bare barn → spiked-hedge
@@ -981,8 +1023,8 @@ trade    researched at the farm         — costs coin, only coin
 marsh    researched at the wight-stone  — needs ≥1 bound wight
 leiden   researched at the workshop     — needs Leiden housed
 
-RESEARCH_COST   trade [40]       marsh [30, 70, 140]     leiden [50, 110, 220]
-RESEARCH_DAYS   trade [2]        marsh [2, 3, 4]         leiden [3, 4, 5]
+RESEARCH_COST   trade [40]       marsh [30, 70, 140, 260]  leiden [50, 110, 220]
+RESEARCH_DAYS   trade [2]        marsh [2, 3, 4, 5]        leiden [3, 4, 5]
 ```
 
 There is **no tree-pick gate**. Exclusivity is economic — coin, cover
@@ -1041,7 +1083,14 @@ random, not scheduled — *you did not choose him, and you could not have.*
 **Housing him** needs a building with ≥ LEIDEN_COVER = 4 spare cover
 capacity; he occupies it permanently and it becomes the workshop. Turn him
 away and he is rowed back out on the next tide; the offer re-rolls on
-later landings until a second refusal, then never. He is a person in the
+later landings until a second refusal, then never. Note the arithmetic the
+card must speak (M5c playtest): the farm's whole cover is 4, so the farm
+takes him only when its hides hold *nothing* — and he arrives on the very
+lugger that just filled them. When a building cannot take him the card
+says the shortfall in plain text on its face (*"the hides there spare only
+2 of the 4 he needs"*), never only in a hover tooltip — a disabled button
+with a hidden reason reads as a bug, and the refusal is the game's most
+interesting sentence that night. He is a person in the
 collection sense: the wights will happily take him.
 
 #### Publication — the floor that rises
@@ -1071,6 +1120,7 @@ What suppression eventually costs *him* (§8.3) is M6's business.
 | Marsh 1: Marsh-lantern haulers | night moves exposure ×0.1 | +1 Debt per run |
 | Marsh 2: Wight-fog | a raid Call: raider alpha ×0.5 that battle | +8 Debt per invocation |
 | Marsh 3: Hollow Way | one marsh edge never enters `knownEdges`, exposure 0 | +1 Debt per traversal |
+| Marsh 4: The Reed-Veil | while raised, every building's fortVisibility ÷ MARSH_VEIL_DIV 4 | +MARSH_VEIL_DEBT 1 per veiled hard building, per dawn |
 | Leiden 1: Galvanic fence | garrison alpha ×1.5 at that building | fortificationVisibility +8, Noise + |
 | Leiden 2: Steam-lighter | water hauler, capacity 16, runs all hours | loud: exposure ×1.3 |
 | Leiden 3: Aetheric Telegraph | the intel panel defogs — the true `RevenueModel`, live | the largest floor rise |
@@ -1078,6 +1128,23 @@ What suppression eventually costs *him* (§8.3) is M6's business.
 The **Bound Guardian** and the **Great Sluice-Engine** are ending machinery —
 M6. Ichor green `#6FBF8F` and Phlogiston orange `#E09B3D` leave §13's reserve
 with their owners.
+
+**The Reed-Veil, in full (M5c playtest — §6.4's promise kept).** The marsh
+grows over what the player has built: reeds to the walls, wet mist in the
+gunports, and the works read a quarter as loud (§6.4/§6.12 —
+`fortVisibility ÷ MARSH_VEIL_DIV 4`, the galvanic apparatus included; the
+divide is applied in `fortVisibility` itself, so dawn fort heat, over-cover
+leak multipliers, and the yard meter all follow one number). It is a
+standing state, not a use: **raise the veil / let the reeds fall** is a free,
+reversible verb at the wight-stone (`setVeil`), and while it stands the
+marsh charges `MARSH_VEIL_DEBT 1` Debt per hard building it hides (raw
+visibility > 0), per dawn, scaled by §6.15's `debtMult`. The reversible verb
+is the point — every other Debt is charged per use and stops when the use
+stops; a veil the player could not lower would be a standing order they
+never signed (§6.11's lesson). Defence is untouched: the veil hides from
+the Revenue's eyes, not the raiders' — alpha, breakpoints, and garrison caps
+read the true works. `wights.veil: boolean` joins GameState (save v20,
+migrating v19 and v18 in chain — the family playtest still runs).
 
 **The Steam-lighter, in full (M5c decision: it ships whole, not cut down).**
 The game's first water hauler: completing Leiden 2 launches one lighter at

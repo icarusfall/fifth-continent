@@ -81,7 +81,14 @@ import {
   officerTick,
 } from './revenue';
 import { raidTick, resolveRaid } from './raid';
-import { accrueNightMarsh, addDebt, applyPayTribute, applyTrapWight, wightsAtDawn } from './wights';
+import {
+  accrueNightMarsh,
+  addDebt,
+  applyPayTribute,
+  applySetVeil,
+  applyTrapWight,
+  wightsAtDawn,
+} from './wights';
 import {
   applyHouseLeiden,
   applyPublishLetter,
@@ -191,6 +198,7 @@ export function initialState(seed: number, difficulty: Difficulty = 'fair'): Gam
       stone: null,
       lastSignDay: -1,
       hollowWay: null,
+      veil: false,
     },
     collection: null,
     peopleCollected: 0,
@@ -801,7 +809,7 @@ function applyAction(state: GameState, action: Action): void {
       // §6.14 (M5c) — the lighter is a hull, not a stall: it never counts
       // against the yard.
       if (state.carts.filter((c) => !c.vessel).length >= MAX_CARTS) {
-        logEvent(state, 'The yard holds three carts and no more.');
+        logEvent(state, 'The yard is full: every stall holds a cart already.');
         return;
       }
       if (state.coin < CART_COST) {
@@ -814,7 +822,7 @@ function applyAction(state: GameState, action: Action): void {
       const stall = Array.from({ length: MAX_CARTS }, (_, i) => i + 1).find(
         (n) => !state.carts.some((c) => c.id === `cart-${n}`),
       )!;
-      const ordinal = ['The Cart', 'The Second Cart', 'The Third Cart'][stall - 1];
+      const ordinal = ['The Cart', 'The Second Cart', 'The Third Cart', 'The Fourth Cart', 'The Fifth Cart'][stall - 1];
       state.carts.push({
         id: `cart-${stall}`,
         name: ordinal,
@@ -1220,6 +1228,11 @@ function applyAction(state: GameState, action: Action): void {
       return;
     }
 
+    case 'setVeil': {
+      applySetVeil(state, action.up);
+      return;
+    }
+
     case 'resolveRaid': {
       resolveRaid(state, action.calls);
       return;
@@ -1346,6 +1359,7 @@ function researchProgress(state: GameState): void {
       'The stone teaches the lantern-word. Night carts over the marsh read a tenth as loud — and every run owes the marsh one.',
       'The stone teaches the fog. In a fight, one Call and the raiders swing at shapes — eight owed, each time.',
       'The stone teaches the way that is not there. Choose the track at the stone; nobody will ever watch it, and it is never free.',
+      'The stone teaches the reed-word. Speak it and the marsh grows over your works — every hidden building owes a dawn-rent while the veil stands.',
     ];
     logEvent(state, marshDone[state.research.completed.marsh - 1] ?? 'The stone falls silent.');
   } else if (active.tree === 'leiden') {

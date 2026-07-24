@@ -18,6 +18,7 @@ import {
   FARM_STORE_CAPACITY,
   FLOCK_CAP,
   LEIDEN_PRICE_MULT,
+  MAX_CARTS,
   PLAUSIBLE_YIELD_MIN,
   RENT_AMOUNT,
   RESEARCH_COST,
@@ -260,7 +261,9 @@ export function relayPolicy(state: GameState): Action[] {
   }
 
   // Crime's proceeds buy the wheels, always keeping the rent in reserve.
-  if (state.carts.length < 3 && state.coin >= CART_COST + RENT_AMOUNT) {
+  // House rule 3: the cap is balance.ts's, not an inline three. The scripted
+  // policies keep their historical three-cart fleet regardless of MAX_CARTS.
+  if (state.carts.length < Math.min(3, MAX_CARTS) && state.coin >= CART_COST + RENT_AMOUNT) {
     actions.push({ type: 'buyCart' });
   }
   // Cart-2: the lawful alibi — the surplus clip to Ryne keeps the barn
@@ -466,6 +469,8 @@ function runMarsh(
     actions.push({ type: 'trapWight' });
   }
   // The stone teaches as soon as it may — the first word, or all of them.
+  // (The scripted lives stop at the hollow way: the reed-word is the
+  // veil test's business, and these policies' distributions are load-bearing.)
   const targetTier = mode.deepTiers ? 3 : 1;
   if (
     state.boundWights >= 1 &&

@@ -31,6 +31,8 @@ import {
   SMOUCH_YIELD,
   FORT_COST,
   LEIDEN_PRICE_MULT,
+  MARSH_VEIL_DEBT,
+  MARSH_VEIL_DIV,
   MAX_CARTS,
   MAX_FORT_TIER,
   REFINER_UNLOCK,
@@ -224,6 +226,16 @@ function coatOn(state: GameState, edgeId: EdgeId, from: NodeId): boolean {
 /** '· the blue coat…' suffix for a dispatch button, or empty. */
 function coatNote(state: GameState, edgeId: EdgeId, from: NodeId): string {
   return coatOn(state, edgeId, from) ? ' · the blue coat rides it' : '';
+}
+
+/** '· lanterns lit' suffix (§6.14 Marsh 1 — M5c playtest): the word is
+ *  passive and the game must say when it is working. Night moves over marsh
+ *  read a tenth as loud, one Debt the laden run; the button says so at the
+ *  moment the choice is made. */
+function lanternNote(state: GameState, edgeId: EdgeId): string {
+  if (state.research.completed.marsh < 1) return '';
+  if (!(edgeId === 'marsh-track' || edgeId.startsWith('cut-'))) return '';
+  return dayPhaseOf(state.tick) === 'night' ? ' · lanterns lit — a tenth as loud' : '';
 }
 
 /**
@@ -1103,6 +1115,11 @@ const MARSH_TIERS: ReadonlyArray<{ name: string; effect: string; price: string }
     effect: 'one marsh track leaves the world’s knowing',
     price: '+1 Debt each crossing, laden or empty',
   },
+  {
+    name: 'The Reed-Veil',
+    effect: 'the reeds swallow three parts in four of every work’s showing',
+    price: `+${MARSH_VEIL_DEBT} Debt per hidden building, each dawn it stands`,
+  },
 ];
 
 /**
@@ -1178,6 +1195,28 @@ function StoneMenu({ state }: { state: GameState }) {
             .join(' · ')}
           .
         </p>
+      )}
+      {tier >= 4 && (
+        <>
+          <h5>the reed-veil</h5>
+          <p className="flavour">
+            {state.wights.veil
+              ? 'The reeds stand around your works and the mist stands with them. Every hidden building owes the marsh one, each dawn, while they hold.'
+              : 'The reeds lie ready. Raised, they swallow three parts in four of every work’s showing — the fence, the walls, all of it — and the marsh charges by the dawn for the holding.'}
+          </p>
+          <div className="menu-buttons">
+            <button
+              title={
+                state.wights.veil
+                  ? 'The works stand showing again, and the account stops running.'
+                  : `fortVisibility ÷ ${MARSH_VEIL_DIV} at every building · +${MARSH_VEIL_DEBT} Debt per hidden building each dawn. Free to raise, free to lower.`
+              }
+              onClick={() => enqueue({ type: 'setVeil', up: !state.wights.veil })}
+            >
+              {state.wights.veil ? 'Let the reeds fall' : 'Raise the veil'}
+            </button>
+          </div>
+        </>
       )}
       {tier >= 3 && state.wights.hollowWay === null && (
         <>
@@ -1649,7 +1688,7 @@ function FarmMenu({
             {/* §6.11 — not offered until the first rent has fallen due: before
                 the squeeze is felt, 50 coin looks like a toy and is the rent. */}
             {(state.rentPending || state.dutchman.unlocked) &&
-              state.carts.length < MAX_CARTS && (
+              state.carts.filter((c) => !c.vessel).length < MAX_CARTS && (
                 <button
                   disabled={state.coin < CART_COST}
                   title="Cart, pony, and no questions from the wheelwright."
@@ -2215,6 +2254,7 @@ function roadButtons(
             onClick={() => send(cart.id, 'marsh-track')}
           >
             Send {name} over the marsh to the shingle{coatNote(state, 'marsh-track', 'farm')}
+            {lanternNote(state, 'marsh-track')}
           </button>,
         );
       }
@@ -2222,6 +2262,7 @@ function roadButtons(
         btns.push(
           <button key="cut" onClick={() => send(cart.id, 'cut-farm-track')}>
             Send {name} to the cutting house{coatNote(state, 'cut-farm-track', 'farm')}
+            {lanternNote(state, 'cut-farm-track')}
           </button>,
         );
       }
@@ -2245,6 +2286,7 @@ function roadButtons(
         btns.push(
           <button key="cut" onClick={() => send(cart.id, 'cut-ryne-track')}>
             Out to the cutting house{coatNote(state, 'cut-ryne-track', 'ryne')}
+            {lanternNote(state, 'cut-ryne-track')}
           </button>,
         );
       }
@@ -2254,12 +2296,14 @@ function roadButtons(
       btns.push(
         <button key="marsh" onClick={() => send(cart.id, 'marsh-track')}>
           Home over the marsh{coatNote(state, 'marsh-track', 'shingle')}
+          {lanternNote(state, 'marsh-track')}
         </button>,
       );
       if (state.cuttingHouse) {
         btns.push(
           <button key="cut" onClick={() => send(cart.id, 'cut-shingle-track')}>
             To the cutting house{coatNote(state, 'cut-shingle-track', 'shingle')}
+            {lanternNote(state, 'cut-shingle-track')}
           </button>,
         );
       }
@@ -2269,12 +2313,15 @@ function roadButtons(
       btns.push(
         <button key="ryne" onClick={() => send(cart.id, 'cut-ryne-track')}>
           Send to Ryne{coatNote(state, 'cut-ryne-track', 'cutting-house')}
+          {lanternNote(state, 'cut-ryne-track')}
         </button>,
         <button key="farm" onClick={() => send(cart.id, 'cut-farm-track')}>
           Send home to the farm{coatNote(state, 'cut-farm-track', 'cutting-house')}
+          {lanternNote(state, 'cut-farm-track')}
         </button>,
         <button key="shingle" onClick={() => send(cart.id, 'cut-shingle-track')}>
           Send to the shingle{coatNote(state, 'cut-shingle-track', 'cutting-house')}
+          {lanternNote(state, 'cut-shingle-track')}
         </button>,
       );
       break;

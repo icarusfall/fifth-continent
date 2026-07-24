@@ -19,6 +19,7 @@ import {
   LEIDEN_COVER,
   LIGHTER_EXPOSURE_MULT,
   MARKET_TATTLE,
+  MARSH_VEIL_DIV,
   MAX_FORT_TIER,
   MAX_LOG_EVENTS,
   NATIONAL_HEAT_DECAY,
@@ -132,12 +133,12 @@ export function accrueRouteHeat(state: GameState, cart: Cart, edge: MapEdge): vo
 }
 
 /**
- * Fortification visibility of a building (spec §6.4/§6.12): the sum of its
- * tiers' visibility contributions. Concealment tech would divide this (§6.4,
- * M5); until then a hard building is exactly as loud as its works. Tier 0 (or
- * an un-listed node) is invisible.
+ * Fortification visibility of a building before concealment (spec §6.4):
+ * the sum of its tiers' visibility contributions, plus the galvanic fence.
+ * Tier 0 (or an un-listed node) is invisible. The Reed-Veil's Debt is
+ * charged against this raw figure — the marsh knows what it is hiding.
  */
-export function fortVisibility(state: GameState, nodeId: NodeId): number {
+export function fortVisibilityRaw(state: GameState, nodeId: NodeId): number {
   const tier = Math.min(state.fortifications[nodeId] ?? 0, MAX_FORT_TIER);
   let v = 0;
   for (let t = 1; t <= tier; t++) v += FORT_VISIBILITY[t];
@@ -151,6 +152,15 @@ export function fortVisibility(state: GameState, nodeId: NodeId): number {
     v += GALVANIC_VISIBILITY;
   }
   return v;
+}
+
+/** §6.4's promise kept (§6.14 Marsh 4, M5c playtest): while the Reed-Veil
+ *  stands, the whole sum — the galvanic apparatus included — reads divided.
+ *  Every consumer (dawn tell, over-cover leak, the yard meter) follows this
+ *  one number; the raiders' arithmetic never does (§14 reads fort tiers). */
+export function fortVisibility(state: GameState, nodeId: NodeId): number {
+  const raw = fortVisibilityRaw(state, nodeId);
+  return state.wights.veil && state.research.completed.marsh >= 4 ? raw / MARSH_VEIL_DIV : raw;
 }
 
 /** Storage heat, per tick (§18): stores hide up to their cover; carts hide nothing. */
@@ -261,12 +271,41 @@ export function loseStanding(state: GameState, amount: number): void {
   }
 }
 
-/** The dawn tell of visible works (§6.12): each hard building stains itself. */
+/** Your own roofs — the only buildings that can carry works or the fence. */
+export function playerBuildings(state: GameState): NodeId[] {
+  return state.cuttingHouse !== null ? ['farm', 'cutting-house'] : ['farm'];
+}
+
+/** The dawn tell of visible works (§6.12): each hard building stains itself.
+ *  Walked over the player's buildings, not the fortification record — the
+ *  galvanic fence makes a building loud without a single spade of earthwork
+ *  (M5c playtest fix: an unfortified workshop previously paid no dawn tell). */
 export function accrueFortHeat(state: GameState): void {
-  for (const nodeId of Object.keys(state.fortifications)) {
+  for (const nodeId of playerBuildings(state)) {
     const vis = fortVisibility(state, nodeId);
     if (vis > 0) addHeat(state, vis * FORT_VISIBILITY_HEAT, nodeId);
   }
+}
+
+/**
+ * §20.2 (M5c playtest) — the standing charge: heat the coming dawn will bring
+ * with no further crime committed, per day. The dawn tell of the works plus a
+ * day of over-cover leak. Pure of the tick so the HUD can read the charge
+ * aloud; `/(1 − REGIONAL_HEAT_DECAY)` gives where the parish settles.
+ */
+export function standingDawnHeat(state: GameState): number {
+  const mult = DIFFICULTY[state.difficulty].heatMult;
+  let perDay = 0;
+  for (const nodeId of playerBuildings(state)) {
+    perDay += fortVisibility(state, nodeId) * FORT_VISIBILITY_HEAT;
+  }
+  for (const nodeId of Object.keys(state.stores)) {
+    const over = illicitCount(state.stores[nodeId]) - coverOf(state, nodeId);
+    if (over > 0) {
+      perDay += over * STORAGE_HEAT_COEFF * (1 + fortVisibility(state, nodeId)) * TICKS_PER_DAY;
+    }
+  }
+  return perDay * mult;
 }
 
 /** Highest-suspicion node at or over the threshold; otherwise the Ryne beat. */

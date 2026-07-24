@@ -12,6 +12,7 @@ import {
   COLLECTION_GRACE_DAYS,
   DIFFICULTY,
   MARSH_TICKS_PER_TILE,
+  MARSH_VEIL_DEBT,
   MAX_LOG_EVENTS,
   NIGHT_MARSH_UNITS,
   PERSON_DEBT,
@@ -22,6 +23,7 @@ import {
 } from './balance';
 import { edgesFor, isPlaceable, nodeById } from './map';
 import { collectLeiden } from './leiden';
+import { fortVisibilityRaw, playerBuildings } from './revenue';
 import { dayPhaseOf } from './time';
 import type { Cart, EdgeId, GameEvent, GameState, MapEdge } from './types';
 
@@ -260,10 +262,23 @@ function takeAs(state: GameState, who: string): void {
   );
 }
 
-/** The wights' dawn, in order: the sign, the trap, the account. */
+/** §6.14 Marsh 4 — the veil's rent: while the reeds stand, the marsh charges
+ *  per hidden hard building (raw visibility — it knows what it is hiding),
+ *  each dawn. Charged before the account is read: today's rent can breach. */
+function veilAtDawn(state: GameState): void {
+  if (!state.wights.veil || state.research.completed.marsh < 4) return;
+  let hidden = 0;
+  for (const nodeId of playerBuildings(state)) {
+    if (fortVisibilityRaw(state, nodeId) > 0) hidden += 1;
+  }
+  addDebt(state, hidden * MARSH_VEIL_DEBT);
+}
+
+/** The wights' dawn, in order: the sign, the trap, the rent, the account. */
 export function wightsAtDawn(state: GameState): void {
   signAtDawn(state);
   trapAtDawn(state);
+  veilAtDawn(state);
   collectionAtDawn(state);
 }
 
@@ -322,5 +337,22 @@ export function applyPayTribute(state: GameState): void {
   logEvent(
     state,
     `A sheep left hobbled at the stone is gone by morning — it is always gone by morning. The account is ${TRIBUTE_RELIEF} lighter.`,
+  );
+}
+
+/** §6.14 Marsh 4 — raise the Reed-Veil or let the reeds fall. Free and
+ *  reversible: every other Debt stops when the use stops, and so must this. */
+export function applySetVeil(state: GameState, up: boolean): void {
+  if (state.research.completed.marsh < 4) {
+    logEvent(state, 'The stone has not taught the reed-word. The marsh hides nothing for free.');
+    return;
+  }
+  if (state.wights.veil === up) return;
+  state.wights.veil = up;
+  logEvent(
+    state,
+    up
+      ? 'The reeds stand up around your works and the mist stands with them. The marsh will hold them so — and charges by the dawn for the holding.'
+      : 'The reeds lie down. The works stand showing again, and the account stops running.',
   );
 }

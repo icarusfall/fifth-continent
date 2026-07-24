@@ -168,7 +168,7 @@ export const BOOK_AUDIT_OFFSET_DAYS = 1;
 // ---- M3: wheels (spec §6.11) ----
 export const CART_COST = 50; // coin, cart and pony, bought at the farm
 export const CART_RESALE = 40; // the wheelwright buys back at a small loss (§6.11)
-export const MAX_CARTS = 3; // the yard holds three
+export const MAX_CARTS = 5; // the yard holds five (M5c playtest — was 3)
 export const CARTER_WAGE = 3; // coin per carter, due at dawn with the wool
 /** §6.11 (M5 tutorial pass) — danger money: an order that names contraband
  *  (outbound or backhaul) or touches the shingle costs this instead. The
@@ -431,6 +431,15 @@ export const WIGHT_FOG_DEBT = 8;
 /** Marsh 3 — every crossing of the hollow way owes one, laden or empty:
  *  the way itself is the favour, whatever you carry. */
 export const HOLLOW_WAY_DEBT = 1;
+/** Marsh 4 — the Reed-Veil (§6.4's promised concealment, M5c playtest):
+ *  while it stands, every building's fortVisibility is divided by this —
+ *  tuned so a veiled tier-4 settles the parish near ~22 and a veiled
+ *  galvanic fence near ~87 (loud, but unpinned); only fence-atop-tier-4
+ *  still boils (§6.12's equilibrium note). */
+export const MARSH_VEIL_DIV = 4;
+/** …and the marsh charges rent for the holding: per hidden hard building
+ *  (raw visibility > 0), per dawn, while the veil stands. */
+export const MARSH_VEIL_DEBT = 1;
 
 // ---- M5c: Leiden (spec §6.14) ----
 // He arrives as cargo, at random — you did not choose him, and could not have.
@@ -464,12 +473,12 @@ export const SEA_TICKS_PER_TILE = 0.2;
 // (Debt, the Heat floor, Standing). Trade costs only coin: safe, and weak.
 export const RESEARCH_COST: Record<ResearchTree, readonly number[]> = {
   trade: [40],
-  marsh: [30, 70, 140],
+  marsh: [30, 70, 140, 260],
   leiden: [50, 110, 220],
 };
 export const RESEARCH_DAYS: Record<ResearchTree, readonly number[]> = {
   trade: [2],
-  marsh: [2, 3, 4],
+  marsh: [2, 3, 4, 5],
   leiden: [3, 4, 5],
 };
 /** Trade tier 1 — the false-bottom cart: route exposure eased, and a hollow

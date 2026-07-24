@@ -73,21 +73,31 @@ export function EventCard() {
               (nodeId) => {
                 const spare = spareCoverAt(state, nodeId, coverOf(state, nodeId));
                 const short = spare < LEIDEN_COVER;
+                const name = nodeId === 'farm' ? 'Walland Farm' : 'the Cutting House';
                 return (
-                  <button
-                    key={nodeId}
-                    className="event-primary"
-                    disabled={short}
-                    title={
-                      short
-                        ? `The hides there spare only ${spare} — he needs ${LEIDEN_COVER}, and he will not share with the brandy.`
-                        : 'He, the glass, and the smell of burning air. The building becomes the workshop.'
-                    }
-                    onClick={() => answerLeiden(nodeId)}
-                  >
-                    House him at {nodeId === 'farm' ? 'Walland Farm' : 'the Cutting House'} ·{' '}
-                    {LEIDEN_COVER} cover, for good
-                  </button>
+                  <div key={nodeId}>
+                    <button
+                      className="event-primary"
+                      disabled={short}
+                      title={
+                        short
+                          ? `The hides there spare only ${spare} — he needs ${LEIDEN_COVER}, and he will not share with the brandy.`
+                          : 'He, the glass, and the smell of burning air. The building becomes the workshop.'
+                      }
+                      onClick={() => answerLeiden(nodeId)}
+                    >
+                      House him at {name} · {LEIDEN_COVER} cover, for good
+                    </button>
+                    {/* §6.14 — the refusal speaks on the card's face, never
+                        only in a hover tooltip: a disabled button with a
+                        hidden reason reads as a bug. */}
+                    {short && (
+                      <p className="flavour">
+                        The hides at {name} spare only {spare} of the {LEIDEN_COVER} he needs — he
+                        will not share with the brandy.
+                      </p>
+                    )}
+                  </div>
                 );
               },
             )}

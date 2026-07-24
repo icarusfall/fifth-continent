@@ -306,15 +306,19 @@ describe('the books (spec §6.10 / §19.2)', () => {
 });
 
 describe('bought carts and the hired carter (spec §6.11)', () => {
-  it('a cart costs 50 coin and the yard holds three', () => {
+  it('a cart costs 50 coin and the yard holds MAX_CARTS stalls', () => {
     const s0 = initialState(1);
-    s0.coin = 200;
+    s0.coin = 50 * MAX_CARTS + 100;
     let s = tick(s0, [{ type: 'buyCart' }, { type: 'buyCart' }]);
     expect(s.carts).toHaveLength(3);
-    expect(s.coin).toBe(200 - 2 * CART_COST);
+    expect(s.coin).toBe(s0.coin - 2 * CART_COST);
+    // Fill the yard to the cap (M5c playtest: five stalls now), then one more.
+    while (s.carts.length < MAX_CARTS) s = tick(s, [{ type: 'buyCart' }]);
+    expect(s.carts).toHaveLength(MAX_CARTS);
+    expect(s.coin).toBe(s0.coin - (MAX_CARTS - 1) * CART_COST);
     s = tick(s, [{ type: 'buyCart' }]);
     expect(s.carts).toHaveLength(MAX_CARTS);
-    expect(s.log.some((e) => e.text.includes('holds three'))).toBe(true);
+    expect(s.log.some((e) => e.text.includes('The yard is full'))).toBe(true);
   });
 
   it('a carter shuttles the wool round unattended', () => {
