@@ -124,7 +124,7 @@ export const DAILY_DEMAND: Record<Good, number> = {
   lace: 2,
   'brandy-rough': 10,
   'brandy-fair': 6,
-  'brandy-gent': 2,
+  'brandy-gent': 4, // M5c retune: the ladder's top must out-earn its foot
 };
 
 // ---- M3: Heat, two pools (spec §6.10) ----
@@ -206,11 +206,13 @@ export const SHEEP_VALUE = 10; // the agent's valuation under distraint
 // A rival smuggling company, provoked by your market footprint, that raids to
 // take your goods. Numbers are opening bids for the distribution test (§13).
 /** Cumulative contraband units sold at Ryne before the Company takes notice. */
-export const HAWKSMERE_PROVOKE = 60;
+// M5c survival retune (§6.13): the designer never saw day 30 on fair — first
+// contact comes to an established trade, and the cadence leaves room to live.
+export const HAWKSMERE_PROVOKE = 120;
 /** Days from provocation to the first muster. */
-export const HAWKSMERE_FIRST_RAID_DELAY_DAYS = 4;
+export const HAWKSMERE_FIRST_RAID_DELAY_DAYS = 6;
 /** Days between one raid resolving and the next mustering. */
-export const RAID_INTERVAL_DAYS = 6;
+export const RAID_INTERVAL_DAYS = 9;
 /** Days of warning between a muster gathering and the blow falling. */
 export const RAID_MUSTER_LEAD_DAYS = 2;
 /** The first raid is a gentle introduction: this many men, seizing only a share. */
@@ -218,13 +220,15 @@ export const HAWKSMERE_FIRST_RAID = 6;
 export const FIRST_RAID_SEIZE_FRAC = 1 / 3;
 /** Every raid after the first: base, plus growth per raid survived, plus footprint. */
 export const HAWKSMERE_BASE = 12;
-export const HAWKSMERE_GROWTH = 4;
+export const HAWKSMERE_GROWTH = 2; // M5c retune: the spiral tightens, it does not snap
 export const HAWKSMERE_SCALE = 40; // +1 raider per this many contraband units sold
 
 // The Crown escalates on the *other* meter (§6.13): national Heat. The raider
 // who comes is the worst your doom clock has earned — and Dragoons do not rout.
-export const WATER_GUARD_HEAT = 40;
-export const DRAGOON_HEAT = 80;
+// M5c retune: Publication's floor and the fort-tell had eaten most of the old
+// 40 before the player did anything — the Crown's ladder starts higher now.
+export const WATER_GUARD_HEAT = 55;
+export const DRAGOON_HEAT = 110;
 export const WATER_GUARD_BASE = 14;
 export const DRAGOON_BASE = 20;
 

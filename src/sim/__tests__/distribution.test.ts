@@ -16,6 +16,7 @@ import {
   SHEEP_VALUE,
   FLEECE_PER_HEAD_PER_DAY,
   FLOCK_CAP,
+  PROMOTION_THRESHOLD,
   RENT_AMOUNT,
   STARTING_FLOCK,
   TICKS_PER_DAY,
@@ -235,12 +236,17 @@ describe(`${GAMES} seeded games, 30 days — the hub (spec §6.17, Beat 3)`, () 
       // the hub cannot pull ahead — before the book audit closed the loop,
       // crime-only ran ~50% richer; now its raw-coin edge is pinned to a
       // razor's margin (the stapler's cap binds only lawful sales, so the
-      // bare life never feels it), and it pays for that margin in a
-      // decisively hotter run — the doom clock M6's endings will spend.
-      // Watch this band: if the bare life ever pulls ahead by a distance
-      // again, an enforcement loop has broken.
+      // bare life never feels it). Watch this band: if the bare life ever
+      // pulls ahead by a distance again, an enforcement loop has broken.
       expect(bare.coin).toBeLessThan(hub.coin * 1.05);
-      expect(bare.heat.regional).toBeGreaterThan(hub.heat.regional * 1.05);
+      // Both lives boil the parish — the doom clock is the price either way.
+      // (M5c survival retune: the old "bare runs 5% hotter" margin was an
+      // artefact of the 6-day raid cadence stripping the twins' stores
+      // asymmetrically; at a 9-day cadence both sit pinned within a few
+      // points of each other, and the enforcement tripwire lives in the
+      // coin band above.)
+      expect(bare.heat.regional).toBeGreaterThan(PROMOTION_THRESHOLD);
+      expect(hub.heat.regional).toBeGreaterThan(PROMOTION_THRESHOLD);
 
       hubCoins.push(hub.coin);
       bareCoins.push(bare.coin);

@@ -197,10 +197,13 @@ function defendingSmuggler(state: GameState): Action[] {
 }
 
 const GAMES = 200;
-const DAYS = 30;
+// M5c survival retune: provocation moved 60 → 120 sold and the cadence 6 → 9
+// days, so the scenario runs longer to keep its teeth — the Company must
+// still come, and the smuggler must still answer.
+const DAYS = 45;
 
 describe(`${GAMES} seeded games, ${DAYS} days — the defending smuggler (spec §13)`, () => {
-  it('the Company comes, the smuggler answers, and the tenancy survives', { timeout: 120_000 }, () => {
+  it('the Company comes, the smuggler answers, and the tenancy survives', { timeout: 240_000 }, () => {
     const coins: number[] = [];
     let raidedGames = 0;
 

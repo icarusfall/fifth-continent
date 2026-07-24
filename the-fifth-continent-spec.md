@@ -337,8 +337,9 @@ sellPrice[good]        fleece 2 · brandy round(BRANDY_BASE_PRICE × tierMult)
                        · tea 7 · lace 24        (BRANDY_BASE_PRICE = 6)
 tierMult               Rough 0.6 / Fair 1.0 / Gentleman's 1.8   (§17.3)
 demandRemaining        resets at dawn to DAILY_DEMAND[ryne][good]:
-                       fleece 24 · brandy Rough 10 / Fair 6 / Gentleman's 2
-                       · tea 8 · lace 2
+                       fleece 24 · brandy Rough 10 / Fair 6 / Gentleman's 4
+                       · tea 8 · lace 2      (Gentleman's 2 → 4, M5c retune —
+                       the top of the refining ladder must out-earn its foot)
 overproof jenever has no legal buyer — it cannot be sold at Ryne at all
 ```
 When the appetite is spent, the town is done buying until dawn. This is the
@@ -919,13 +920,13 @@ threats legible:
 
 ```
 HAWKSMERE (rival) — wants your market. Provoked by your FOOTPRINT:
-  contrabandSold (cumulative illicit units sold at Ryne) ≥ HAWKSMERE_PROVOKE 60
+  contrabandSold (cumulative illicit units sold at Ryne) ≥ HAWKSMERE_PROVOKE 120
   Once provoked, they raid on a cadence; each raid you survive grows the next.
 
 THE CROWN (state force) — wants you gone. Summoned by national HEAT (§6.3, the
   doom clock):
-    national ≥ WATER_GUARD_HEAT 40  → the Preventive Water Guard rides (α 0.35, bp 25)
-    national ≥ DRAGOON_HEAT     80  → Dragoons (α 0.55, bp 0 — they do not rout)
+    national ≥ WATER_GUARD_HEAT 55  → the Preventive Water Guard rides (α 0.35, bp 25)
+    national ≥ DRAGOON_HEAT    110  → Dragoons (α 0.55, bp 0 — they do not rout)
   The raider's faction is the worst its national Heat has earned. This is §11's
   spiral made real: kill the Crown's men and national Heat leaps (§14.6,
   revenueDead × 40), summoning worse — Force against the state is a trap that
@@ -940,7 +941,7 @@ the two who bring it.
 ```
 target      the building holding the most contraband (illicitCount), tie-break
             to the cutting house, then the farm — they take what they can carry
-size        HAWKSMERE_BASE 12 + raidsSurvived × HAWKSMERE_GROWTH 4
+size        HAWKSMERE_BASE 12 + raidsSurvived × HAWKSMERE_GROWTH 2
             + floor(contrabandSold / HAWKSMERE_SCALE 40); Crown raids read their
             base off the faction (WATER_GUARD_BASE, DRAGOON_BASE)
 first raid  a deliberate gentle introduction (design call): HAWKSMERE_FIRST_RAID
@@ -957,8 +958,23 @@ ride        a raid entity with a graph location (node | edge+progress), moving
             (revenue.ts firstHop/horseLatency) — deterministic, not a random walk
             (§14/§15 sim-render line). No dykes yet (§21 is mid-game), so the
             law is SQUARE: numbers dominate, and the pre-battle readout says so.
-cadence     next raid at RAID_INTERVAL 6 days after the last resolves
+cadence     next raid at RAID_INTERVAL 9 days after the last resolves
 ```
+
+**The survival retune (M5c playtest — §13's numbers were opening bids and
+this is the beating-into-shape).** The designer, knowing every mechanic,
+never reached day 30 on fair and never touched the wight tiers or the
+workshop — the mid-game the whole design exists for. Verdict: the crime
+economy's margins support the doom clock, not a metronome. Retuned in one
+pass: provocation 60 → 120 sold (first contact comes to an *established*
+trade), first-raid delay 4 → 6 days, cadence 6 → 9 days, growth per raid
+survived 4 → 2 (the spiral tightens, it does not snap), Water Guard at 55
+and Dragoons at 110 national (Publication's floor and the fort-tell had
+eaten most of the old 40 before the player did anything), and Ryne's
+gentleman's-brandy appetite 2 → 4 a day (the deepest refining chain must
+not be the smallest legal market: at 2 it earned less per day than rough).
+Difficulty dial multipliers unchanged — the dial scales the world's hand,
+this retunes the hand itself.
 
 **Resolution.** When the raid reaches the target node the sim *marks* a pending
 battle; the store pauses (§6.13 pause-event, house rule 1 keeps the pause out of
