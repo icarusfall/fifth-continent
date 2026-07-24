@@ -1233,6 +1233,19 @@ migration** — a family playtest is running, and mid-milestone the old
 Design intent, stated plainly: **this game must be playable by someone who has
 never played an RTS.** Two layers, both deterministic, neither hidden.
 
+**The floor (designer's verdict, M5c playtest — governs every balance pass
+from here on):** the game should be **almost impossible to fail**. Ending
+bankrupt should take *determination* — ignoring warnings, spending the flock,
+courting every faction at once. The player's natural drift, doing the obvious
+thing each day, must be toward making money; the pressure systems (rent, Heat,
+raids, Debt) exist to shape *which* money and at *what* cost to the meters —
+never to end tenancies on their own. Failure states remain in the design (§11)
+as walls you can back into deliberately, not gradients you slide down. This
+retires the last hard-loss instinct: even rent forfeiture must pass through
+the whole mercy chain (distraint → the Dutchman's book → the parish vouch)
+before it can end a game, and the concrete floor mechanics get their own
+design pass (they are not built by tightening the retune's numbers further).
+
 **The dial** scales what the world does to you — never what your own economy
 yields. Prices, yields, and capacities are identical at every difficulty, so
 every player learns the same arithmetic; only the adversaries lean harder or
