@@ -198,6 +198,8 @@ describe('the Riding Officer (spec §6.10)', () => {
     expect(s.stores.farm?.jenever).toBe(4); // the cover's worth survives
     expect(s.stores.farm?.fleece).toBe(2); // wool is not his to take
     expect(s.log.some((e) => e.text.includes('seizes 6 goods'))).toBe(true);
+    // §6.10 (M5c playtest) — the seizure names its goods, never a bare count.
+    expect(s.log.some((e) => e.text.includes('6 tubs of jenever'))).toBe(true);
     expect(s.heat.regional).toBeGreaterThanOrEqual(6 * SEIZURE_HEAT);
     // §6.10 (M5 hub polish) — the tally the seizure card watches.
     expect(s.goodsSeized).toBe(6);
@@ -231,6 +233,25 @@ describe('the Riding Officer (spec §6.10)', () => {
     expect(s.carts[0].cargo.tea).toBe(0);
     expect(s.carts[0].cargo.fleece).toBe(3);
     expect(s.log.some((e) => e.text.includes('stops The Cart'))).toBe(true);
+    // §6.10 (M5c playtest) — the road stop names the goods too.
+    expect(s.log.some((e) => e.text.includes('5 bohea tea'))).toBe(true);
+  });
+
+  it('the hollow floor keeps its four on the road, and the stop says so', () => {
+    const s0 = officerBoundFor('farm');
+    s0.research.completed.trade = 1; // false-bottom carts fitted
+    s0.revenue.officer.location = {
+      kind: 'edge',
+      edgeId: 'high-road',
+      from: 'ryne',
+      to: 'farm',
+      progress: 0,
+    };
+    s0.carts[0].cargo = { tea: 6 }; // 4 under the boards, 2 findable
+    const s = tick(s0, [{ type: 'dispatchCart', cartId: 'cart-1', edgeId: 'high-road' }]);
+    expect(s.carts[0].cargo.tea).toBe(4); // the floor's worth rides on
+    expect(s.log.some((e) => e.text.includes('seizes 2 goods: 2 bohea tea'))).toBe(true);
+    expect(s.log.some((e) => e.text.includes('The hollow floor keeps its 4'))).toBe(true);
   });
 });
 

@@ -30,7 +30,7 @@ import {
 import { simulateBattle } from './combat';
 import type { BattleSetup, CombatLog, Faction, ForceSpec, ScheduledCall } from './combat';
 import { nodeById } from './map';
-import { CONTRABAND, illicitCount, loseStanding } from './revenue';
+import { CONTRABAND, goodsSummary, illicitCount, loseStanding } from './revenue';
 import { fenceActiveAt } from './leiden';
 import { addDebt } from './wights';
 import type { GameState, NodeId, Store } from './types';
@@ -131,17 +131,18 @@ export function raidBattleSetup(state: GameState, calls?: ScheduledCall[]): Batt
 }
 
 /** Seize a share of a store's contraband. `frac >= 1` takes it all. */
-function seizeGoods(store: Store, frac: number): number {
-  let taken = 0;
+function seizeGoods(store: Store, frac: number, taken?: Store): number {
+  let count = 0;
   for (const g of CONTRABAND) {
     const have = store[g] ?? 0;
     const take = frac >= 1 ? have : Math.floor(have * frac);
     if (take > 0) {
       store[g] = have - take;
-      taken += take;
+      count += take;
+      if (taken) taken[g] = (taken[g] ?? 0) + take;
     }
   }
-  return taken;
+  return count;
 }
 
 /** Reduce a building's garrison to the survivors — crew hold, militia fall first. */
@@ -177,12 +178,13 @@ function applyRaidConsequences(state: GameState, target: NodeId, isFirst: boolea
   // They hold the field: the goods are theirs. The gentle first raid takes a share.
   const frac = isFirst ? FIRST_RAID_SEIZE_FRAC : 1;
   const store = state.stores[target] ?? {};
-  const taken = seizeGoods(store, frac);
+  const plunder: Store = {};
+  const taken = seizeGoods(store, frac, plunder);
   state.stores[target] = store;
   logEvent(
     state,
     taken > 0
-      ? `${name} is overrun. The Company carries off ${taken} goods, and ${c.friendlyDead} of yours are lost.`
+      ? `${name} is overrun. The Company carries off ${taken} goods — ${goodsSummary(plunder)} — and ${c.friendlyDead} of yours are lost.`
       : `${name} is overrun, but there was nothing worth the carrying.`,
   );
 }

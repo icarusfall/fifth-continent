@@ -462,6 +462,13 @@ A seizure raises an auto-pause card (M5 hub polish, playtest —
 `goodsSeized`/`lastSeizureNode` tallies in GameState): the Crown's hand in
 your stores must never happen in the corner of the player's eye. Raid
 plunder is not double-carded — the raid owns its own beats (§6.13).
+**Every seizure names its goods (M5c playtest, the read-the-charge rule):**
+"seizes 6 goods" told a player who thought he was hauling wool nothing —
+the log itemises what was taken ("4 bohea tea, 2 lace"), the road stop
+says what the hollow floor kept back, and a yard seizure that emptied a
+standing cart says so — the false bottom fools the road, never the yard
+(§6.14's trade tier: cover *on the move*; a stopped cart is searched at
+leisure).
 There is deliberately no verb for violence against him — that verb arrives
 with M4 and §7 prices it as catastrophe. The ditch (§6.9) becomes the panic
 button it was built to be: see the blue coat on your road, tip the lot.
@@ -1120,7 +1127,7 @@ What suppression eventually costs *him* (§8.3) is M6's business.
 
 | Tier | Effect | The price |
 |---|---|---|
-| Trade: False-bottom cart | cart exposure ×0.6, +4 cover on the move | coin only |
+| Trade: False-bottom cart | cart exposure ×0.6, +4 cover on the move (road stops only — a cart standing in a yard is searched at leisure) | coin only |
 | Marsh 1: Marsh-lantern haulers | night moves exposure ×0.1 | +1 Debt per run |
 | Marsh 2: Wight-fog | a raid Call: raider alpha ×0.5 that battle | +8 Debt per invocation |
 | Marsh 3: Hollow Way | one marsh edge never enters `knownEdges`, exposure 0 | +1 Debt per traversal |

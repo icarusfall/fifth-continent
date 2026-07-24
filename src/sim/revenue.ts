@@ -59,6 +59,28 @@ export function illicitCount(store: Store): number {
   return CONTRABAND.reduce((sum, g) => sum + (store[g] ?? 0), 0);
 }
 
+/** What the officer writes in his book — the goods' names as the log and the
+ *  UI both speak them. Lives sim-side so seizures can name what they take
+ *  (§6.10, M5c playtest: "seizes 6 goods" reads as nothing at all). */
+export const GOOD_LABEL: Record<Good, string> = {
+  fleece: 'fleece',
+  jenever: 'tubs of jenever',
+  tea: 'bohea tea',
+  'bulked-tea': 'bulked tea',
+  lace: 'lace',
+  'brandy-rough': 'rough brandy',
+  'brandy-fair': 'fair brandy',
+  'brandy-gent': "gentleman's brandy",
+};
+
+/** "4 bohea tea, 2 lace" — the itemised line every seizure speaks. */
+export function goodsSummary(taken: Store): string {
+  const parts = (Object.entries(taken) as Array<[Good, number]>)
+    .filter(([, n]) => n > 0)
+    .map(([g, n]) => `${n} ${GOOD_LABEL[g]}`);
+  return parts.join(', ');
+}
+
 /** Contraband held anywhere — every store and every cart. Zero means the
  *  player has genuinely gone straight, not merely stashed the tubs elsewhere. */
 export function illicitAnywhere(state: GameState): number {
@@ -327,18 +349,19 @@ export function patrolTarget(state: GameState): NodeId {
 // ---- The officer's day ----
 
 /** Seize contraband from a store, up to `limit` units. Returns units taken. */
-function seizeFrom(store: Store, limit: number): number {
-  let taken = 0;
+function seizeFrom(store: Store, limit: number, taken?: Store): number {
+  let count = 0;
   for (const g of CONTRABAND) {
-    if (taken >= limit) break;
+    if (count >= limit) break;
     const here = store[g] ?? 0;
-    const take = Math.min(here, limit - taken);
+    const take = Math.min(here, limit - count);
     if (take > 0) {
       store[g] = here - take;
-      taken += take;
+      count += take;
+      if (taken) taken[g] = (taken[g] ?? 0) + take;
     }
   }
-  return taken;
+  return count;
 }
 
 /** Search a node: what the cover cannot hide is seized (§6.10). */
@@ -372,15 +395,27 @@ function searchNode(state: GameState, nodeId: NodeId): void {
     return;
   }
 
-  let remaining = found - seizeFrom(store, Math.max(0, inStore - cover));
+  const taken: Store = {};
+  let remaining = found - seizeFrom(store, Math.max(0, inStore - cover), taken);
+  let offCarts = 0;
   for (const cart of cartsHere) {
     if (remaining <= 0) break;
-    remaining -= seizeFrom(cart.cargo, remaining);
+    const fromThisCart = seizeFrom(cart.cargo, remaining, taken);
+    remaining -= fromThisCart;
+    offCarts += fromThisCart;
   }
   state.goodsSeized += found;
   state.lastSeizureNode = nodeId;
   addHeat(state, found * SEIZURE_HEAT); // no extra stain: the stain was earned already
-  logEvent(state, `The officer searches ${name} and seizes ${found} goods for the Crown.`);
+  // §6.10 (M5c playtest) — the seizure names its goods, and a standing cart
+  // learns the hard rule: the false bottom fools the road, never the yard.
+  logEvent(
+    state,
+    `The officer searches ${name} and seizes ${found} goods for the Crown: ${goodsSummary(taken)}.` +
+      (offCarts > 0 && hasFalseBottom(state)
+        ? ' A cart standing still is searched at leisure — the hollow floor hides nothing in the yard.'
+        : ''),
+  );
 }
 
 /** The farm inspection reads the books as well (§6.10 / §19.2). */
@@ -471,15 +506,21 @@ function stopCartsOnEdge(state: GameState, edge: MapEdge): void {
   const hidden = hasFalseBottom(state) ? FALSE_BOTTOM_COVER : 0;
   for (const cart of state.carts) {
     if (cart.location.kind !== 'edge' || cart.location.edgeId !== edge.id) continue;
-    const found = Math.max(0, illicitCount(cart.cargo) - hidden);
+    const aboard = illicitCount(cart.cargo);
+    const found = Math.max(0, aboard - hidden);
     if (found <= 0) continue; // honest wool is waved on, silently
-    seizeFrom(cart.cargo, found);
+    const taken: Store = {};
+    seizeFrom(cart.cargo, found, taken);
     state.goodsSeized += found;
     state.lastSeizureNode = cart.location.to;
     addHeat(state, found * SEIZURE_HEAT, cart.location.to);
+    // §6.10 (M5c playtest) — name the goods; and when the hollow floor held
+    // its four, say that too, so the tier is seen working (like the lanterns).
+    const kept = Math.min(hidden, aboard);
     logEvent(
       state,
-      `The officer stops ${cart.name} on ${edge.name.toLowerCase()} and seizes ${found} goods.`,
+      `The officer stops ${cart.name} on ${edge.name.toLowerCase()} and seizes ${found} goods: ${goodsSummary(taken)}.` +
+        (kept > 0 ? ` The hollow floor keeps its ${kept}.` : ''),
     );
   }
 }
