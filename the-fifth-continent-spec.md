@@ -1075,23 +1075,27 @@ is the point: the moral reserve currency of the marsh has legs and a bell.
 #### Leiden — courted, and you did not choose him
 
 From the LEIDEN_ARRIVAL_MIN_RUN = 4th successful landing onward, every
-landing where goods are bought off the lugger rolls the seeded PRNG once:
-at LEIDEN_ARRIVAL_CHANCE = 1/4, one randomly chosen tub or barrel of that
+landing where goods are bought off the lugger rolls the seeded PRNG once —
+**but only once a cutting house stands** (M5c playtest): the farm's whole
+cover is 4 and he wants all 4 for good, so a farm-only tenancy has nowhere
+he can honestly go — the roll would arrive as a card whose every button is
+a refusal. Landings still count toward the run while the house is unbuilt;
+the dice simply wait for a roof that could take him. At
+LEIDEN_ARRIVAL_CHANCE = 1/4, one randomly chosen tub or barrel of that
 night's purchase holds a philosopher (pause card — he is cargo, uninsured,
 and wet, and the boat has already gone). Design call (playtest, 2026-07):
 random, not scheduled — *you did not choose him, and you could not have.*
 **Housing him** needs a building with ≥ LEIDEN_COVER = 4 spare cover
-capacity; he occupies it permanently and it becomes the workshop. Turn him
-away and he is rowed back out on the next tide; the offer re-rolls on
-later landings until a second refusal, then never. Note the arithmetic the
-card must speak (M5c playtest): the farm's whole cover is 4, so the farm
-takes him only when its hides hold *nothing* — and he arrives on the very
-lugger that just filled them. When a building cannot take him the card
-says the shortfall in plain text on its face (*"the hides there spare only
-2 of the 4 he needs"*), never only in a hover tooltip — a disabled button
-with a hidden reason reads as a bug, and the refusal is the game's most
-interesting sentence that night. He is a person in the
-collection sense: the wights will happily take him.
+capacity; he occupies it permanently and it becomes the workshop. The farm
+remains a legal berth for him (empty hides, the whole clutter surrendered)
+— a hard choice, not a trap, now that taking it is never the only door.
+Turn him away and he is rowed back out on the next tide; the offer re-rolls
+on later landings until a second refusal, then never. When a building
+cannot take him the card says the shortfall in plain text on its face
+(*"the hides there spare only 2 of the 4 he needs"*), never only in a
+hover tooltip — a disabled button with a hidden reason reads as a bug, and
+the refusal is the game's most interesting sentence that night. He is a
+person in the collection sense: the wights will happily take him.
 
 #### Publication — the floor that rises
 

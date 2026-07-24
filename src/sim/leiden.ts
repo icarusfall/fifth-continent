@@ -56,6 +56,11 @@ export function leidenAtDeparture(state: GameState): void {
   l.landingsBought += 1;
   if (l.state !== 'unmet') return;
   if (l.landingsBought < LEIDEN_ARRIVAL_MIN_RUN) return;
+  // §6.14 (M5c playtest) — the dice wait for a roof that could take him: a
+  // farm-only tenancy has 4 hides and he wants all 4 for good, so the card
+  // would open with every button a refusal. Landings counted above still
+  // stand; the roll resumes the night after the cutting house does.
+  if (state.cuttingHouse === null) return;
   const r = nextRandom(state.rngState);
   state.rngState = r.state;
   if (r.value >= LEIDEN_ARRIVAL_CHANCE) return;

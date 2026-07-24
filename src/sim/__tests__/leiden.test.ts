@@ -70,8 +70,11 @@ function throughBuyingVisit(s: GameState): GameState {
 }
 
 describe('the arrival (spec §6.14 M5c): a tub with a man inside, at random', () => {
+  // The arrival fixtures raise a cutting house: the dice wait for a roof
+  // that could take him (the gate has its own test below).
   it('a buying visit counts a landing; the dice only roll from the minimum run', () => {
     let s = fresh((st) => {
+      st.cuttingHouse = { x: 24, y: 12 };
       st.leiden.landingsBought = LEIDEN_ARRIVAL_MIN_RUN - 2; // still short after this one
       st.rngState = rngWhere(true); // even favourable dice must not fire
     });
@@ -84,6 +87,7 @@ describe('the arrival (spec §6.14 M5c): a tub with a man inside, at random', ()
 
   it('from the minimum run, the seeded dice decide — and their state advances', () => {
     let hit = fresh((st) => {
+      st.cuttingHouse = { x: 24, y: 12 };
       st.leiden.landingsBought = LEIDEN_ARRIVAL_MIN_RUN - 1;
       st.rngState = rngWhere(true);
     });
@@ -91,12 +95,30 @@ describe('the arrival (spec §6.14 M5c): a tub with a man inside, at random', ()
     expect(hit.leiden.state).toBe('offered');
 
     let miss = fresh((st) => {
+      st.cuttingHouse = { x: 24, y: 12 };
       st.leiden.landingsBought = LEIDEN_ARRIVAL_MIN_RUN - 1;
       st.rngState = rngWhere(false);
     });
     miss = throughBuyingVisit(miss);
     expect(miss.leiden.state).toBe('unmet');
     expect(miss.leiden.landingsBought).toBe(LEIDEN_ARRIVAL_MIN_RUN);
+  });
+
+  it('no cutting house, no knock: landings count, the dice wait for a roof (M5c playtest)', () => {
+    let s = fresh((st) => {
+      st.leiden.landingsBought = LEIDEN_ARRIVAL_MIN_RUN - 1; // the run is served
+      st.rngState = rngWhere(true); // dice that would fire, given the chance
+    });
+    const rngBefore = s.rngState;
+    s = throughBuyingVisit(s);
+    expect(s.leiden.state).toBe('unmet');
+    expect(s.leiden.landingsBought).toBe(LEIDEN_ARRIVAL_MIN_RUN); // the run still counts
+    expect(s.rngState).toBe(rngBefore); // the dice were never touched
+
+    // The house goes up; the very next qualifying landing may knock.
+    s.cuttingHouse = { x: 24, y: 12 };
+    s = throughBuyingVisit(s);
+    expect(s.leiden.state).toBe('offered');
   });
 
   it('a visit of selling only is no landing of his', () => {
