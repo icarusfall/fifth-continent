@@ -15,7 +15,6 @@ import {
   DIFFICULTY_ORDER,
   DUTCHMAN_SLICE,
   DUTCHMAN_VIG,
-  FLOCK_CAP,
   PARISH_VOUCH_COOLDOWN_DAYS,
   PARISH_VOUCH_COST,
   PARISH_VOUCH_STANDING,
@@ -81,6 +80,7 @@ import {
   officerTick,
 } from './revenue';
 import { raidTick, resolveRaid } from './raid';
+import { applyDigDyke, digProgress, flockCapOf } from './dykes';
 import {
   accrueNightMarsh,
   addDebt,
@@ -214,6 +214,9 @@ export function initialState(seed: number, difficulty: Difficulty = 'fair'): Gam
       heldLetters: [],
     },
     nationalHeatFloor: 0,
+    // §6.18 (M5½a) — the survey is known; nothing has been dug.
+    dykesDug: [],
+    digging: null,
     carts: [
       {
         id: 'cart-1',
@@ -1112,8 +1115,9 @@ function applyAction(state: GameState, action: Action): void {
     }
 
     case 'buySheep': {
-      // Spec §6.16 — growth without farming: purchase, capped by the pasture.
-      const room = FLOCK_CAP - state.flockSize - state.sheepArriving;
+      // Spec §6.16 — growth without farming: purchase, capped by the pasture
+      // (§6.18: drained land grazes more — flockCapOf counts the dykes).
+      const room = flockCapOf(state) - state.flockSize - state.sheepArriving;
       const qty = Math.min(action.qty, room, Math.floor(state.coin / SHEEP_PRICE_BUY));
       if (qty <= 0) {
         logEvent(
@@ -1254,6 +1258,11 @@ function applyAction(state: GameState, action: Action): void {
 
     case 'setVeil': {
       applySetVeil(state, action.up);
+      return;
+    }
+
+    case 'digDyke': {
+      applyDigDyke(state, action.id);
       return;
     }
 
@@ -1869,6 +1878,7 @@ export function tick(state: GameState, actions: Action[]): GameState {
   shearerAtDawn(next);
   refinerAtDawn(next);
   researchProgress(next);
+  digProgress(next); // §6.18 — the spade's clock runs beside the bench's
   payCartersAtDawn(next);
   payGarrisonsAtDawn(next);
   recoverStandingAtDawn(next);

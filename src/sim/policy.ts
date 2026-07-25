@@ -16,7 +16,6 @@ import {
   CUTTING_HOUSE_COST,
   DUTCHMAN_PRICE,
   FARM_STORE_CAPACITY,
-  FLOCK_CAP,
   LEIDEN_PRICE_MULT,
   MAX_CARTS,
   PLAUSIBLE_YIELD_MIN,
@@ -27,6 +26,7 @@ import {
   WIGHT_TRAP_IRON,
   WOOL_PRICE_DOMESTIC,
 } from './balance';
+import { flockCapOf } from './dykes';
 import { isFlooded } from './time';
 import { initialState, tick } from './tick';
 import type { Action, Cart, CarterOrder, GameState, Good } from './types';
@@ -374,7 +374,7 @@ function runHub(state: GameState, alibi: boolean): Action[] {
     actions.push({ type: 'buyCart' });
   } else if (
     state.cuttingHouse &&
-    state.flockSize + state.sheepArriving < FLOCK_CAP &&
+    state.flockSize + state.sheepArriving < flockCapOf(state) &&
     state.coin >= SHEEP_PRICE_BUY + RENT_AMOUNT
   ) {
     actions.push({ type: 'buySheep', qty: 1 });

@@ -62,7 +62,10 @@ import type { Action, ActionLog, Difficulty, GameState, NodeId } from '../sim/ty
 //      tenancy.
 // v20: M5c playtest — wights.veil (the Reed-Veil, §6.14 Marsh 4). Migrates
 //      v19 (and v18 through it) in place: the family playtest still runs.
-const SAVE_KEY = 'fifth-continent-save-v20';
+// v21: M5½a — dykesDug + digging (§6.18, the survey and the spade).
+//      Migrates the whole chain, as ever.
+const SAVE_KEY = 'fifth-continent-save-v21';
+const SAVE_KEY_V20 = 'fifth-continent-save-v20';
 const SAVE_KEY_V19 = 'fifth-continent-save-v19';
 const SAVE_KEY_V18 = 'fifth-continent-save-v18';
 const AUTOSAVE_EVERY_TICKS = 30;
@@ -370,6 +373,21 @@ interface Milestone {
 // Order is priority when several come true at once — the pause sequences them.
 const MILESTONES: Milestone[] = [
   {
+    // §6.18 (M5½a) — the survey appears with the improver's eye: a cutting
+    // house standing is proof the player thinks in works, not just wool.
+    key: 'old-sewers',
+    when: (s) => s.cuttingHouse !== null,
+    title: 'The old sewers',
+    body: 'Every marshman knows the lines: the old drainage channels, silted a century, surveyed and named long before your tenancy. Faint lines stand on your map now, each with its post. Coin and a digging crew would cut any of them fresh — the gentry call it improvement, the parish calls it enclosure, and the marsh keeps its own accounts of what it loses. Dug land drains; drained land grazes sheep.',
+  },
+  {
+    // §6.18 — the first cut completed: the whole §21.2 axis in one card.
+    key: 'first-dyke',
+    when: (s) => s.dykesDug.length >= 1,
+    title: 'The water runs',
+    body: 'Your first channel runs with clean water, and the marsh is smaller than it was. Applesham approves — improvement flatters the men who own things. The parish mutters — enclosure always starts with a ditch. And the account at the stone is heavier, for good. The drained margin already grows grass: the pasture holds more head than it did.',
+  },
+  {
     // §6.9 (M5a-4) — the unlock was earned on the quay: the rumour chain
     // ran its length before the first rent forced the matter.
     key: 'shingle-open-asked',
@@ -663,11 +681,24 @@ function migrateV19(parsed: SaveFile): SaveFile {
   return parsed;
 }
 
+/** v20 → v21 (§6.18 M5½a): nothing has been dug in an old save. */
+function migrateV20(parsed: SaveFile): SaveFile {
+  const s = parsed.state as GameState & { dykesDug?: unknown; digging?: unknown };
+  if (!Array.isArray(s.dykesDug)) s.dykesDug = [];
+  if (s.digging === undefined) s.digging = null;
+  return parsed;
+}
+
 function loadSave(): SaveFile | null {
   try {
     let raw = localStorage.getItem(SAVE_KEY);
     let fromV18 = false;
     let fromV19 = false;
+    let fromV20 = false;
+    if (!raw) {
+      raw = localStorage.getItem(SAVE_KEY_V20);
+      fromV20 = raw !== null;
+    }
     if (!raw) {
       raw = localStorage.getItem(SAVE_KEY_V19);
       fromV19 = raw !== null;
@@ -680,6 +711,7 @@ function loadSave(): SaveFile | null {
     let parsed = JSON.parse(raw) as SaveFile;
     if (fromV18) parsed = migrateV18(parsed);
     if (fromV18 || fromV19) parsed = migrateV19(parsed);
+    if (fromV18 || fromV19 || fromV20) parsed = migrateV20(parsed);
     if (parsed.version !== 1 || typeof parsed.state?.tick !== 'number') return null;
     if (typeof parsed.state.farm?.x !== 'number' || typeof parsed.state.fleeceReady !== 'number')
       return null;
@@ -730,6 +762,7 @@ function loadSave(): SaveFile | null {
     )
       return null;
     if (typeof parsed.state.wights?.veil !== 'boolean') return null;
+    if (!Array.isArray(parsed.state.dykesDug) || parsed.state.digging === undefined) return null;
     return parsed;
   } catch {
     return null;

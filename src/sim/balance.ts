@@ -480,6 +480,21 @@ export const SEA_LANE_EXPOSURE = 0.8;
 /** Steam beats any cart, and the sea is flat. */
 export const SEA_TICKS_PER_TILE = 0.2;
 
+// ---- M5½a: the survey and the spade (spec §6.18 / §21.1) ----
+// Digging is slow, capital-intensive, and permanent — this game's
+// rail-building. The prices are §21.2's axis made arithmetic: coin to the
+// diggers, Debt to the marsh, Standing to the parish, pasture to the flock.
+/** Coin per tile of channel — a 10-tile segment runs ~120. */
+export const DYKE_COST_PER_TILE = 12;
+/** Crew-days per tile, rounded up per segment. One crew, one dig at a time. */
+export const DYKE_DAYS_PER_TILE = 0.5;
+/** §21.1's fourth thing: every dyke shrinks the marsh, permanently. */
+export const DYKE_DEBT = 15;
+/** Enclosure enrages the commoners: parish Standing per completed segment. */
+export const DYKE_PARISH_STANDING = 5;
+/** Drainage manufactures pasture: flock cap per completed segment (§19.2). */
+export const DYKE_PASTURE_HEAD = 2;
+
 // ---- M5a: the research bench (spec §6.14) ----
 // Coin is nominal everywhere in research — the real price is always a meter
 // (Debt, the Heat floor, Standing). Trade costs only coin: safe, and weak.

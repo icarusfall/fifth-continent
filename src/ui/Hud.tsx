@@ -3,7 +3,6 @@ import {
   BINDING_CAPACITY,
   DIFFICULTY_ORDER,
   DRAGOON_HEAT,
-  FLOCK_CAP,
   LONDON_GAUGE_CEILING,
   OFFICER_ARRIVAL_HEAT,
   PAUPER_FLOOR,
@@ -12,6 +11,7 @@ import {
   TICKS_PER_HOUR,
   WATER_GUARD_HEAT,
 } from '../sim/balance';
+import { flockCapOf } from '../sim/dykes';
 import { standingDawnHeat, underTheCandle } from '../sim/revenue';
 import { rentAmount } from '../sim/tick';
 import {
@@ -243,7 +243,7 @@ export function Hud({ state }: { state: GameState }) {
         <span className="hud-label">Flock</span>
         <span
           className="hud-coin"
-          title={`Your sheep. The pasture holds ${FLOCK_CAP}.`}
+          title={`Your sheep. The pasture holds ${flockCapOf(state)}.`}
         >
           {state.flockSize}
         </span>

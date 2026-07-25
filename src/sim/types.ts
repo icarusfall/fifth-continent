@@ -8,6 +8,8 @@ import type { RngState } from './rng';
 export type NodeId = string;
 export type EdgeId = string;
 export type CartId = string;
+/** §6.18 (M5½a) — a surveyed channel's name; the segments are map data. */
+export type DykeId = string;
 
 // Brandy tiers are distinct goods: quality is what a thing sells as (§17.3),
 // and a plain string key keeps Store JSON-flat. Cloth and woolpacks arrive
@@ -370,6 +372,13 @@ export interface GameState {
   };
   /** Spec §6.14 — Publication: decay can never take national Heat below this. */
   nationalHeatFloor: number;
+  /**
+   * Spec §6.18 (M5½a) — the survey and the spade. Segments dug are permanent
+   * (a dyke is never filled in); the crew is one crew, so at most one dig
+   * runs, bench-pattern. The segments themselves are authored map data.
+   */
+  dykesDug: DykeId[];
+  digging: { id: DykeId; doneTick: number } | null;
   carts: Cart[];
   /** Ring buffer of recent events, oldest first. Part of state: deterministic. */
   log: GameEvent[];
@@ -420,6 +429,7 @@ export type Action =
   | { type: 'releaseLetter' }
   | { type: 'designateHollowWay'; edgeId: EdgeId }
   | { type: 'setVeil'; up: boolean }
+  | { type: 'digDyke'; id: DykeId }
   | { type: 'resolveRaid'; calls?: ScheduledCall[] };
 
 /** Actions to apply at a given tick, for replay: actionLog[tick] = Action[]. */

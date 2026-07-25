@@ -26,10 +26,11 @@ import {
   DUTCHMAN_PRICE,
   FARM_STORE_CAPACITY,
   FENCE_PRICE_MULT,
-  FLOCK_CAP,
   SMOUCH_COST,
   SMOUCH_YIELD,
   FORT_COST,
+  DYKE_DEBT,
+  DYKE_PASTURE_HEAD,
   LEIDEN_PRICE_MULT,
   MARSH_VEIL_DEBT,
   MARSH_VEIL_DIV,
@@ -53,7 +54,10 @@ import {
   WOOL_PRICE_DOMESTIC,
 } from '../sim/balance';
 import {
+  DYKE_SEGMENTS,
   SHINGLE,
+  dykeById,
+  dykeTiles,
   edgeById,
   edgesFor,
   firstHop,
@@ -66,6 +70,7 @@ import {
 import { dayPhaseOf, isFlooded, ticksUntilTideTurn } from '../sim/time';
 import { carterWageOf, garrisonCap, woolOnTheBooks } from '../sim/tick';
 import { HEAT_RED, REVENUE_BLUE } from './palette';
+import { dykeCost, dykeDays, flockCapOf, stoneRefuses } from '../sim/dykes';
 import { CONTRABAND, coverOf, fortVisibility, illicitAnywhere, illicitCount } from '../sim/revenue';
 import { GOOD_LABEL, spanOf, storeSummary } from './format';
 import type { Action, Cart, CutDepth, EdgeId, GameState, Good, NodeId } from '../sim/types';
@@ -91,6 +96,8 @@ import {
   drawSheep,
   drawShingle,
   drawStockChip,
+  drawDyke,
+  drawSurveyPost,
   drawTileHighlight,
   drawLighter,
   drawSeaLane,
@@ -110,6 +117,7 @@ type Selection =
   | 'wight-stone'
   | 'officer'
   | `cart:${string}`
+  | `dyke:${string}`
   | null;
 
 function cargoCount(cargo: Partial<Record<Good, number>>): number {
@@ -344,6 +352,10 @@ function anchorWorld(sel: Selection, state: GameState): { x: number; y: number }
     const cart = state.carts.find((c) => c.id === sel.slice(5));
     return cart ? cartWorldPosOf(state, cart) : null;
   }
+  if (sel?.startsWith('dyke:')) {
+    const seg = DYKE_SEGMENTS.find((d) => d.id === sel.slice(5));
+    return seg ? pointAlong(seg.path.map(tileCenter), 0.5) : null;
+  }
   switch (sel) {
     case 'farm':
       return tileCenter(state.farm);
@@ -486,6 +498,22 @@ export function GameMap({ state }: { state: GameState }) {
       if (isFreshGame(s) && !farmVisitedRef.current) {
         drawFarmGlow(ctx, s.farm, (performance.now() / 1800) % 1);
       }
+      // §6.18 (M5½a) — the survey and the water: under the buildings, over
+      // the roads. The lines appear with the improver's eye (cutting house).
+      if (s.cuttingHouse) {
+        for (const seg of DYKE_SEGMENTS) {
+          const status = s.dykesDug.includes(seg.id)
+            ? 'dug'
+            : s.digging?.id === seg.id
+              ? 'digging'
+              : 'survey';
+          drawDyke(ctx, seg.path, status);
+          if (status !== 'dug') {
+            drawSurveyPost(ctx, pointAlong(seg.path.map(tileCenter), 0.5));
+          }
+        }
+      }
+
       drawRyne(ctx);
       drawLabel(ctx, 'Ryne', 28.5 * TILE, 19.6 * TILE);
       drawCustoms(ctx);
@@ -822,6 +850,14 @@ export function GameMap({ state }: { state: GameState }) {
       const wc = tileCenter(s.wights.sign);
       targets.push({ sel: 'wight-sign', x: wc.x, y: wc.y, r: 16 });
     }
+    // §6.18 — the survey's posts, once the improver's eye has opened. Pushed
+    // last, so a building or the stone always wins a crowded pixel.
+    if (s.cuttingHouse) {
+      for (const seg of DYKE_SEGMENTS) {
+        const mid = pointAlong(seg.path.map(tileCenter), 0.5);
+        targets.push({ sel: `dyke:${seg.id}`, x: mid.x, y: mid.y, r: 14 });
+      }
+    }
 
     let best: { sel: Selection; d: number } | null = null;
     for (const t of targets) {
@@ -1031,6 +1067,9 @@ export function GameMap({ state }: { state: GameState }) {
             {selected === 'wight-sign' && <SignMenu state={state} />}
             {selected === 'wight-stone' && <StoneMenu state={state} />}
             {selected === 'officer' && <OfficerMenu state={state} />}
+            {selected?.startsWith('dyke:') && (
+              <DykeMenu state={state} dykeId={selected.slice(5)} />
+            )}
             {selected?.startsWith('cart:') && (
               <CartMenu state={state} flooded={flooded} cartId={selected.slice(5)} />
             )}
@@ -1039,6 +1078,72 @@ export function GameMap({ state }: { state: GameState }) {
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * §6.18 (M5½a) — a surveyed channel's post: the dig offered with its whole
+ * price on its face (coin, days, Debt, the parish, the pasture — §21.2's
+ * axis, read aloud before the spade goes in).
+ */
+function DykeMenu({ state, dykeId }: { state: GameState; dykeId: string }) {
+  const enqueue = useEnqueue();
+  const seg = dykeById(dykeId);
+  if (!seg) return null;
+  const dug = state.dykesDug.includes(seg.id);
+  const inHand = state.digging?.id === seg.id;
+  const busy = state.digging !== null && !inHand;
+  const refused = stoneRefuses(state, seg);
+  const cost = dykeCost(seg);
+  const short = state.coin < cost;
+  return (
+    <>
+      <h4>{seg.name}</h4>
+      {dug ? (
+        <p className="flavour">
+          Clean water, cut banks, and drained grazing either side. The gentry call it
+          improvement; the marsh keeps its own account of it. A dyke is never filled in.
+        </p>
+      ) : inHand ? (
+        <p className="flavour">
+          The crew is in it now — mud to the knees, done in about{' '}
+          {Math.max(1, Math.ceil((state.digging!.doneTick - state.tick) / TICKS_PER_DAY))} day
+          {Math.ceil((state.digging!.doneTick - state.tick) / TICKS_PER_DAY) === 1 ? '' : 's'}.
+        </p>
+      ) : (
+        <>
+          <p className="flavour">
+            An old line, silted a century: {dykeTiles(seg)} chains of channel wanting a crew.
+            Cut it and the water runs for ever — the marsh smaller by that much ({DYKE_DEBT}{' '}
+            to the account), the parish colder for the enclosure, and the drained margin
+            grazing {DYKE_PASTURE_HEAD} more head.
+          </p>
+          <div className="menu-buttons">
+            <button
+              disabled={busy || refused || short}
+              title={
+                refused
+                  ? 'The men will not put a spade in the ground by the stone.'
+                  : busy
+                    ? 'The crew is one crew: one dig at a time.'
+                    : short
+                      ? `The diggers want ${cost} coin up front, and the till is short.`
+                      : 'Slow, permanent, and the whole parish will have an opinion.'
+              }
+              onClick={() => enqueue({ type: 'digDyke', id: seg.id })}
+            >
+              Cut the channel · {cost} coin · {dykeDays(seg)} days
+            </button>
+          </div>
+          {refused && (
+            <p className="flavour">
+              The wight-stone stands too near this line. The men will not dig by it, and you
+              would not ask twice.
+            </p>
+          )}
+        </>
+      )}
+    </>
   );
 }
 
@@ -1476,12 +1581,13 @@ function ShearerRow({ state }: { state: GameState }) {
 /** Spec §6.16 — the flock market: purchase and sale, never husbandry. */
 function FlockMarketRow({ state }: { state: GameState }) {
   const enqueue = useEnqueue();
-  const room = FLOCK_CAP - state.flockSize - state.sheepArriving;
+  const room = flockCapOf(state) - state.flockSize - state.sheepArriving;
   return (
     <>
       <p className="flavour">
-        The pasture holds {FLOCK_CAP}. More sheep, more wool, more alibi — and Ryne buys only so
-        much honest fleece.
+        The pasture holds {flockCapOf(state)}
+        {state.dykesDug.length > 0 ? ' (the drained land grazes more)' : ''}. More sheep, more
+        wool, more alibi — and Ryne buys only so much honest fleece.
       </p>
       <div className="menu-buttons">
         <button

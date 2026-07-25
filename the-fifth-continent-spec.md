@@ -1598,7 +1598,76 @@ key → **v13**. All JSON-plain.
 
 ---
 
-## 7. THE REVENUE — A LEARNING ADVERSARY
+### 6.18 M5½ — the dykes: the survey and the spade
+
+§21.1 priced in full at last — the mid-game's central verb, taken in three
+stops on the design pass of 2026-07: **M5½a** the survey and the spade
+(digging, Debt, Standing, pasture — this section), **M5½b** the tub-boat
+(§21's hauler on the dug network, lighter-pattern vessel), **M5½c** the
+water fights back (linear law behind dykes, cut-the-crossing). Each stop is
+its own review. The four-in-one payoff of §21.1 unfolds across them;
+nothing here contradicts §21, it schedules it.
+
+**The survey — pre-surveyed channels, not freeform digging (design call).**
+Romney's sewers are ancient: the lines are *known*, and the player pays to
+re-cut them. An authored network of DYKE_SEGMENTS ≈ 8 named segments lies
+over the marsh — each a path of tiles with two ends, chosen so the dug
+network eventually links the farm's ground toward the shingle and the
+cutting country, encloses defensible ground (M5½c's chokepoints), and
+skirts nothing important. Freeform digging is deferred, deliberately: a
+named segment is a decision; a spaghetti ditch is a mess nobody can read.
+
+```
+segment      { id, name, path[] }      authored in map.ts, like the roads
+visibility   the survey appears once the cutting house stands (the
+             improver's eye); a one-shot card names the old sewers (§10)
+DYKE_COST_PER_TILE   12 coin          a 10-tile segment ≈ 120 coin
+DYKE_DAYS_PER_TILE   0.5 days        rounded up — slow, capital-intensive
+one dig at a time    state.digging = { id, doneTick } | null — the crew
+             is one crew; the bench pattern (§6.14), its own slot (you
+             may research and dig at once)
+refusals     coin short · a dig already running · already dug · the
+             stone's ground (any segment passing within 1 tile of the
+             wight-stone refuses the spade while the stone stands) ·
+             (covenanted land, M6, reserved)
+
+on completion, at dawn:
+  dykesDug += segment          permanent — a dyke is never filled in
+  debt += DYKE_DEBT 15 × debtMult      §21.1's fourth thing, §6.14's account
+  loseStanding(DYKE_PARISH_STANDING 5)  enclosure enrages the commoners
+  gentry favour: recorded, not yet spent — dykesDug.length is the number
+             M6's Respectability reads; no second Standing meter before
+             the alliances (§21.2's axis, deferred to its consumer)
+  flockCapOf(state) = FLOCK_CAP + dykesDug.length × DYKE_PASTURE_HEAD 2
+             drainage manufactures pasture, pasture manufactures alibi
+             (§19.2); every consumer of FLOCK_CAP reads the function
+```
+
+**What a dug dyke is in M5½a:** a permanent line of water on the map —
+drawn, named, and priced, its Debt in the account and its pasture under
+the flock — and *not yet* an edge, a fortification, or a boat's road.
+The logistics and the fighting arrive in M5½b/c; the spade's own
+consequences (coin gone, Debt for ever, the parish colder, the flock
+richer) are a complete, reviewable loop on their own. The land is the
+protagonist (§21.2), and this stop is the first time the player redraws
+it.
+
+**Art:** undug segments read as faint surveyor's pin-lines with a post at
+the midpoint (the click target — the popover offers the dig with its
+price, days, and what the marsh will make of it); a dig in progress reads
+dashed; a dug dyke is a solid water line in the map's own blues, banked
+with drained-green margins. Reserved palette untouched.
+
+**What joins GameState (save bump v21, migrating v20):** `dykesDug:
+DykeId[]`, `digging: { id, doneTick } | null`. All JSON-plain; the
+segments themselves are authored map data, never state.
+
+**Arithmetic (opening bids for the distribution pass).** All eight
+segments ≈ 70 tiles ≈ 840 coin, 35 crew-days, +120 Debt (two bindings'
+worth — the digger MUST live with the wights or tribute hard), −40
+parish Standing, +16 head of pasture. A full dig is a mid-game fortune
+and a standing argument with both the marsh and the parish: exactly
+§21.2's axis, priced.
 
 **Not a random-raid system.** The Revenue maintains its own data structure:
 
@@ -1742,7 +1811,7 @@ disclosure: routes appear only once there is something to move.
 **M3 — The Revenue.** `RevenueModel`, suspicion inference, the fogged player-facing intel map, cover & leak, first Riding Officer (§6.10). Bought carts and the hired carter on standing orders (§6.11) — automation arrives with the man who stops carts.
 **M4 — Force.** Hawksmere, raid resolution, fortification tiers, the visibility trade-off.
 **M5 — The Trees.** Ichor and Phlogiston, Debt, Publication, the two unlock events (§6.14). Difficulty dial & mercy (§6.15) and the shearer + flock market (§6.16) land first, in M5a. Sub-stops M5a/M5b/M5c.
-**M5½ — The Dykes.** §21.1's dig verb: channel logistics, chokepoints, drainage cover, dyke Debt. Its own design pass and stop.
+**M5½ — The Dykes.** §21.1's dig verb: channel logistics, chokepoints, drainage cover, dyke Debt. Designed 2026-07 (§6.18): three stops — M5½a the survey & the spade, M5½b the tub-boat, M5½c the water fights back.
 **M6 — Alliances & Endings.**
 
 ---

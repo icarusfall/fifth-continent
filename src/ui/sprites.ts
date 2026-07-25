@@ -833,3 +833,80 @@ export function drawTileHighlight(
   ctx.strokeRect(tx * TILE, ty * TILE, TILE, TILE);
   ctx.setLineDash([]);
 }
+
+// ---- The survey and the spade (spec §6.18, M5½a) ----
+
+/** §6.18 — a surveyed channel: faint pin-line and a post while undug, dashed
+ *  mud while the crew is in it, solid water with drained-green margins once
+ *  it runs. The land is the protagonist; this is the player redrawing it. */
+export function drawDyke(
+  ctx: CanvasRenderingContext2D,
+  path: Array<{ x: number; y: number }>,
+  status: 'survey' | 'digging' | 'dug',
+): void {
+  const pts = path.map(tileCenter);
+  const trace = () => {
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+  };
+
+  if (status === 'dug') {
+    // Drained margins first: the grass the water bought.
+    ctx.strokeStyle = MARSH_DARK;
+    ctx.globalAlpha = 0.5;
+    ctx.lineWidth = 7;
+    ctx.lineCap = 'round';
+    trace();
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    // The channel itself, ink-banked.
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 4.6;
+    trace();
+    ctx.stroke();
+    ctx.strokeStyle = DYKE;
+    ctx.lineWidth = 3;
+    trace();
+    ctx.stroke();
+    // A pale thread of light down the water.
+    ctx.strokeStyle = LIMEWASH;
+    ctx.globalAlpha = 0.25;
+    ctx.lineWidth = 0.9;
+    trace();
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.lineCap = 'butt';
+    return;
+  }
+
+  // Survey pin-line (faint) or the crew's open workings (dashed mud).
+  ctx.strokeStyle = status === 'digging' ? CLAY : LIMEWASH;
+  ctx.globalAlpha = status === 'digging' ? 0.9 : 0.35;
+  ctx.lineWidth = status === 'digging' ? 2.4 : 1.2;
+  ctx.setLineDash(status === 'digging' ? [6, 4] : [2, 5]);
+  trace();
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.globalAlpha = 1;
+}
+
+/** The surveyor's post at a segment's midpoint — the click target's mark. */
+export function drawSurveyPost(
+  ctx: CanvasRenderingContext2D,
+  at: { x: number; y: number },
+): void {
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(at.x, at.y + 4);
+  ctx.lineTo(at.x, at.y - 5);
+  ctx.stroke();
+  ctx.fillStyle = LIMEWASH;
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.rect(at.x - 3, at.y - 9, 6, 4.5);
+  ctx.fill();
+  ctx.stroke();
+}

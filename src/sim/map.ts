@@ -284,6 +284,52 @@ export function otherEnd(edge: MapEdge, from: NodeId): NodeId {
   throw new Error(`Node ${from} is not an endpoint of ${edge.id}`);
 }
 
+// ---- The survey (spec §6.18 / §21.1, M5½a) ----
+// Romney's sewers are ancient: the lines are known, and the player pays to
+// re-cut them. Eight named segments over the open marsh — authored data,
+// never state; the game records only which have been dug. Chosen to run the
+// farm's country toward the shingle and the cutting grounds (M5½b's boat
+// road), to enclose defensible ground (M5½c's chokepoints), and to skirt
+// nothing important. The names are the marsh's own.
+
+export interface DykeSegment {
+  id: string;
+  name: string;
+  path: Array<{ x: number; y: number }>;
+}
+
+export const DYKE_SEGMENTS: readonly DykeSegment[] = [
+  { id: 'walland-cut', name: 'The Walland Cut', path: [{ x: 7, y: 13 }, { x: 7, y: 17 }] },
+  { id: 'petts-level', name: 'Petts Level Sewer', path: [{ x: 19, y: 17 }, { x: 26, y: 17 }] },
+  { id: 'white-sewer', name: 'The White Kemp Sewer', path: [{ x: 12, y: 8 }, { x: 12, y: 4 }] },
+  {
+    id: 'five-waterings',
+    name: 'The Five Waterings',
+    path: [{ x: 14, y: 10 }, { x: 20, y: 10 }, { x: 20, y: 14 }],
+  },
+  {
+    id: 'guldeford',
+    name: 'The Guldeford Sewer',
+    path: [{ x: 20, y: 14 }, { x: 26, y: 14 }],
+  },
+  { id: 'camber-cut', name: 'The Camber Cut', path: [{ x: 26, y: 14 }, { x: 30, y: 10 }] },
+  { id: 'wainway', name: 'The Wainway Channel', path: [{ x: 10, y: 20 }, { x: 16, y: 20 }] },
+  {
+    id: 'broomhill',
+    name: 'The Broomhill Sewer',
+    path: [{ x: 16, y: 20 }, { x: 23, y: 21 }],
+  },
+];
+
+export function dykeById(id: string): DykeSegment | null {
+  return DYKE_SEGMENTS.find((d) => d.id === id) ?? null;
+}
+
+/** Whole tiles of digging in a segment — the unit its coin and days price. */
+export function dykeTiles(segment: DykeSegment): number {
+  return Math.max(1, Math.ceil(pathTileLength(segment.path)));
+}
+
 // ---- The officer's map (spec §6.10) ----
 // The Customs House sits beside the high road but off the cart graph: the
 // officer alone rides the short lane between his lodgings and Ryne. He does
