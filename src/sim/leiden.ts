@@ -13,7 +13,6 @@ import {
   DIFFICULTY,
   LEIDEN_ARRIVAL_CHANCE,
   LEIDEN_ARRIVAL_MIN_RUN,
-  LEIDEN_COVER,
   LIGHTER_CAPACITY,
   MAX_LOG_EVENTS,
   MAX_SUPPRESSIONS,
@@ -21,7 +20,7 @@ import {
   SUPPRESS_STANDING,
 } from './balance';
 import { nodeById } from './map';
-import { illicitCount, loseStanding } from './revenue';
+import { loseStanding } from './revenue';
 import { nextRandom } from './rng';
 import type { GameState, NodeId } from './types';
 
@@ -71,15 +70,12 @@ export function leidenAtDeparture(state: GameState): void {
   );
 }
 
-/** Cover a building can still spare (§6.14): its hides minus what sits in them. */
-export function spareCoverAt(state: GameState, nodeId: NodeId, cover: number): number {
-  return Math.max(0, cover - illicitCount(state.stores[nodeId] ?? {}));
-}
-
-/** §6.14 — house the philosopher: the building becomes the workshop. The
- *  caller (tick.ts) supplies the building's cover so this module does not
- *  import revenue's cover model. */
-export function applyHouseLeiden(state: GameState, nodeId: NodeId, cover: number): void {
+/** §6.14 — house the philosopher: the building becomes the workshop. He
+ *  takes the loft, not the hides (M5½ playtest — an unpredictable arrival
+ *  must never compete with goods for space the player could not have
+ *  reserved): cover is untouched, and his prices are the letters, the
+ *  floor, and the wights' list. */
+export function applyHouseLeiden(state: GameState, nodeId: NodeId): void {
   const l = state.leiden;
   if (l.state !== 'offered') {
     logEvent(state, 'No philosopher waits on your word.');
@@ -90,19 +86,12 @@ export function applyHouseLeiden(state: GameState, nodeId: NodeId, cover: number
     logEvent(state, 'He must be housed under your own roof — nobody else keeps such secrets.');
     return;
   }
-  if (spareCoverAt(state, nodeId, cover) < LEIDEN_COVER) {
-    logEvent(
-      state,
-      `He needs ${LEIDEN_COVER} cover to spare — him, the glass, and the smell of burning air. The hides there are full.`,
-    );
-    return;
-  }
   l.state = 'housed';
   l.node = nodeId;
   const name = nodeById(nodeId, state.farm, state.cuttingHouse).name;
   logEvent(
     state,
-    `The philosopher is installed at ${name}, behind the same boards as the brandy. The room smells of storms now. The workshop is open.`,
+    `The philosopher is installed in the loft at ${name}; the brandy keeps the dark below. The room smells of storms now. The workshop is open.`,
   );
 }
 

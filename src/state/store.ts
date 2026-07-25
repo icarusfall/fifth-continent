@@ -10,7 +10,6 @@ import {
   CART_COST,
   COLLECTION_GRACE_DAYS,
   FLOCK_CAP,
-  LEIDEN_COVER,
   MAX_SUPPRESSIONS,
   PERSON_DEBT,
   FLOCK_SPOTLIGHT_DAY,
@@ -64,7 +63,9 @@ import type { Action, ActionLog, Difficulty, GameState, NodeId } from '../sim/ty
 //      v19 (and v18 through it) in place: the family playtest still runs.
 // v21: M5½a — dykesDug + digging (§6.18, the survey and the spade).
 //      Migrates the whole chain, as ever.
-const SAVE_KEY = 'fifth-continent-save-v21';
+// v22: M5½ playtest — cellars (§6.12, the Cellar Hide). Chain migrates.
+const SAVE_KEY = 'fifth-continent-save-v22';
+const SAVE_KEY_V21 = 'fifth-continent-save-v21';
 const SAVE_KEY_V20 = 'fifth-continent-save-v20';
 const SAVE_KEY_V19 = 'fifth-continent-save-v19';
 const SAVE_KEY_V18 = 'fifth-continent-save-v18';
@@ -173,7 +174,7 @@ function leidenCard(next: GameState): EventCard {
     id: `leiden-${next.tick}`,
     kind: 'leiden',
     title: 'A tub with a man inside',
-    body: `The last tub off the lugger is heavier than the rest, and it is knocking. Inside: a natural philosopher — wet to the collar, indignant in three languages, travelling with a crate of glass and a letter of introduction nobody sent for. He asks for somewhere dry, a bench, and no questions; he needs ${LEIDEN_COVER} cover to spare, housed exactly like the brandy. He was not on your manifest. He is, however, in your boat.`,
+    body: 'The last tub off the lugger is heavier than the rest, and it is knocking. Inside: a natural philosopher — wet to the collar, indignant in three languages, travelling with a crate of glass and a letter of introduction nobody sent for. He asks for a loft, a bench, and no questions; the hides below stay yours. He was not on your manifest. He is, however, in your boat.',
   };
 }
 
@@ -689,12 +690,24 @@ function migrateV20(parsed: SaveFile): SaveFile {
   return parsed;
 }
 
+/** v21 → v22 (§6.12 M5½): no cellars under an old save's floors. */
+function migrateV21(parsed: SaveFile): SaveFile {
+  const s = parsed.state as GameState & { cellars?: unknown };
+  if (typeof s.cellars !== 'object' || s.cellars === null) s.cellars = {};
+  return parsed;
+}
+
 function loadSave(): SaveFile | null {
   try {
     let raw = localStorage.getItem(SAVE_KEY);
     let fromV18 = false;
     let fromV19 = false;
     let fromV20 = false;
+    let fromV21 = false;
+    if (!raw) {
+      raw = localStorage.getItem(SAVE_KEY_V21);
+      fromV21 = raw !== null;
+    }
     if (!raw) {
       raw = localStorage.getItem(SAVE_KEY_V20);
       fromV20 = raw !== null;
@@ -712,6 +725,7 @@ function loadSave(): SaveFile | null {
     if (fromV18) parsed = migrateV18(parsed);
     if (fromV18 || fromV19) parsed = migrateV19(parsed);
     if (fromV18 || fromV19 || fromV20) parsed = migrateV20(parsed);
+    if (fromV18 || fromV19 || fromV20 || fromV21) parsed = migrateV21(parsed);
     if (parsed.version !== 1 || typeof parsed.state?.tick !== 'number') return null;
     if (typeof parsed.state.farm?.x !== 'number' || typeof parsed.state.fleeceReady !== 'number')
       return null;
@@ -763,6 +777,7 @@ function loadSave(): SaveFile | null {
       return null;
     if (typeof parsed.state.wights?.veil !== 'boolean') return null;
     if (!Array.isArray(parsed.state.dykesDug) || parsed.state.digging === undefined) return null;
+    if (typeof parsed.state.cellars !== 'object' || parsed.state.cellars === null) return null;
     return parsed;
   } catch {
     return null;

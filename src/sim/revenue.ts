@@ -5,6 +5,7 @@
 import {
   BOOK_AUDIT_OFFSET_DAYS,
   BOOK_AUDIT_PERIOD_DAYS,
+  CELLAR_COVER_PER_TIER,
   COVER_CAPACITY,
   DIFFICULTY,
   DITCH_HEAT,
@@ -16,10 +17,10 @@ import {
   FORT_VISIBILITY_HEAT,
   GALVANIC_VISIBILITY,
   INFORMER_COVER,
-  LEIDEN_COVER,
   LIGHTER_EXPOSURE_MULT,
   MARKET_TATTLE,
   MARSH_VEIL_DIV,
+  MAX_CELLAR_TIER,
   MAX_FORT_TIER,
   MAX_LOG_EVENTS,
   NATIONAL_HEAT_DECAY,
@@ -117,15 +118,18 @@ export function illicitAnywhere(state: GameState): number {
 /**
  * What a building can hide in plain sight (§18, §6.1). With an informer set
  * (Standing hit zero, §6.13), the marsh's free hides close: cover drops to
- * INFORMER_COVER and every tub is visible to a search.
+ * INFORMER_COVER and every tub is visible to a search — but a cellar the
+ * parish never saw dug stays yours (§6.12 M5½ playtest: the scar stays
+ * severe; the recovery the player *built* survives it, per §6.15's Floor).
  */
 export function coverOf(state: GameState, nodeId: NodeId): number {
   const base = state.informer ? INFORMER_COVER : (COVER_CAPACITY[nodeId] ?? 0);
-  // §6.14 (M5c) — the philosopher is housed exactly like brandy: he, the
-  // glass, and the smell of burning air occupy LEIDEN_COVER of the hides.
-  const leidenTax =
-    state.leiden.state === 'housed' && state.leiden.node === nodeId ? LEIDEN_COVER : 0;
-  return Math.max(0, base - leidenTax);
+  const cellar =
+    Math.min(state.cellars[nodeId] ?? 0, MAX_CELLAR_TIER) * CELLAR_COVER_PER_TIER;
+  // §6.14 (M5½ playtest) — the philosopher takes the loft, not the hides:
+  // housing him no longer touches cover. His prices are the letters, the
+  // floor, and the wights' list.
+  return Math.max(0, base + cellar);
 }
 
 // ---- Heat plumbing ----

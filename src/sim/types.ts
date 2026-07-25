@@ -291,6 +291,12 @@ export interface GameState {
    */
   fortifications: Partial<Record<NodeId, number>>;
   /**
+   * Spec §6.12 (M5½ playtest) — the Cellar Hide, `cellarTier 0..2`: the fort
+   * ladder's quiet twin. Absent = tier 0. Raises coverOf; noise 0, vis 0.
+   * A cellar the parish never saw dug survives the informer (§6.15's Floor).
+   */
+  cellars: Partial<Record<NodeId, number>>;
+  /**
    * Spec §6.13 — men posted at each building against the raid. Absent = none.
    * The cap is a function of the building's fortTier (fort = capacity too).
    */
@@ -430,6 +436,7 @@ export type Action =
   | { type: 'designateHollowWay'; edgeId: EdgeId }
   | { type: 'setVeil'; up: boolean }
   | { type: 'digDyke'; id: DykeId }
+  | { type: 'digCellar'; nodeId: NodeId }
   | { type: 'resolveRaid'; calls?: ScheduledCall[] };
 
 /** Actions to apply at a given tick, for replay: actionLog[tick] = Action[]. */

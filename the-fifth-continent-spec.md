@@ -429,7 +429,11 @@ the Customs House and he is entirely deterministic — outplaying him is
 timetabling, not luck (§7: countermeasures against an inference, never a
 dice roll).
 ```
-at dawn    target = argmax suspicion[node], if the max ≥ PATROL_THRESHOLD (4);
+at dawn    target = argmax suspicion[node], if the max ≥ PATROL_THRESHOLD (8;
+           raised from 4, M5½ playtest — a working smuggler's daily tattle
+           put every dawn over the old bar, which read as a frisking, not a
+           patrol: he now rides for genuinely sore stains and otherwise
+           walks his beat);
            otherwise his beat: Customs House → Ryne → back
 audit      (M5, §6.17) every BOOK_AUDIT_PERIOD_DAYS = 6, on the dawn after
            the rent falls (day % 6 == BOOK_AUDIT_OFFSET_DAYS = 1), the farm
@@ -863,6 +867,32 @@ under the building rises with `fortVisibility`, so the trade is legible at a
 glance in the Yard view. Reserved palette is untouched (house rule 7): fort
 uses ink, clay, and roof-tile, darkening as it hardens.
 
+**The Cellar Hide — the ladder's quiet twin (M5½ playtest; §8.1's
+Concealment rung 1, built at last).** Fortifying makes a building loud;
+this is the coin spent the other way. A per-building dig, bought like the
+fort tiers, that raises what the clutter can hide:
+
+```
+digCellar    CELLAR_COST [—, 60, 120] coin to climb TO each tier, instant,
+             at your own buildings only; MAX_CELLAR_TIER 2
+cover        coverOf gains cellarTier × CELLAR_COVER_PER_TIER 4:
+             farm 4 → 8 → 12 · cutting house 6 → 10 → 14
+             (§18's "tiny capacity" doctrine holds: a lugger-load can rest
+             hidden overnight while the carters drain it — a buffer, never
+             a warehouse. Noise 0, visibility 0: §18's own table priced the
+             cellar at nothing, which is the whole point.)
+informer     the parish's FREE hides close when someone talks (§6.13) —
+             but a cellar the parish never saw dug stays yours: coverOf =
+             (informer ? INFORMER_COVER : base) + cellar cover. The scar
+             stays severe; the recovery the player *built* survives it
+             (the Floor, §6.15).
+```
+
+Against the fort ladder the §6.12 trade finally stands symmetrical: harden
+the building you will fight for, *dig under* the building you store in.
+Gated in the UI with the fort row (first rent felt / Dutchman known, §10);
+the sim stays permissive. `cellars` joins GameState (save bump).
+
 ### 6.13 M4c — the raid: standing garrison, Hawksmere, and resolution
 
 Force is the second half of M4 and the milestone's namesake. M4b made a
@@ -1119,26 +1149,28 @@ is the point: the moral reserve currency of the marsh has legs and a bell.
 
 From the LEIDEN_ARRIVAL_MIN_RUN = 4th successful landing onward, every
 landing where goods are bought off the lugger rolls the seeded PRNG once —
-**but only once a cutting house stands** (M5c playtest): the farm's whole
-cover is 4 and he wants all 4 for good, so a farm-only tenancy has nowhere
-he can honestly go — the roll would arrive as a card whose every button is
-a refusal. Landings still count toward the run while the house is unbuilt;
-the dice simply wait for a roof that could take him. At
-LEIDEN_ARRIVAL_CHANCE = 1/4, one randomly chosen tub or barrel of that
-night's purchase holds a philosopher (pause card — he is cargo, uninsured,
-and wet, and the boat has already gone). Design call (playtest, 2026-07):
-random, not scheduled — *you did not choose him, and you could not have.*
-**Housing him** needs a building with ≥ LEIDEN_COVER = 4 spare cover
-capacity; he occupies it permanently and it becomes the workshop. The farm
-remains a legal berth for him (empty hides, the whole clutter surrendered)
-— a hard choice, not a trap, now that taking it is never the only door.
-Turn him away and he is rowed back out on the next tide; the offer re-rolls
-on later landings until a second refusal, then never. When a building
-cannot take him the card says the shortfall in plain text on its face
-(*"the hides there spare only 2 of the 4 he needs"*), never only in a
-hover tooltip — a disabled button with a hidden reason reads as a bug, and
-the refusal is the game's most interesting sentence that night. He is a
-person in the collection sense: the wights will happily take him.
+**but only once a cutting house stands** (M5c playtest): a philosopher
+wants a works, and a farm-only tenancy has no roof of the right kind.
+Landings still count toward the run while the house is unbuilt; the dice
+simply wait. At LEIDEN_ARRIVAL_CHANCE = 1/4, one randomly chosen tub or
+barrel of that night's purchase holds a philosopher (pause card — he is
+cargo, uninsured, and wet, and the boat has already gone). Design call
+(playtest, 2026-07): random, not scheduled — *you did not choose him, and
+you could not have.*
+
+**Housing him takes the loft, not the hides (design call reversed, M5½
+playtest).** He originally consumed LEIDEN_COVER 4 of the building's cover
+for good — but his arrival is unpredictable *by our own design*, and a
+cost the player must pre-reserve space for, against an event they cannot
+foresee, is a trap by construction (§6.15's Floor). So: housing him at any
+building of yours succeeds, always, and touches cover not at all — he,
+the glass, and the smell of burning air go up under the roof, and the
+brandy keeps the dark below. His real prices were always elsewhere and
+they stand untouched: the letters, the rising floor, the galvanic
+apparatus's visibility, and his person on the wights' list. Turn him away
+and he is rowed back out on the next tide; the offer re-rolls on later
+landings until a second refusal, then never. He is a person in the
+collection sense: the wights will happily take him.
 
 #### Publication — the floor that rises
 

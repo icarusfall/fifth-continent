@@ -2,9 +2,7 @@
 // card-worthy moment and freezes the world (useGameLoop); this overlay is how
 // the player answers it. The sim knows nothing of any of this (house rule 1).
 
-import { LEIDEN_COVER, MAX_SUPPRESSIONS, SUPPRESS_STANDING } from '../sim/balance';
-import { spareCoverAt } from '../sim/leiden';
-import { coverOf } from '../sim/revenue';
+import { MAX_SUPPRESSIONS, SUPPRESS_STANDING } from '../sim/balance';
 import { rentAmount } from '../sim/tick';
 import type { Difficulty, NodeId } from '../sim/types';
 import { useGameStore } from '../state/store';
@@ -69,37 +67,21 @@ export function EventCard() {
           </button>
         ) : card.kind === 'leiden' ? (
           <>
+            {/* §6.14 (M5½ playtest) — he takes the loft, not the hides: no
+                cover arithmetic, no disabled buttons. The choice is only
+                where the letters will be written from. */}
             {(['farm', ...(state.cuttingHouse ? ['cutting-house'] : [])] as NodeId[]).map(
-              (nodeId) => {
-                const spare = spareCoverAt(state, nodeId, coverOf(state, nodeId));
-                const short = spare < LEIDEN_COVER;
-                const name = nodeId === 'farm' ? 'Walland Farm' : 'the Cutting House';
-                return (
-                  <div key={nodeId}>
-                    <button
-                      className="event-primary"
-                      disabled={short}
-                      title={
-                        short
-                          ? `The hides there spare only ${spare} — he needs ${LEIDEN_COVER}, and he will not share with the brandy.`
-                          : 'He, the glass, and the smell of burning air. The building becomes the workshop.'
-                      }
-                      onClick={() => answerLeiden(nodeId)}
-                    >
-                      House him at {name} · {LEIDEN_COVER} cover, for good
-                    </button>
-                    {/* §6.14 — the refusal speaks on the card's face, never
-                        only in a hover tooltip: a disabled button with a
-                        hidden reason reads as a bug. */}
-                    {short && (
-                      <p className="flavour">
-                        The hides at {name} spare only {spare} of the {LEIDEN_COVER} he needs — he
-                        will not share with the brandy.
-                      </p>
-                    )}
-                  </div>
-                );
-              },
+              (nodeId) => (
+                <button
+                  key={nodeId}
+                  className="event-primary"
+                  title="He, the glass, and the smell of burning air go up under the roof; the brandy keeps the dark below. The building becomes the workshop."
+                  onClick={() => answerLeiden(nodeId)}
+                >
+                  House him in the loft at{' '}
+                  {nodeId === 'farm' ? 'Walland Farm' : 'the Cutting House'}
+                </button>
+              ),
             )}
             <button className="event-check" onClick={() => answerLeiden(null)}>
               Turn him away — the sea can have him back

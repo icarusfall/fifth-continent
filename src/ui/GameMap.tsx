@@ -29,8 +29,11 @@ import {
   SMOUCH_COST,
   SMOUCH_YIELD,
   FORT_COST,
+  CELLAR_COST,
+  CELLAR_COVER_PER_TIER,
   DYKE_DEBT,
   DYKE_PASTURE_HEAD,
+  MAX_CELLAR_TIER,
   LEIDEN_PRICE_MULT,
   MARSH_VEIL_DEBT,
   MARSH_VEIL_DIV,
@@ -1441,6 +1444,44 @@ const FORT_TIER_LABEL = ['open ground', 'dogs & hedge', 'bolted doors & firing s
  * Spec §6.12 — dig in one rung of the Trade line. The cost is coin now; the
  * cost the player learns to fear is being *seen* — the button says so.
  */
+/** §6.12 (M5½ playtest) — the fort ladder's quiet twin: cover, bought. */
+function CellarRow({ state, nodeId }: { state: GameState; nodeId: NodeId }) {
+  const enqueue = useEnqueue();
+  const tier = state.cellars[nodeId] ?? 0;
+  const maxed = tier >= MAX_CELLAR_TIER;
+  const cost = maxed ? 0 : CELLAR_COST[tier + 1];
+  const canAfford = state.coin >= cost;
+
+  return (
+    <>
+      <p className="flavour">
+        Hides: <strong>{coverOf(state, nodeId)}</strong> of anything rest unseen here
+        {tier > 0 ? ` (a cellar${tier > 1 ? ' with a false wall' : ''} under the boards)` : ''}.
+        {state.informer && tier > 0
+          ? ' The parish talked, but nobody ever saw this dug.'
+          : ''}
+      </p>
+      <div className="menu-buttons">
+        <button
+          disabled={maxed || !canAfford}
+          title={
+            maxed
+              ? 'Any deeper is a well.'
+              : canAfford
+                ? 'Dry, dark, on no plan anywhere — and the Revenue never notices, which is the point.'
+                : `${cost} coin, and the till is short.`
+          }
+          onClick={() => enqueue({ type: 'digCellar', nodeId })}
+        >
+          {maxed
+            ? 'The hides are dug'
+            : `Dig a cellar hide · +${CELLAR_COVER_PER_TIER} cover · ${cost} coin`}
+        </button>
+      </div>
+    </>
+  );
+}
+
 function FortifyRow({ state, nodeId }: { state: GameState; nodeId: NodeId }) {
   const enqueue = useEnqueue();
   const tier = state.fortifications[nodeId] ?? 0;
@@ -1810,6 +1851,8 @@ function FarmMenu({
           <h5>works &amp; men</h5>
           {/* Fortification appears once you have something worth guarding (§10). */}
           {state.dutchman.unlocked && <FortifyRow state={state} nodeId="farm" />}
+          {/* §6.12 — the quiet twin, same gate as the works (§10). */}
+          {state.dutchman.unlocked && <CellarRow state={state} nodeId="farm" />}
           {/* §6.13 — the men behind the works, same gate as the works. */}
           {state.dutchman.unlocked && <GarrisonRow state={state} nodeId="farm" />}
           {/* §6.14 M5c — the workshop, if the philosopher is behind these hides. */}
@@ -2048,6 +2091,7 @@ function CuttingHouseMenu({ state }: { state: GameState }) {
       <RefinerRow state={state} />
 
       <FortifyRow state={state} nodeId="cutting-house" />
+      <CellarRow state={state} nodeId="cutting-house" />
       <GarrisonRow state={state} nodeId="cutting-house" />
       <WorkshopRow state={state} nodeId="cutting-house" />
 

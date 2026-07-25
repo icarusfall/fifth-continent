@@ -40,6 +40,8 @@ import {
   SMOUCH_YIELD,
   FENCE_PRICE_MULT,
   DAILY_DEMAND,
+  CELLAR_COST,
+  CELLAR_COVER_PER_TIER,
   FORT_COST,
   GARRISON_BASE,
   GARRISON_PER_TIER,
@@ -53,6 +55,7 @@ import {
   FLEECE_PER_HEAD_PER_DAY,
   LEIDEN_PRICE_MULT,
   MAX_CARTS,
+  MAX_CELLAR_TIER,
   MAX_FORT_TIER,
   MAX_LOG_EVENTS,
   MAX_SUPPRESSIONS,
@@ -74,7 +77,6 @@ import {
   accrueMarketTattle,
   accrueRouteHeat,
   accrueStorageHeat,
-  coverOf,
   dawnRevenue,
   loseStanding,
   officerTick,
@@ -217,6 +219,8 @@ export function initialState(seed: number, difficulty: Difficulty = 'fair'): Gam
     // §6.18 (M5½a) — the survey is known; nothing has been dug.
     dykesDug: [],
     digging: null,
+    // §6.12 (M5½ playtest) — no cellars yet: the clutter hides what it hides.
+    cellars: {},
     carts: [
       {
         id: 'cart-1',
@@ -950,6 +954,41 @@ function applyAction(state: GameState, action: Action): void {
       return;
     }
 
+    case 'digCellar': {
+      // Spec §6.12 (M5½ playtest) — the fort ladder's quiet twin: coin spent
+      // the other way. Instant, invisible, and the Revenue never notices —
+      // that is the whole point.
+      const isYours =
+        action.nodeId === 'farm' || (action.nodeId === 'cutting-house' && state.cuttingHouse);
+      if (!isYours) {
+        logEvent(state, 'You can only dig under your own floors.');
+        return;
+      }
+      const tier = state.cellars[action.nodeId] ?? 0;
+      if (tier >= MAX_CELLAR_TIER) {
+        logEvent(
+          state,
+          `${nodeById(action.nodeId, state.farm, state.cuttingHouse).name} hides all it can. Any deeper is a well.`,
+        );
+        return;
+      }
+      const cost = CELLAR_COST[tier + 1];
+      if (state.coin < cost) {
+        logEvent(state, `The digging costs ${cost} coin, and the till is short.`);
+        return;
+      }
+      state.coin -= cost;
+      state.cellars[action.nodeId] = tier + 1;
+      const name = nodeById(action.nodeId, state.farm, state.cuttingHouse).name;
+      logEvent(
+        state,
+        tier === 0
+          ? `A cellar opens under ${name} — dry, dark, and on no plan anywhere. ${CELLAR_COVER_PER_TIER} more of anything can rest unseen.`
+          : `The cellar under ${name} grows a second chamber behind a false wall. ${CELLAR_COVER_PER_TIER} more, unseen. The Revenue will never notice, which is the point.`,
+      );
+      return;
+    }
+
     case 'raiseGarrison': {
       // Spec §6.13 — post one man of a kind at one of your buildings.
       if (!isYourBuilding(state, action.nodeId)) {
@@ -1209,7 +1248,7 @@ function applyAction(state: GameState, action: Action): void {
     }
 
     case 'houseLeiden': {
-      applyHouseLeiden(state, action.nodeId, coverOf(state, action.nodeId));
+      applyHouseLeiden(state, action.nodeId);
       return;
     }
 

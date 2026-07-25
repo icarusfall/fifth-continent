@@ -12,7 +12,6 @@ import {
   FACTION_ALPHA,
   LEIDEN_ARRIVAL_CHANCE,
   LEIDEN_ARRIVAL_MIN_RUN,
-  LEIDEN_COVER,
   LIGHTER_CAPACITY,
   MAX_SUPPRESSIONS,
   NATIONAL_HEAT_DECAY,
@@ -140,26 +139,31 @@ describe('the arrival (spec §6.14 M5c): a tub with a man inside, at random', ()
   });
 });
 
-describe('housing (spec §6.14): the workshop, the cover tax, the two refusals', () => {
+describe('housing (spec §6.14): the loft, not the hides, and the two refusals', () => {
   const offered = (mutate?: (s: GameState) => void) =>
     fresh((st) => {
       st.leiden.state = 'offered';
       mutate?.(st);
     });
 
-  it('housing him takes the cover, permanently, and opens the workshop', () => {
+  it('housing him opens the workshop and touches cover not at all (M5½ playtest)', () => {
     const before = coverOf(offered(), 'farm');
     let s = tick(offered(), [{ type: 'houseLeiden', nodeId: 'farm' }]);
     expect(s.leiden.state).toBe('housed');
     expect(s.leiden.node).toBe('farm');
-    expect(coverOf(s, 'farm')).toBe(before - LEIDEN_COVER);
+    expect(coverOf(s, 'farm')).toBe(before); // the loft is his; the hides stay yours
   });
 
-  it('a building with full hides cannot take him', () => {
+  it('full hides are no obstacle — an unpredictable arrival must never be a trap', () => {
     const s0 = offered((st) => {
-      st.stores.farm = { tea: 99 }; // the hides are stuffed
+      st.stores.farm = { tea: 99 }; // the hides are stuffed, and it does not matter
     });
     const s = tick(s0, [{ type: 'houseLeiden', nodeId: 'farm' }]);
+    expect(s.leiden.state).toBe('housed');
+  });
+
+  it('but only under your own roof', () => {
+    const s = tick(offered(), [{ type: 'houseLeiden', nodeId: 'ryne' }]);
     expect(s.leiden.state).toBe('offered'); // still dripping on the shingle
   });
 

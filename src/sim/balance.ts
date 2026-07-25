@@ -156,7 +156,9 @@ export const OFFICER_ARRIVAL_HEAT = 30; // first dawn regional at or above this,
 /** §20.2 — the London gauge's display ceiling (the doom dial reads full here).
  *  A display scale only, until M6 names the ending's true threshold. */
 export const LONDON_GAUGE_CEILING = 100;
-export const PATROL_THRESHOLD = 4; // max suspicion below this, he rides his beat
+// M5½ playtest: raised 4 → 8 — a working smuggler's daily tattle put every
+// dawn over the old bar, which read as a frisking, not a patrol.
+export const PATROL_THRESHOLD = 8; // max suspicion below this, he rides his beat
 export const SEIZURE_HEAT = 1.5; // regional heat per unit seized
 export const SEARCH_RELIEF = 0.5; // × suspicion at a node searched clean
 export const SEARCH_HEAT_RELIEF = 0.8; // × regional heat when a search finds you clean — going straight pays
@@ -258,6 +260,15 @@ export const STANDING_START = 100;
 export const STANDING_RECOVERY = 0.5; // per day, up to the start
 /** With an informer set (Standing hit zero), the free hides close to this. */
 export const INFORMER_COVER = 0;
+
+// ---- M5½ playtest: the Cellar Hide — the fort ladder's quiet twin (§6.12/§8.1) ----
+// Coin spent the other way: what the clutter can hide, raised by digging.
+// Noise 0, visibility 0 (§18's table priced the cellar at nothing).
+export const MAX_CELLAR_TIER = 2;
+/** Coin to climb *to* each tier (index = tier), like FORT_COST. */
+export const CELLAR_COST: readonly number[] = [0, 60, 120];
+/** Cover per cellar tier: farm 4 → 8 → 12, cutting house 6 → 10 → 14. */
+export const CELLAR_COVER_PER_TIER = 4;
 
 // ---- M4b: fortification & the visibility trade-off (spec §6.12) ----
 // A per-building tier ladder (the Trade line, §22). Bought with coin, no
@@ -459,8 +470,9 @@ export const MARSH_VEIL_DEBT = 1;
 export const LEIDEN_ARRIVAL_MIN_RUN = 4;
 /** Per qualifying landing thereafter: the chance one tub held a philosopher. */
 export const LEIDEN_ARRIVAL_CHANCE = 0.25;
-/** Spare cover the workshop must spare him — housed exactly like brandy. */
-export const LEIDEN_COVER = 4;
+// (LEIDEN_COVER removed, M5½ playtest: he takes the loft, not the hides —
+// an unpredictable arrival must never compete with goods for space the
+// player could not have reserved. His prices are §6.14's meters.)
 /** Each published letter raises the national-Heat floor (the §6.15 dial scales it). */
 export const PUBLICATION_HEAT: readonly number[] = [6, 10, 16];
 /** Standing each suppressed letter costs — he is well liked. */
