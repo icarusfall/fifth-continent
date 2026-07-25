@@ -2767,6 +2767,27 @@ function CartsAtNode({
                 )
               ) : cart.carter ? (
                 <>
+                  {/* §6.17 (M5½ playtest) — the fence over the carter's
+                      shoulder: a crewed cart stuck on the appetite can be
+                      emptied by hand at the market, and the man simply turns
+                      for home. */}
+                  {present &&
+                    nodeId === 'ryne' &&
+                    CONTRABAND.filter(
+                      (g) => (cart.cargo[g] ?? 0) > 0 && RYNE_PRICE[g] > 0,
+                    ).map((g) => {
+                      const n = cart.cargo[g] ?? 0;
+                      const fencePrice = Math.round(RYNE_PRICE[g] * FENCE_PRICE_MULT);
+                      return (
+                        <button
+                          key={`fence-${g}`}
+                          title="The whole remainder, round the back, at once — the carter looks away, then turns for home."
+                          onClick={() => enqueue({ type: 'sellToFence', cartId: cart.id, good: g })}
+                        >
+                          Fence the remaining {n} {GOOD_LABEL[g]} · {n * fencePrice} coin
+                        </button>
+                      );
+                    })}
                   <button
                     onClick={() => setHiring({ cartId: cart.id, from: cart.carter!.from })}
                   >

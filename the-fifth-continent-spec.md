@@ -1588,6 +1588,12 @@ fenceRest     (§6.11 order flag, M5c playtest — reversing the "manual only"
               never waits laden in plain view under this order. Offered
               only for contraband orders into Ryne; sanitised off anything
               else at hire.
+over the      (M5½ playtest) the manual fence also works on a CREWED cart
+shoulder      standing at the market: a one-off dump never fights the
+              standing order — emptied, the carter simply turns for home.
+              The Ryne menu offers "Fence the remaining N …" on any crewed
+              cart stuck on the appetite. Off the market, a crewed cart
+              still refuses the player's reins as ever (§6.11).
 ```
 
 *(Design call reversed, M5c playtest: the fence was "manual only — automation

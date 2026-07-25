@@ -656,13 +656,17 @@ function applyAction(state: GameState, action: Action): void {
       // the day's appetite, at a haircut. The priced way out of a sated market,
       // so a laden cart need not sit in town waiting to be seized (§6.10/§6.11).
       const cart = findCart(state, action.cartId);
-      if (!cart || underOrders(state, cart)) return;
-      if (cart.location.kind !== 'node') return;
+      if (!cart || cart.location.kind !== 'node') return;
       const node = nodeById(cart.location.nodeId, state.farm, state.cuttingHouse);
       if (node.kind !== 'market') {
+        // §6.11 — off the market a crewed cart still refuses the reins; at
+        // the market, the fence works over the carter's shoulder (below).
+        if (underOrders(state, cart)) return;
         logEvent(state, `No fence at ${node.name}.`);
         return;
       }
+      // §6.17 (M5½ playtest) — a one-off dump at the market never fights the
+      // standing order: emptied, the carter simply turns for home.
       if (!CONTRABAND.includes(action.good) || RYNE_PRICE[action.good] <= 0) {
         logEvent(state, 'The fence deals in contraband, not honest goods.');
         return;

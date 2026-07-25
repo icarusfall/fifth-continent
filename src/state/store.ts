@@ -238,17 +238,41 @@ function vigilCard(next: GameState): EventCard {
   };
 }
 
-/** §6.10 — the officer took goods: pause, and say what the cover could not hide. */
+/** §6.10 — the officer took goods: pause, and say what the cover could not
+ *  hide — BY NAME (M5½ playtest, the read-the-charge rule: the log lines were
+ *  itemised but this card still said "2 goods", which reads as nothing).
+ *  The sim's own log holds the itemised sentence from this very seizure. */
 function seizureCard(next: GameState, units: number): EventCard {
   const where = next.lastSeizureNode
     ? nodeById(next.lastSeizureNode, next.farm, next.cuttingHouse).name
     : 'the road';
+  const itemised = [...next.log].reverse().find((e) => e.text.includes('seizes'))?.text;
   return {
     id: `seizure-${next.tick}`,
     kind: 'info',
     title: 'Seized for the Crown',
-    body: `The Riding Officer takes ${units} good${units === 1 ? '' : 's'} at ${where} — everything the cover could not hide. What the Crown takes, it keeps, and the parish talks the louder for it. Split your stock, mind his road, and keep the stains moving.`,
+    body: `${
+      itemised ?? `The Riding Officer takes ${units} good${units === 1 ? '' : 's'} at ${where}.`
+    } What the Crown takes, it keeps, and the parish talks the louder for it. Split your stock, mind his road, and keep the stains moving.`,
   };
+}
+
+/** §6.11 (M5½ playtest) — men walked off unpaid: pause, and say so. A silent
+ *  emptying of the stable reads as carts breaking, not wages failing. */
+function walkedCard(next: GameState, walked: number): EventCard {
+  return {
+    id: `walked-${next.tick}`,
+    kind: 'info',
+    title: walked === 1 ? 'The reins go slack' : 'The stable empties',
+    body: `${
+      walked === 1 ? 'A carter' : `${walked} carters`
+    } went unpaid at dawn and walked off the job. The carts stand where they stopped; the till holds ${next.coin} coin. Nothing else is lost — hire again when the purse recovers, at the same day-rate — but nothing moves until you do.`,
+  };
+}
+
+/** Dawn walk-offs this tick, read from the sim's own log. */
+function walkoffsIn(s: GameState): number {
+  return s.log.filter((e) => e.text.includes('No wage, no carter')).length;
 }
 
 /** §6.8 — the rent came short and the agent took sheep: pause, and count them. */
@@ -876,6 +900,8 @@ export const useGameStore = create<GameStore>()((set, get) => {
         card = signCard(next);
       } else if (justSeized) {
         card = seizureCard(next, next.goodsSeized - state.goodsSeized);
+      } else if (walkoffsIn(next) > walkoffsIn(state)) {
+        card = walkedCard(next, walkoffsIn(next) - walkoffsIn(state));
       } else if (roundStood && !next.dutchman.unlocked) {
         card = roundCard(next);
       } else {

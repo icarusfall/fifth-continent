@@ -387,6 +387,25 @@ describe('bought carts and the hired carter (spec §6.11)', () => {
     expect(s.contrabandSold).toBe(moved); // the tattle is paid in full either way
   });
 
+  it('the manual fence works over a carter’s shoulder at the market — and only there', () => {
+    const s0 = initialState(1);
+    s0.coin = 0;
+    s0.carts[0].carter = { from: 'farm', to: 'ryne', good: 'lace' };
+    s0.carts[0].cargo = { lace: 5 };
+    s0.carts[0].location = { kind: 'node', nodeId: 'ryne' };
+    const s = tick(s0, [{ type: 'sellToFence', cartId: 'cart-1', good: 'lace' }]);
+    expect(s.carts[0].cargo.lace).toBe(0); // the whole remainder, round the back
+    expect(s.coin).toBeGreaterThan(0);
+    expect(s.contrabandSold).toBe(5); // tattle paid in full
+
+    const home = initialState(1);
+    home.carts[0].carter = { from: 'farm', to: 'ryne', good: 'lace' };
+    home.carts[0].cargo = { lace: 5 };
+    const refused = tick(home, [{ type: 'sellToFence', cartId: 'cart-1', good: 'lace' }]);
+    expect(refused.carts[0].cargo.lace).toBe(5); // off the market, he keeps the reins
+    expect(refused.log.some((e) => e.text.includes('Dismiss him'))).toBe(true);
+  });
+
   it('the fence flag is sanitised off orders it means nothing to', () => {
     const s0 = initialState(1);
     s0.stores.farm = { fleece: 12 };
