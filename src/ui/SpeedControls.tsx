@@ -22,16 +22,26 @@ export function SpeedControls() {
   return (
     <div className="speed-controls">
       <button onClick={() => setPaused(!paused)}>{paused ? '▶' : '⏸'}</button>
-      {[3, 10, 30].map((tps, i) => (
+      {/* M5½ playtest — an amble below the old slowest: the marsh rewards
+          being read, and the old floor still hurried the reader. */}
+      {(
+        [
+          [1, '▷', 'An amble — a day in about two and a half minutes'],
+          [3, '▶', 'A walk — a day in under a minute'],
+          [10, '▶▶', 'A trot'],
+          [30, '▶▶▶', 'A gallop'],
+        ] as Array<[number, string, string]>
+      ).map(([tps, glyph, title]) => (
         <button
           key={tps}
           className={speed === tps && !paused && !waiting ? 'active' : ''}
+          title={title}
           onClick={() => {
             setSpeed(tps);
             setPaused(false);
           }}
         >
-          {'▶'.repeat(i + 1)}
+          {glyph}
         </button>
       ))}
       {waiting && (
