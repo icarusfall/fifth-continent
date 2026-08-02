@@ -6,7 +6,34 @@ A single-player, browser-based god/builder game about smuggling, logistics, and
 the two kinds of magic you can use to hide a crime. Design spec and build brief:
 [the-fifth-continent-spec.md](./the-fifth-continent-spec.md).
 
-## Status: M5c — Leiden ✅ (awaiting review)
+## Status: M5½b — the tub-boat ✅ (awaiting review)
+
+**M5½ so far (spec §6.18, §21.1):** the mid-game's central verb arrives.
+**M5½a — the survey and the spade:** eight named channels of Romney's old
+sewers lie on the map once a cutting house stands, each a surveyor's post
+you can pay a crew to re-cut. Digging is slow, capital-intensive, and
+permanent, and every completed cut lands the whole ideological axis at
+once — Debt to the marsh (which is smaller now, and knows it), Standing
+to a parish that calls drainage enclosure, and grazing for two more head,
+because drainage manufactures pasture and pasture manufactures alibi.
+**M5½b — the tub-boat:** chains of dug channels link the landings into
+**waterways**, and a flat-bottomed tub (12 to the load, quiet as weed)
+rides them and nothing else — near-silent bulk on a network you own, so
+long as the tide gives the channels depth. The blue coat never rides the
+water; a horse does not row. The channel hides the journey, never the
+mooring.
+
+**The Wealth Clock (§6.15):** a full economic rebalance after an audit
+found the wealth clock running at half the doom clock — earnings up,
+capital costs down, the town thirstier, and a 200-seed CI promise that
+the double fortress is day-22 money, for ever.
+
+Also live: the **Cellar Hide** (concealment you buy, invisible and
+informer-proof), **not worth the candle** (nobody prosecutes a pauper),
+the ledger's **cash-flow forecast** and **sound-the-alarm**, and the
+battle drawn as men, not meters. 346 tests green; save v23.
+
+Earlier: **M5c — Leiden ✅.**
 
 **M5c (spec §6.14):** the philosopher arrives as smuggled cargo — from the
 fourth landing where coin crosses the gunwale, each departure rolls the
