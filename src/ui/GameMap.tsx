@@ -53,6 +53,7 @@ import {
   TICKS_PER_DAY,
   TRIBUTE_RELIEF,
   TUB_BOAT_COST,
+  TUB_BOAT_CAPACITY,
   MAX_TUB_BOATS,
   TUB_TIDE_MIN,
   WIGHT_TRAP_IRON,
@@ -74,12 +75,29 @@ import {
   otherEnd,
 } from '../sim/map';
 import { dayPhaseOf, isFlooded, ticksUntilTideTurn, tideLevel } from '../sim/time';
-import { carterWageOf, garrisonCap, woolOnTheBooks } from '../sim/tick';
+import { carterWageOf, garrisonCap, reachableNodesFor, woolOnTheBooks } from '../sim/tick';
 import { HEAT_RED, REVENUE_BLUE } from './palette';
-import { dykeCost, dykeDays, dykeWaterways, flockCapOf, stoneRefuses } from '../sim/dykes';
+import {
+  dykeCost,
+  dykeDays,
+  dykePreview,
+  dykeWaterways,
+  flockCapOf,
+  stoneRefuses,
+} from '../sim/dykes';
+import type { WaterwayPair } from '../sim/dykes';
 import { CONTRABAND, coverOf, fortVisibility, illicitAnywhere, illicitCount } from '../sim/revenue';
 import { GOOD_LABEL, spanOf, storeSummary } from './format';
-import type { Action, Cart, CutDepth, EdgeId, GameState, Good, NodeId } from '../sim/types';
+import type {
+  Action,
+  Cart,
+  CarterOrder,
+  CutDepth,
+  EdgeId,
+  GameState,
+  Good,
+  NodeId,
+} from '../sim/types';
 import { useGameStore } from '../state/store';
 import { CameraController } from './camera';
 import { pathPoints, pointAlong, TILE, tileCenter } from './geometry';
@@ -129,6 +147,12 @@ type Selection =
 
 function cargoCount(cargo: Partial<Record<Good, number>>): number {
   return Object.values(cargo).reduce((a, b) => a + (b ?? 0), 0);
+}
+
+/** §6.18 — how a standing order's outbound leg reads: a named load, or the
+ *  light run that carries nothing and goes to fetch. */
+function outboundLabel(order: CarterOrder): string {
+  return order.good ? GOOD_LABEL[order.good] : 'out light, to fetch';
 }
 
 /** One cart's position in world coords; carts at a node fan out in the yard. */
@@ -1103,7 +1127,9 @@ export function GameMap({ state }: { state: GameState }) {
 /**
  * §6.18 (M5½a) — a surveyed channel's post: the dig offered with its whole
  * price on its face (coin, days, Debt, the parish, the pasture — §21.2's
- * axis, read aloud before the spade goes in).
+ * axis, read aloud before the spade goes in). M5½b playtest: and what it
+ * JOINS, said before the price — a player digs channels to link places, and
+ * the one thing the post would not tell them was which places.
  */
 function DykeMenu({ state, dykeId }: { state: GameState; dykeId: string }) {
   const enqueue = useEnqueue();
@@ -1115,14 +1141,32 @@ function DykeMenu({ state, dykeId }: { state: GameState; dykeId: string }) {
   const refused = stoneRefuses(state, seg);
   const cost = dykeCost(seg);
   const short = state.coin < cost;
+  // §6.18 (M5½b playtest) — the route this cut would open, one step of
+  // lookahead when it opens none alone.
+  const preview = dug || inHand ? null : dykePreview(state, seg.id);
+  const pairName = (p: WaterwayPair) =>
+    `${nodeById(p.a, state.farm, state.cuttingHouse).name} to ${
+      nodeById(p.b, state.farm, state.cuttingHouse).name
+    }`;
+  const pairList = (pairs: WaterwayPair[]) => pairs.map(pairName).join(', and ');
+  const standing = dug ? dykeWaterways(state) : [];
   return (
     <>
       <h4>{seg.name}</h4>
       {dug ? (
-        <p className="flavour">
-          Clean water, cut banks, and drained grazing either side. The gentry call it
-          improvement; the marsh keeps its own account of it. A dyke is never filled in.
-        </p>
+        <>
+          <p className="flavour">
+            Clean water, cut banks, and drained grazing either side. The gentry call it
+            improvement; the marsh keeps its own account of it. A dyke is never filled in.
+          </p>
+          <p className="flavour">
+            {standing.length > 0
+              ? `Water you can carry on, as it stands: ${standing
+                  .map((e) => e.name)
+                  .join(', ')}.`
+              : 'No landing yet stands at both ends of your water. Until one does, this is drainage and pasture, and no road at all.'}
+          </p>
+        </>
       ) : inHand ? (
         <p className="flavour">
           The crew is in it now — mud to the knees, done in about{' '}
@@ -1131,6 +1175,27 @@ function DykeMenu({ state, dykeId }: { state: GameState; dykeId: string }) {
         </p>
       ) : (
         <>
+          {/* §6.18 (M5½b playtest) — the road first, the price second: what a
+              cut JOINS is the reason to dig it, and the post never said. */}
+          {preview && preview.opens.length > 0 ? (
+            <p className="flavour">
+              <strong>Dug, this opens the water from {pairList(preview.opens)}</strong> —{' '}
+              {TUB_BOAT_CAPACITY} to the load, quiet as weed, and no blue coat rides a
+              channel.
+            </p>
+          ) : preview?.nextStep ? (
+            <p className="flavour">
+              Alone, this joins no landing. Cut it <em>and</em> {preview.nextStep.name} and the
+              two together open {pairList(preview.nextStep.opens)} — half a road, and the
+              other half is on the survey.
+            </p>
+          ) : preview ? (
+            <p className="flavour">
+              This line reaches no landing at either end, and no hull will ever use it. A
+              channel is a road only where it meets a landing at both ends; some cuts are
+              only pasture, and the marsh does not mind which you dig.
+            </p>
+          ) : null}
           <p className="flavour">
             An old line, silted a century: {dykeTiles(seg)} chains of channel wanting a crew.
             Cut it and the water runs for ever — the marsh smaller by that much ({DYKE_DEBT}{' '}
@@ -2562,6 +2627,9 @@ function CartsAtNode({
     cartId: string;
     from: NodeId;
     good?: Good;
+    /** §6.18 — the light order: chosen to carry nothing out, so an unset
+     *  `good` means "gone to fetch" rather than "not asked yet". */
+    light?: boolean;
     /** §6.11 — load cap per run; 0 means the full cart. */
     max?: number;
     to?: NodeId;
@@ -2578,7 +2646,7 @@ function CartsAtNode({
     cartId: string,
     from: NodeId,
     to: NodeId,
-    good: Good,
+    good: Good | undefined,
     back?: Good,
     backTo?: NodeId,
     fenceRest?: boolean,
@@ -2590,7 +2658,7 @@ function CartsAtNode({
       order: {
         from,
         to,
-        good,
+        ...(good ? { good } : {}), // §6.18 — absent = he runs out light
         ...(maxLoad ? { maxLoad } : {}),
         ...(back ? { back } : {}),
         ...(backTo ? { backTo } : {}),
@@ -2639,6 +2707,17 @@ function CartsAtNode({
         // before that it stays unspoken (§10).
         (n !== 'shingle' || shingleRoutesOpen(state) || state.dutchman.unlocked),
     );
+  // §6.18 (M5½b playtest) — a hull answers only its own element. The picker
+  // asks the sim which nodes this cart could ever reach and greys the rest
+  // with the reason: a tub ordered to a landlocked node used to take the
+  // order, refuse the dispatch, and idle. (The lighter had this bug too.)
+  const adriftFor = (cart: Cart, from: NodeId, to: NodeId): string | null => {
+    if (!cart.vessel) return null;
+    if (reachableNodesFor(state, cart, from).includes(to)) return null;
+    return cart.vessel === 'sea'
+      ? 'No sea lane runs there. Steam does not climb mud.'
+      : 'No water of yours runs there yet. Dig the channels that join these two, and the tub will go.';
+  };
   // §6.17 — where a backhaul may be dropped on the way home: a covered store
   // that is neither end of the run. Home (`from`) is always the default.
   const dropNodesFor = (from: NodeId, to: NodeId): NodeId[] =>
@@ -2662,7 +2741,7 @@ function CartsAtNode({
               <strong>{cart.name}</strong>: {storeSummary(cart.cargo, 'empty')}
               {!present ? ` · ${cartWhereabouts(state, cart)}` : ''}
               {cart.carter
-                ? ` · standing order: ${GOOD_LABEL[cart.carter.good]}${
+                ? ` · standing order: ${outboundLabel(cart.carter)}${
                     cart.carter.maxLoad !== undefined ? ` (up to ${cart.carter.maxLoad} a run)` : ''
                   }${cart.carter.fenceRest ? ' (fence takes the remainder)' : ''} → ${
                     nodeById(cart.carter.to, state.farm, state.cuttingHouse).name
@@ -2679,36 +2758,58 @@ function CartsAtNode({
                   }. ` +
                   (cart.carter.to === 'shingle' && cart.carter.good === 'fleece'
                     ? 'He sells over the gunwale when the lugger stands off, and waits when it does not.'
-                    : 'He minds the tide and nothing else.')
+                    : cart.carter.good === undefined
+                      ? 'He carries nothing out: he goes to fetch, and lies where he is sent until there is something to bring home.'
+                      : 'He minds the tide and nothing else.')
                 : ' · no carter — yours to drive'}
             </p>
             <div className="menu-buttons">
               {drivable && cargoButtons(nodeId, state, cart, enqueue)}
               {drivable && roadButtons(nodeId, state, cart, send, flooded)}
               {hiring?.cartId === cart.id ? (
-                hiring.good === undefined ? (
+                hiring.good === undefined && !hiring.light ? (
                   // The load, at the chosen origin (§6.11 / §6.17): the current
                   // load is always offered, so the picker never dead-ends, and
                   // the origin itself is switchable — any loop among the known
                   // nodes is a standing order, not just farm-and-back.
                   <>
                     {Array.from(
-                      new Set([
-                        ...haulablesFrom(hiring.from),
-                        ...(cart.carter ? [cart.carter.good] : []),
-                      ]),
+                      new Set(
+                        [
+                          ...haulablesFrom(hiring.from),
+                          ...(cart.carter?.good ? [cart.carter.good] : []),
+                        ].filter(Boolean),
+                      ),
                     ).map((good) => (
                       <button key={good} onClick={() => setHiring({ ...hiring, good })}>
                         Have him load {GOOD_LABEL[good]} at{' '}
                         {nodeById(hiring.from, state.farm, state.cuttingHouse).name}
                       </button>
                     ))}
-                    {destinationsFrom(hiring.from).map((n) => (
-                      <button key={`load-${n}`} onClick={() => setHiring({ ...hiring, from: n })}>
-                        …or have him load at{' '}
-                        {nodeById(n, state.farm, state.cuttingHouse).name} instead
-                      </button>
-                    ))}
+                    {/* §6.18 (M5½b playtest) — the light order: the shingle is
+                        a beach and keeps nothing, so the only sentence that
+                        puts a tub to work is one with an empty outbound leg. */}
+                    <button
+                      title="He carries nothing out — he goes to fetch, and lies where he is sent until there is something to bring home."
+                      onClick={() => setHiring({ ...hiring, light: true, max: 0 })}
+                    >
+                      …or have him run out light, and fetch
+                    </button>
+                    {destinationsFrom(hiring.from).map((n) => {
+                      const adrift = adriftFor(cart, n, hiring.from);
+                      return (
+                        <button
+                          key={`load-${n}`}
+                          disabled={!!adrift}
+                          title={adrift ?? undefined}
+                          onClick={() => setHiring({ ...hiring, from: n })}
+                        >
+                          …or have him load at{' '}
+                          {nodeById(n, state.farm, state.cuttingHouse).name} instead
+                          {adrift ? ' · no way there for this hull' : ''}
+                        </button>
+                      );
+                    })}
                     <button onClick={() => setHiring(null)}>Never mind — leave the order</button>
                   </>
                 ) : hiring.max === undefined ? (
@@ -2738,37 +2839,54 @@ function CartsAtNode({
                       // its reason instead of invisible: run the trade once
                       // by hand, then the carter may learn it.
                       const gated = to === 'shingle' && !shingleRoutesOpen(state);
+                      // §6.18 — and the same courtesy for a hull with no way there.
+                      const adrift = adriftFor(cart, hiring.from, to);
+                      const light = hiring.light === true;
                       return (
                         <button
                           key={to}
-                          disabled={gated}
+                          disabled={gated || !!adrift}
                           title={
-                            gated
+                            adrift ??
+                            (gated
                               ? 'No carter automates a trade his master has never made: sell over the gunwale once yourself (wool counts), and the run is his.'
                               : to === 'shingle' && hiring.good === 'fleece'
                                 ? 'He sells over the gunwale whenever the lugger stands off — and the books will not record it (§6.10).'
-                                : undefined
+                                : undefined)
                           }
                           onClick={() => {
                             // Destinations with something worth fetching ask one
                             // more question (§6.11: the back leg); the rest hire.
-                            if (backOptionsFor(state, to).length > 0) setHiring({ ...hiring, to });
-                            else hire(cart.id, hiring.from, to, hiring.good!);
+                            // A light order has nothing BUT the back leg, so it
+                            // always asks (§6.18).
+                            if (light || backOptionsFor(state, to).length > 0) {
+                              setHiring({ ...hiring, to });
+                            } else hire(cart.id, hiring.from, to, hiring.good);
                           }}
                         >
-                          {to === 'shingle' && hiring.good === 'fleece'
-                            ? `${GOOD_LABEL[hiring.good]} to the shingle — over the gunwale when the lugger comes · danger money`
-                            : `${GOOD_LABEL[hiring.good!]} to ${
+                          {light
+                            ? `Have him lie at ${
                                 nodeById(to, state.farm, state.cuttingHouse).name
-                              }${to === 'shingle' ? ' · danger money' : ''}`}
-                          {gated ? ' · make the run yourself first' : ''}
+                              } and fetch${to === 'shingle' ? ' · danger money' : ''}`
+                            : to === 'shingle' && hiring.good === 'fleece'
+                              ? `${GOOD_LABEL[hiring.good]} to the shingle — over the gunwale when the lugger comes · danger money`
+                              : `${GOOD_LABEL[hiring.good!]} to ${
+                                  nodeById(to, state.farm, state.cuttingHouse).name
+                                }${to === 'shingle' ? ' · danger money' : ''}`}
+                          {adrift
+                            ? ' · no way there for this hull'
+                            : gated
+                              ? ' · make the run yourself first'
+                              : ''}
                         </button>
                       );
                     })}
                     {/* §6.11 (M5c playtest) — the glut valve: sell into the
                         appetite, and the fence takes the remainder the same
                         visit. Offered only where the fence deals. */}
-                    {destinationsFrom(hiring.from).includes('ryne') &&
+                    {hiring.good !== undefined &&
+                      destinationsFrom(hiring.from).includes('ryne') &&
+                      !adriftFor(cart, hiring.from, 'ryne') &&
                       CONTRABAND.includes(hiring.good) &&
                       RYNE_PRICE[hiring.good] > 0 && (
                         <button
@@ -2787,9 +2905,13 @@ function CartsAtNode({
                   </>
                 ) : hiring.back === undefined ? (
                   <>
-                    <button onClick={() => hire(cart.id, hiring.from, hiring.to!, hiring.good!)}>
-                      …and home empty-handed, until told otherwise
-                    </button>
+                    {/* §6.18 — a light order is the back leg: "out empty and
+                        home empty" is not an order, and is never offered. */}
+                    {!hiring.light && (
+                      <button onClick={() => hire(cart.id, hiring.from, hiring.to!, hiring.good)}>
+                        …and home empty-handed, until told otherwise
+                      </button>
+                    )}
                     {backOptionsFor(state, hiring.to).map((g) => (
                       <button
                         key={g}
@@ -2804,7 +2926,7 @@ function CartsAtNode({
                           if (dropNodesFor(hiring.from, hiring.to!).length > 0) {
                             setHiring({ ...hiring, back: g });
                           } else {
-                            hire(cart.id, hiring.from, hiring.to!, hiring.good!, g);
+                            hire(cart.id, hiring.from, hiring.to!, hiring.good, g);
                           }
                         }}
                       >
@@ -2818,7 +2940,7 @@ function CartsAtNode({
                   <>
                     <button
                       onClick={() =>
-                        hire(cart.id, hiring.from, hiring.to!, hiring.good!, hiring.back)
+                        hire(cart.id, hiring.from, hiring.to!, hiring.good, hiring.back)
                       }
                     >
                       …dropped at home —{' '}
@@ -2829,7 +2951,7 @@ function CartsAtNode({
                         key={n}
                         title="Delivered on the way home, so the backhaul never touches the wool barn."
                         onClick={() =>
-                          hire(cart.id, hiring.from, hiring.to!, hiring.good!, hiring.back, n)
+                          hire(cart.id, hiring.from, hiring.to!, hiring.good, hiring.back, n)
                         }
                       >
                         …dropped at {nodeById(n, state.farm, state.cuttingHouse).name} on the way
@@ -2970,7 +3092,7 @@ function CartMenu({
       {cart.carter && (
         <>
           <p className="flavour">
-            A carter holds the reins: {GOOD_LABEL[cart.carter.good]},{' '}
+            A carter holds the reins: {outboundLabel(cart.carter)},{' '}
             {nodeById(cart.carter.from, state.farm, state.cuttingHouse).name} to{' '}
             {nodeById(cart.carter.to, state.farm, state.cuttingHouse).name}, {CARTER_WAGE} coin a
             day. He minds the tide and nothing else — not even the blue coat.

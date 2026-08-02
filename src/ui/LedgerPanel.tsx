@@ -178,10 +178,18 @@ export function LedgerPanel({ state }: { state: GameState }) {
             <section>
               <h5>the societies</h5>
               {state.nationalHeatFloor > 0 && (
-                <p>
-                  London&rsquo;s memory of this parish never falls below{' '}
-                  <strong>{Math.round(state.nationalHeatFloor)}</strong> now. Print is for ever.
-                </p>
+                <>
+                  <p>
+                    London&rsquo;s memory of this parish never falls below{' '}
+                    <strong>{Math.round(state.nationalHeatFloor)}</strong> now. Print is for ever.
+                  </p>
+                  {/* §6.14 (M5½ playtest) — say what the floor IS: the national
+                      meter is the one the Crown musters off. */}
+                  <p className="ledger-hint">
+                    The parish cools by morning; London does not, and never now below this. It is
+                    the meter the Crown reads when it decides who rides.
+                  </p>
+                </>
               )}
               {state.leiden.heldLetters.length > 0 && (
                 <p className="ledger-hint">

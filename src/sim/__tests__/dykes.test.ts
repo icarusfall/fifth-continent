@@ -15,7 +15,7 @@ import {
   STANDING_START,
   TICKS_PER_DAY,
 } from '../balance';
-import { dykeCost, dykeDays, flockCapOf, stoneRefuses } from '../dykes';
+import { dykeCost, dykeDays, dykePreview, flockCapOf, stoneRefuses } from '../dykes';
 import { DYKE_SEGMENTS, dykeById, dykeTiles } from '../map';
 import { initialState, tick } from '../tick';
 import type { GameState } from '../types';
@@ -121,6 +121,47 @@ describe('the spade (§6.18): coin up front, one crew, done days later', () => {
     });
     s = tick(s, [{ type: 'buySheep', qty: DYKE_PASTURE_HEAD + 5 }]);
     expect(s.sheepArriving).toBe(DYKE_PASTURE_HEAD); // only the drained margin's worth
+  });
+});
+
+// ---- M5½b playtest: the post sells a route, not a ditch (§6.18) ----
+
+describe('the survey preview (§6.18): what a cut would open, before its price', () => {
+  it('names the landings the last segment of a chain joins', () => {
+    const s = fresh((st) => (st.dykesDug = ['five-waterings', 'guldeford']));
+    const { opens, nextStep } = dykePreview(s, 'camber-cut');
+    expect(opens.map((p) => [p.a, p.b].sort().join('~'))).toEqual(['farm~shingle']);
+    expect(nextStep).toBeNull(); // it needs no partner: it IS the last cut
+  });
+
+  it('points at the other half when a cut is half a road', () => {
+    const s = fresh((st) => (st.dykesDug = ['five-waterings']));
+    const { opens, nextStep } = dykePreview(s, 'guldeford');
+    expect(opens).toEqual([]); // mid-marsh: it reaches no landing alone
+    expect(nextStep?.id).toBe('camber-cut');
+    // Only the water the PAIR opens: the Camber Cut reaches the cutting house
+    // by itself, and the Guldeford may not bill for it.
+    expect(nextStep?.opens.map((p) => [p.a, p.b].sort().join('~'))).toEqual(['farm~shingle']);
+  });
+
+  it('says plainly when a line is only pasture: the white sewer is a dead end', () => {
+    expect(dykePreview(fresh(), 'white-sewer')).toEqual({ opens: [], nextStep: null });
+    // …and stays a dead end with water either side of it (found live: the
+    // lookahead credited it with the Camber Cut's own landing).
+    const s = fresh((st) => (st.dykesDug = ['five-waterings']));
+    expect(dykePreview(s, 'white-sewer')).toEqual({ opens: [], nextStep: null });
+  });
+
+  it('a dug line has nothing left to promise', () => {
+    const s = fresh((st) => (st.dykesDug = ['camber-cut']));
+    expect(dykePreview(s, 'camber-cut')).toEqual({ opens: [], nextStep: null });
+  });
+
+  it('never mutates the state it reads (house rule 1)', () => {
+    const s = fresh((st) => (st.dykesDug = ['five-waterings']));
+    const before = JSON.stringify(s);
+    dykePreview(s, 'guldeford');
+    expect(JSON.stringify(s)).toBe(before);
   });
 });
 

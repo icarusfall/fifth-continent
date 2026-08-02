@@ -304,7 +304,7 @@ function findCart(state: GameState, cartId: string): Cart | undefined {
  */
 export function carterWageOf(order: CarterOrder): number {
   const risky =
-    CONTRABAND.includes(order.good) ||
+    (order.good !== undefined && CONTRABAND.includes(order.good)) ||
     (order.back !== undefined && CONTRABAND.includes(order.back)) ||
     order.from === 'shingle' ||
     order.to === 'shingle' ||
@@ -332,6 +332,31 @@ function worldEdges(state: GameState): MapEdge[] {
 
 function worldEdgeById(state: GameState, id: EdgeId): MapEdge | null {
   return worldEdges(state).find((e) => e.id === id) ?? null;
+}
+
+/**
+ * §6.18 (M5½b playtest) — every node this hull could ever reach from `from`,
+ * over the same `wayAllows` the dispatch enforces, so the hire picker and the
+ * sim can never disagree: a tub ordered to a landlocked node used to take the
+ * order, refuse the dispatch, and idle. The tide is deliberately not
+ * consulted — a standing order outlives a low water.
+ */
+export function reachableNodesFor(state: GameState, cart: Cart, from: NodeId): NodeId[] {
+  const ways = worldEdges(state).filter((e) => wayAllows(e, cart));
+  const seen = new Set<NodeId>([from]);
+  const queue: NodeId[] = [from];
+  while (queue.length > 0) {
+    const at = queue.shift()!;
+    for (const way of ways) {
+      if (way.a !== at && way.b !== at) continue;
+      const next = otherEnd(way, at);
+      if (seen.has(next)) continue;
+      seen.add(next);
+      queue.push(next);
+    }
+  }
+  seen.delete(from);
+  return [...seen];
 }
 
 /** §6.14/§6.18 — hulls and wheels never share a way: the lighter answers the
@@ -1104,6 +1129,9 @@ function applyAction(state: GameState, action: Action): void {
       const { from, to } = action.order;
       const nodesKnown = ['farm', 'ryne', 'shingle', ...(state.cuttingHouse ? ['cutting-house'] : [])];
       if (from === to || !nodesKnown.includes(from) || !nodesKnown.includes(to)) return;
+      // §6.18 — the light order may run out empty, but an order with neither
+      // a load to take nor a thing to fetch is not an order at all.
+      if (action.order.good === undefined && action.order.back === undefined) return;
       // A man already on the reins takes new orders in place — no need to pay
       // him off and hire afresh just to redirect the round (spec §6.11).
       const reorder = !!cart.carter;
@@ -1126,7 +1154,12 @@ function applyAction(state: GameState, action: Action): void {
       // where a fence stands (a market) for goods he deals in.
       if (
         order.fenceRest &&
-        !(to === 'ryne' && CONTRABAND.includes(order.good) && RYNE_PRICE[order.good] > 0)
+        !(
+          to === 'ryne' &&
+          order.good !== undefined &&
+          CONTRABAND.includes(order.good) &&
+          RYNE_PRICE[order.good] > 0
+        )
       ) {
         delete order.fenceRest;
       }
@@ -1606,6 +1639,7 @@ function carterDispatch(state: GameState, cart: Cart, target: NodeId): void {
   });
   if (!hop) return; // no open road: he waits for the tide like anyone
   cart.location = { kind: 'edge', edgeId: hop.id, from, to: otherEnd(hop, from), progress: 0 };
+  delete cart.lyingAt; // §6.18 — under way again; the vigil may be told afresh
 }
 
 /**
@@ -1650,7 +1684,12 @@ function carterBackload(state: GameState, cart: Cart, order: CarterOrder): void 
  * outbound good is unloaded into the store, respecting its walls. What
  * cannot fit stays aboard and eats the cart's room.
  */
-function carterUnloadForeign(state: GameState, cart: Cart, outbound: Good, at: NodeId): void {
+function carterUnloadForeign(
+  state: GameState,
+  cart: Cart,
+  outbound: Good | undefined,
+  at: NodeId,
+): void {
   for (const [good, held] of Object.entries(cart.cargo) as Array<[Good, number]>) {
     if (good === outbound || held <= 0) continue;
     const roomHere = storeRoom(state, at);
@@ -1672,34 +1711,64 @@ function runCarters(state: GameState): void {
     if (!order || cart.location.kind !== 'node') continue;
     const at = cart.location.nodeId;
 
+    // §6.18 — absent = the light order: he runs out empty and comes home on
+    // the back leg alone (the tub's whole job at the shingle).
+    const outbound = order.good;
+
     if (at === order.from) {
       // The back leg lands first (§6.11, M5a-4): everything aboard that is
       // not the outbound good goes into the store, respecting its walls.
-      carterUnloadForeign(state, cart, order.good, at);
+      carterUnloadForeign(state, cart, outbound, at);
+      if (outbound === undefined) {
+        carterDispatch(state, cart, order.to); // the one order that departs empty
+        continue;
+      }
       const store = state.stores[at];
-      const available = store?.[order.good] ?? 0;
+      const available = store?.[outbound] ?? 0;
       const room = cart.capacity - cargoCount(cart.cargo);
       // §6.11 — the load cap (M5b playtest): the order may take at most
       // maxLoad of the good per run, counting what already rides aboard.
       const capLeft =
         order.maxLoad !== undefined
-          ? Math.max(0, order.maxLoad - (cart.cargo[order.good] ?? 0))
+          ? Math.max(0, order.maxLoad - (cart.cargo[outbound] ?? 0))
           : Number.MAX_SAFE_INTEGER;
       const qty = Math.min(available, room, capLeft);
       if (qty > 0) {
-        store![order.good] = available - qty;
-        addToStore(cart.cargo, order.good, qty);
+        store![outbound] = available - qty;
+        addToStore(cart.cargo, outbound, qty);
       }
       // A carter shuttles loads, not air: nothing aboard, he waits.
-      if ((cart.cargo[order.good] ?? 0) > 0) carterDispatch(state, cart, order.to);
+      if ((cart.cargo[outbound] ?? 0) > 0) carterDispatch(state, cart, order.to);
       continue;
     }
 
-    if (at === order.to && (cart.cargo[order.good] ?? 0) > 0) {
+    // §6.18 — the light order arrives empty and is still at work: it came
+    // for the back leg, and lies at anchor until there is one to take.
+    if (at === order.to && outbound === undefined) {
+      carterBackload(state, cart, order);
+      if (order.back === undefined || (cart.cargo[order.back] ?? 0) <= 0) {
+        // The vigil is announced once a visit, not once a tick (§20's log is
+        // a history, not a heartbeat).
+        if (cart.lyingAt !== at) {
+          cart.lyingAt = at;
+          logEvent(
+            state,
+            `${cart.name} lies at ${
+              nodeById(at, state.farm, state.cuttingHouse).name
+            }, empty, waiting on something to carry.`,
+          );
+        }
+        continue;
+      }
+      carterDispatch(state, cart, carterHomeward(cart, order));
+      continue;
+    }
+
+    if (at === order.to && outbound !== undefined && (cart.cargo[outbound] ?? 0) > 0) {
       // The shingle order (§6.11, M5a-3): fleece goes over the gunwale when
       // the lugger stands off; otherwise he waits on the beach with the load.
       // He minds the tide and the lugger, and nothing else.
-      if (at === 'shingle' && order.good === 'fleece') {
+      if (at === 'shingle' && outbound === 'fleece') {
         const sold = dutchmanFleeceSale(state, cart);
         if (sold > 0) {
           logEvent(
@@ -1711,23 +1780,23 @@ function runCarters(state: GameState): void {
       } else {
         const node = nodeById(at, state.farm, state.cuttingHouse);
         if (node.kind === 'market') {
-          const sold = marketSale(state, cart, order.good);
+          const sold = marketSale(state, cart, outbound);
           if (sold > 0) {
             logEvent(
               state,
-              `The carter sells ${sold} ${order.good} at ${node.name} for ${sold * RYNE_PRICE[order.good]} coin.`,
+              `The carter sells ${sold} ${outbound} at ${node.name} for ${sold * RYNE_PRICE[outbound]} coin.`,
             );
           }
           // §6.11 (M5c playtest) — "…and fence the remainder": what the
           // town's appetite left, the back door takes at the haircut. The
           // glut valve — a cart never waits laden in plain view under this
           // order, and the tattle is paid in full.
-          if (order.fenceRest && (cart.cargo[order.good] ?? 0) > 0) {
-            const { taken, proceeds } = fenceTake(state, cart, order.good);
+          if (order.fenceRest && (cart.cargo[outbound] ?? 0) > 0) {
+            const { taken, proceeds } = fenceTake(state, cart, outbound);
             if (taken > 0) {
               logEvent(
                 state,
-                `The carter walks the remainder round the back: the fence takes ${taken} ${order.good} for ${proceeds} coin.`,
+                `The carter walks the remainder round the back: the fence takes ${taken} ${outbound} for ${proceeds} coin.`,
               );
             }
           }
@@ -1735,19 +1804,19 @@ function runCarters(state: GameState): void {
           // no longer sloshes home. He waits for the appetite to refresh —
           // exposed, a laden cart in town has no cover — until his patience
           // runs out, then carries the remainder home to cover.
-          if ((cart.cargo[order.good] ?? 0) > 0) {
+          if ((cart.cargo[outbound] ?? 0) > 0) {
             if (cart.marketPatienceUntil === undefined) {
               cart.marketPatienceUntil =
                 state.tick + CARTER_MARKET_PATIENCE_DAYS * TICKS_PER_DAY;
               // §6.10: wool can also be stopped by the book, not the town —
               // the stapler's tally ran out before Ryne's appetite did.
               const bookCapped =
-                order.good === 'fleece' && (state.demandRemaining.fleece ?? 0) > 0;
+                outbound === 'fleece' && (state.demandRemaining.fleece ?? 0) > 0;
               logEvent(
                 state,
                 bookCapped
                   ? `The wool-stapler will take no more against your book today. The carter waits on tomorrow's page.`
-                  : `${node.name} has had its fill of ${order.good}. The carter waits on the appetite, laden and in plain view.`,
+                  : `${node.name} has had its fill of ${outbound}. The carter waits on the appetite, laden and in plain view.`,
               );
             }
             if (state.tick < cart.marketPatienceUntil) continue; // waiting, exposed
@@ -1761,13 +1830,13 @@ function runCarters(state: GameState): void {
           }
         } else {
           // Unload into the store, respecting the barn's walls (§6.9).
-          const held = cart.cargo[order.good] ?? 0;
+          const held = cart.cargo[outbound] ?? 0;
           const roomHere = storeRoom(state, at);
           const qty = Math.min(held, Math.max(0, roomHere));
           if (qty > 0) {
-            cart.cargo[order.good] = held - qty;
+            cart.cargo[outbound] = held - qty;
             state.stores[at] = state.stores[at] ?? {};
-            addToStore(state.stores[at], order.good, qty);
+            addToStore(state.stores[at], outbound, qty);
           }
         }
       }
@@ -1799,19 +1868,32 @@ function runCarters(state: GameState): void {
         );
       }
       // Deliveries still first: a leftover backhaul dropped in passing must
-      // not turn an outbound cart for home.
-      carterDispatch(state, cart, (cart.cargo[order.good] ?? 0) > 0 ? order.to : order.from);
+      // not turn an outbound cart for home. (Home, not `carterHomeward` — a
+      // drop node that reads its own name would never leave it.)
+      carterDispatch(
+        state,
+        cart,
+        outbound !== undefined && (cart.cargo[outbound] ?? 0) > 0 ? order.to : order.from,
+      );
       continue;
     }
 
     // Anywhere else: head for the work — deliveries first, then the drop
     // node if the backhaul is aboard (§6.17), then home.
-    carterDispatch(
-      state,
-      cart,
-      (cart.cargo[order.good] ?? 0) > 0 ? order.to : carterHomeward(cart, order),
-    );
+    carterDispatch(state, cart, carterTarget(cart, order));
   }
+}
+
+/**
+ * Where a carter caught between nodes is headed (§6.11/§6.17/§6.18): the
+ * delivery while the outbound load is aboard; out to fetch when the order is
+ * light and the hold is empty; homeward otherwise.
+ */
+function carterTarget(cart: Cart, order: CarterOrder): NodeId {
+  if (order.good !== undefined && (cart.cargo[order.good] ?? 0) > 0) return order.to;
+  const backAboard = order.back !== undefined && (cart.cargo[order.back] ?? 0) > 0;
+  if (order.good === undefined && !backAboard) return order.to;
+  return carterHomeward(cart, order);
 }
 
 /** Where a carter turning for home actually heads (§6.17): the backhaul's

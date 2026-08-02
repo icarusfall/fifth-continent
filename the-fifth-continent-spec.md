@@ -1192,6 +1192,31 @@ after MAX_SUPPRESSIONS 3 he refuses the bench until a letter goes out
                    (research blocked, not lost)
 ```
 
+**The letter must name itself and state its price (M5½ playtest).** The card
+that asked for this decision said only that "your parish enters the record
+for good — the floor under London's memory rises, and rises for ever": two
+metaphors for one mechanic, and neither of them a number. It is the only
+permanently irreversible cost in the game, and it was the vaguest sentence
+on the screen. Fixed, on the read-the-charge principle (§14 — every price
+is stated where it is paid):
+
+```
+the subject     LETTER_SUBJECTS[letterPending] — galvanic defence, marine
+                steam, aetheric signalling: HIS letter, about the thing he
+                has just built, in the words the log already used
+the number      publicationRiseFor(state, letterPending) = PUBLICATION_HEAT
+                × heatMult, stated on the card and on its button, rounded
+what it means   named in one clause, not one metaphor: national Heat is the
+                clock that never forgets, and print sets a minimum it can
+                never decay below again — the Crown reads that meter
+                (WATER_GUARD_HEAT 55, DRAGOON_HEAT 110)
+the trade       sending is not pure loss and must not read as one: he is a
+                known man doing known work in your loft, and being known is
+                the rent he charges for it. The parish tolerates him because
+                he is famous; the strongbox is slighting a famous man before
+                a parish that likes him (SUPPRESS_STANDING 15)
+```
+
 What suppression eventually costs *him* (§8.3) is M6's business.
 
 #### The tiers M5 ships (capstones wait for the endings)
@@ -1786,6 +1811,98 @@ worth — the digger MUST live with the wights or tribute hard), −40
 parish Standing, +16 head of pasture. A full dig is a mid-game fortune
 and a standing argument with both the marsh and the parish: exactly
 §21.2's axis, priced.
+
+#### M5½b playtest — the water has to say what it is for
+
+The tub-boat shipped able and unusable. The report, and what it found:
+*"it just goes from the Shingle to Ryne, and I can't see what it solves."*
+Three separate failures behind one symptom, all of them legibility or
+grammar — the sim was right throughout.
+
+**1. The survey sells a ditch, not a route.** The post's popover priced the
+cut in coin, days, Debt, parish and pasture, and never said what it *joins*.
+A player digs channels to link places; the only thing the game would not
+tell them was which places. The dig is now sold as the road it is:
+
+```
+dykePreview(state, id)   pure, in dykes.ts — no dice, no clocks
+  opens[]      the landing pairs joined once `id` is dug that are not
+               joined now: dykeWaterways over dykesDug ∪ {id}, minus the
+               pairs standing today. Named in the popover, before the price
+  nextStep     when opens[] is empty, ONE step of lookahead: the undug
+               segment that, dug WITH this one, opens a pair **that the
+               partner alone would not** — the baseline is the partner dug
+               by itself, never today, or a dead end takes credit for its
+               neighbour's water (caught in live test: the White Kemp
+               claimed the Camber Cut's landing). "Alone it joins nothing;
+               with the Guldeford it opens the Shingle to your house."
+               Bounded and cheap (≤8 authored segments)
+  silence      when neither opens anything, the popover says so plainly:
+               a channel is only a road when it reaches a landing at both
+               ends. Some cuts are only pasture, and the White Kemp is a
+               dead end on purpose (§6.18 — not every channel is a route)
+```
+
+**2. The hire picker offers water a hull cannot reach.** `destinationsFrom`
+listed all four nodes regardless of what floats. A tub ordered to a
+landlocked node takes the order, refuses the dispatch, and idles — the sim
+being correct and the menu lying. The §6.11 refusal pattern applies to
+hulls exactly as it applies to the shingle gate: **greyed with its reason,
+never silently absent** (M5½ playtest — an invisible gate reads as the
+thing arriving broken).
+
+```
+reachableNodesFor(state, cart, from)   exported from tick.ts
+  BFS over worldEdges() filtered by wayAllows(edge, cart) — the same
+  predicate the dispatch enforces, so menu and sim can never disagree.
+  Tide is NOT consulted: a standing order outlives a low water
+```
+
+This retires the known M5c gap in the same stroke: the steam-lighter has
+always had this bug and no one had hit it.
+
+**3. The order grammar cannot say what the boat is for.** A standing order
+is `load good at from → sell or unload at to → back again`, and the good is
+mandatory. But the shingle is a beach: unlimited store, COVER_CAPACITY
+undefined, so nothing may be *kept* there and nothing can be loaded from
+it. The tub's whole job — *lie at the shingle, take twelve off the lugger,
+carry them home on quiet water* — is an order whose outbound leg is empty,
+and that sentence could not be written. Hence **the light order**:
+
+```
+CarterOrder.good becomes optional     absent = he runs out light
+  refusal        an order with neither `good` nor `back` is nothing at all
+                 and is refused (the picker never offers it)
+  at `from`      everything aboard goes into the store, then he leaves —
+                 a light order is the one order that departs empty
+  at `to`        no sale, no unload; the back leg loads (store, or over the
+                 gunwale at the Dutchman's prices, §6.11's existing rule)
+  the vigil      if nothing could be loaded he LIES THERE and waits, as the
+                 fleece order already waits on the lugger. A boat at anchor
+                 with an empty hold is the cheapest thing in the game;
+                 shuttling empty for wages is the expensive nonsense, and
+                 it is what the grammar would otherwise have forced
+  wage           danger money by the §6.11 rules, unchanged — `back`'s
+                 contraband and the shingle both still name the risk
+  save           none: an optional field on an existing record, and every
+                 saved order carries its good. No version bump
+```
+
+The sentence the player can now write, in the picker's own words: *"Have
+him lie at the Shingle and bring brandy home to the Cutting House."* One
+cart, one order, and the boat has a job. This is the first leg of §6.11's
+deferred multi-leg question, taken alone because the tub needs it and it
+adds no clause to the sentence — an order with a hole in it is still one
+sentence long (§5).
+
+**What the boat was always worth, said out loud:** TUB_BOAT_CAPACITY 12 a
+run at DYKE_EXPOSURE 0.1, against a cart's 8 at MARSH_TRACK_EXPOSURE 0.7 —
+seven times quieter and half again as fat, the marsh-lantern's discount
+without the Debt per run. That prize was in the build from the first day;
+nothing in the game said so, and the pair of landings the player had
+happened to open (Shingle–Ryne) was the one pair where neither end holds
+goods that are theirs. The fix is not a bigger number. It is telling the
+truth earlier.
 
 **Not a random-raid system.** The Revenue maintains its own data structure:
 

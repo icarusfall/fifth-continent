@@ -3,6 +3,7 @@
 // the player answers it. The sim knows nothing of any of this (house rule 1).
 
 import { MAX_SUPPRESSIONS, SUPPRESS_STANDING } from '../sim/balance';
+import { publicationRiseFor } from '../sim/leiden';
 import { rentAmount } from '../sim/tick';
 import type { Difficulty, NodeId } from '../sim/types';
 import { useGameStore } from '../state/store';
@@ -40,7 +41,11 @@ export function EventCard() {
       <div className="event-card">
         <h2>{card.title}</h2>
         {card.flavour && <p className="event-flavour">{card.flavour}</p>}
-        <p>{card.body}</p>
+        {/* A card may argue in more than one breath (§6.14's letter): blank
+            lines are paragraphs, and every other card has none. */}
+        {card.body.split('\n\n').map((para, i) => (
+          <p key={i}>{para}</p>
+        ))}
 
         {card.kind === 'rent' ? (
           <>
@@ -89,8 +94,16 @@ export function EventCard() {
           </>
         ) : card.kind === 'letter' ? (
           <>
-            <button className="event-primary" onClick={() => answerLetter(true)}>
-              Send the letter · the floor under London&rsquo;s memory rises, for ever
+            {/* §6.14 (M5½ playtest) — read the charge: the one permanent
+                cost in the game states its number on the button that pays it. */}
+            <button
+              className="event-primary"
+              title="National Heat is the clock that barely forgets. Print gives it a minimum it can never decay below — and the Crown musters off that meter."
+              onClick={() => answerLetter(true)}
+            >
+              Send the letter · +
+              {Math.round(publicationRiseFor(state, state.leiden.letterPending ?? 0))} to the floor
+              under London&rsquo;s memory, for ever
             </button>
             <button
               className="event-check"

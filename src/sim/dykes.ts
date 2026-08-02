@@ -226,6 +226,68 @@ function shortestChain(dug: DykeSegment[], from: Pt, to: Pt): DykeSegment[] | nu
   return best?.chain ?? null;
 }
 
+// ---- M5½b playtest: the survey sells a route, not a ditch (spec §6.18) ----
+// The post priced the cut in coin, days, Debt, parish and pasture, and never
+// said what it JOINS — the one thing a player digs channels for. These are
+// pure reads over hypothetical dug-sets: no dice, no clocks, no mutation.
+
+/** A pair of landings a chain of water joins, and the water's name. */
+export interface WaterwayPair {
+  a: NodeId;
+  b: NodeId;
+  name: string;
+}
+
+/** The landing pairs standing in a given dug-set, keyed `a|b`. */
+function pairsWith(state: GameState, dug: string[]): Map<string, WaterwayPair> {
+  const probe: GameState = { ...state, dykesDug: dug };
+  const out = new Map<string, WaterwayPair>();
+  for (const edge of dykeWaterways(probe)) {
+    out.set(`${edge.a}|${edge.b}`, { a: edge.a, b: edge.b, name: edge.name });
+  }
+  return out;
+}
+
+/** Pairs in `after` that were not in `before` — what a cut would open. */
+function newPairs(
+  before: Map<string, WaterwayPair>,
+  after: Map<string, WaterwayPair>,
+): WaterwayPair[] {
+  const out: WaterwayPair[] = [];
+  for (const [key, pair] of after) if (!before.has(key)) out.push(pair);
+  return out;
+}
+
+/**
+ * §6.18 (M5½b playtest) — what this cut would open, said before its price.
+ * `opens` is the landings joined once it runs that are not joined today.
+ * When it opens nothing alone, one step of lookahead names the partner that
+ * would (the survey is eight segments; the search is free) — so a channel
+ * that is only pasture can say so, and a channel that is half a road can
+ * point at its other half.
+ */
+export function dykePreview(
+  state: GameState,
+  id: string,
+): { opens: WaterwayPair[]; nextStep: { id: string; name: string; opens: WaterwayPair[] } | null } {
+  if (state.dykesDug.includes(id)) return { opens: [], nextStep: null };
+  const today = pairsWith(state, state.dykesDug);
+  const opens = newPairs(today, pairsWith(state, [...state.dykesDug, id]));
+  if (opens.length > 0) return { opens, nextStep: null };
+
+  for (const other of DYKE_SEGMENTS) {
+    if (other.id === id || state.dykesDug.includes(other.id)) continue;
+    // The baseline is the PARTNER dug alone, not today: a dead end must never
+    // take credit for water its neighbour would open without it.
+    const alone = pairsWith(state, [...state.dykesDug, other.id]);
+    const both = newPairs(alone, pairsWith(state, [...state.dykesDug, id, other.id]));
+    if (both.length > 0) {
+      return { opens, nextStep: { id: other.id, name: other.name, opens: both } };
+    }
+  }
+  return { opens, nextStep: null };
+}
+
 /** Orient and concatenate a chain's paths so the polyline flows from the
  *  `from` landing's end to the far end, tolerating one-tile junction gaps. */
 function stitchChain(chain: DykeSegment[], from: Pt): Pt[] {

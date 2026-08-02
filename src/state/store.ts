@@ -27,6 +27,7 @@ import {
   SHEEP_VALUE,
   TICKS_PER_DAY,
 } from '../sim/balance';
+import { LETTER_SUBJECTS, publicationRiseFor } from '../sim/leiden';
 import { CONTRABAND, illicitAnywhere } from '../sim/revenue';
 import { simulateBattle } from '../sim/combat';
 import type { BattleSetup, Call, CombatLog, ScheduledCall } from '../sim/combat';
@@ -186,11 +187,29 @@ function leidenCard(next: GameState): EventCard {
  *  strongbox. He will not work past it. */
 function letterCard(next: GameState): EventCard {
   const held = next.leiden.heldLetters.length;
+  // §6.14 (M5½ playtest) — the letter names itself and states its price. It
+  // is the only permanently irreversible cost in the game and it was the
+  // vaguest sentence on the screen: two metaphors, and no number.
+  const pending = next.leiden.letterPending ?? 0;
+  const subject = LETTER_SUBJECTS[pending] ?? 'the work';
+  const rise = Math.round(publicationRiseFor(next, pending));
+  const floor = Math.round(next.nationalHeatFloor);
   return {
     id: `letter-${next.tick}`,
     kind: 'letter',
-    title: 'A letter to the societies',
-    body: `The work is done, written fair, and sealed for the learned societies. Send it, and your parish enters the record for good — the floor under London's memory rises, and rises for ever. Hold it in the strongbox and he is slighted before a parish that likes him: ${SUPPRESS_STANDING} Standing${held >= MAX_SUPPRESSIONS - 1 ? ' — and he will not stand another letter held after this one' : ''}.`,
+    title: `His letter on ${subject}`,
+    body:
+      `Written fair, sealed, and addressed to the learned societies in his own hand. He did not come here to be quiet: being known is the rent he charges for the work, and the parish tolerates a famous man where it would run off a strange one.\n\n` +
+      `Send it and London's memory of this parish ${
+        floor > 0
+          ? `keeps a floor it can never fall below, and that floor rises from ${floor} to ${floor + rise}`
+          : `takes a floor it has never had before: ${rise}, and it will never fall below it again`
+      }. The parish forgets by morning; the national clock does not — and it is the meter the Crown reads before it musters.\n\n` +
+      `Hold it in the strongbox instead and he is slighted before people who like him: ${SUPPRESS_STANDING} Standing${
+        held >= MAX_SUPPRESSIONS - 1
+          ? ', and he will not stand another letter held after this one'
+          : ''
+      }. The floor stays where it is — until you let the letter out, and it rises late.`,
   };
 }
 

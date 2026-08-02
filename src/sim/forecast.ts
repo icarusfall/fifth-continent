@@ -61,14 +61,17 @@ export function forecastDay(state: GameState): DayForecast {
       continue;
     }
     if (order.to !== 'ryne') continue; // stocking a store earns nothing today
+    // §6.18 — the light order sells nothing outbound: it goes to fetch.
+    const good = order.good;
+    if (good === undefined) continue;
 
-    const room = appetite[order.good] ?? 0;
+    const room = appetite[good] ?? 0;
     const sold = Math.min(hauled, room);
-    appetite[order.good] = room - sold;
-    takings += sold * RYNE_PRICE[order.good];
+    appetite[good] = room - sold;
+    takings += sold * RYNE_PRICE[good];
     // §6.17 — "…and fence the remainder": the rest at the haircut, same visit.
-    if (order.fenceRest && CONTRABAND.includes(order.good) && hauled > sold) {
-      takings += (hauled - sold) * Math.round(RYNE_PRICE[order.good] * FENCE_PRICE_MULT);
+    if (order.fenceRest && CONTRABAND.includes(good) && hauled > sold) {
+      takings += (hauled - sold) * Math.round(RYNE_PRICE[good] * FENCE_PRICE_MULT);
     }
   }
 

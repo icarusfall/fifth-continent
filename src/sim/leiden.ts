@@ -117,9 +117,9 @@ export function leidenTierCompleted(state: GameState): void {
   const tier = state.research.completed.leiden; // already incremented
   state.leiden.letterPending = tier - 1;
   const done = [
-    'The fence is wired and the frogs on the dyke have opinions. His letter on galvanic defence sits sealed on the bench.',
-    'The lighter is launched — a hull, a boiler, and no bedtime. His letter on marine steam sits sealed on the bench.',
-    'The telegraph hums. The map knows what the Revenue knows, as it knows it. His letter on aetheric signalling sits sealed on the bench.',
+    `The fence is wired and the frogs on the dyke have opinions. His letter on ${LETTER_SUBJECTS[0]} sits sealed on the bench.`,
+    `The lighter is launched — a hull, a boiler, and no bedtime. His letter on ${LETTER_SUBJECTS[1]} sits sealed on the bench.`,
+    `The telegraph hums. The map knows what the Revenue knows, as it knows it. His letter on ${LETTER_SUBJECTS[2]} sits sealed on the bench.`,
   ];
   logEvent(state, done[tier - 1] ?? 'The bench clears, and a letter sits sealed on it.');
   // §6.14 Leiden 2 — the research was the purchase: one hull, at the shingle.
@@ -136,6 +136,23 @@ export function leidenTierCompleted(state: GameState): void {
   }
 }
 
+/**
+ * §6.14 (M5½ playtest) — what each letter is *about*, in his words. The card
+ * that asks the player to send or suppress it must name it: a decision this
+ * permanent may not be put as two metaphors and no noun.
+ */
+export const LETTER_SUBJECTS: readonly string[] = [
+  'galvanic defence',
+  'marine steam',
+  'aetheric signalling',
+];
+
+/** §6.14 — what publishing this letter would add to the floor under national
+ *  Heat, dial included. One function, so the card and the deed agree. */
+export function publicationRiseFor(state: GameState, letter: number): number {
+  return (PUBLICATION_HEAT[letter] ?? 0) * DIFFICULTY[state.difficulty].heatMult;
+}
+
 /** §6.14 — the letter goes out: the floor under national Heat rises for good.
  *  The §6.15 dial scales it like any heat the world deals. */
 export function applyPublishLetter(state: GameState): void {
@@ -144,7 +161,7 @@ export function applyPublishLetter(state: GameState): void {
     logEvent(state, 'No letter waits on the bench.');
     return;
   }
-  const rise = (PUBLICATION_HEAT[l.letterPending] ?? 0) * DIFFICULTY[state.difficulty].heatMult;
+  const rise = publicationRiseFor(state, l.letterPending);
   state.nationalHeatFloor += rise;
   l.letterPending = null;
   logEvent(

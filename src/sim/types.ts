@@ -100,7 +100,15 @@ export type CartLocation =
 export interface CarterOrder {
   from: NodeId;
   to: NodeId;
-  good: Good;
+  /**
+   * §6.18 (M5½b playtest) — absent = **the light order**: he runs out empty
+   * and comes home with the back leg alone. The shingle is a beach with no
+   * cover: nothing may be kept there, so nothing can be loaded from it, and
+   * the tub-boat's whole job ("lie at the shingle, take twelve off the
+   * lugger, carry them home on quiet water") is an order with an empty
+   * outbound leg. An order with neither `good` nor `back` is refused.
+   */
+  good?: Good;
   /** §6.11 (M5b playtest) — load at most this much of `good` per run;
    *  absent = fill the cart. The wool-split lever. */
   maxLoad?: number;
@@ -126,6 +134,12 @@ export interface Cart {
    * home with the remainder. Absent when he is not waiting.
    */
   marketPatienceUntil?: number;
+  /**
+   * §6.18 — set while a light order lies at its destination with nothing to
+   * carry, so the vigil is announced once and not every tick. Cleared the
+   * moment the hauler moves (see `carterDispatch`).
+   */
+  lyingAt?: NodeId;
   /** §6.14 (M5c) — the steam-lighter: a hull, not a cart. Moves only on the
    *  sea lane; carts never do. Absent on every land cart. */
   /** §6.14/§6.18 — a hull, not a cart: 'sea' rides the sea lane (the

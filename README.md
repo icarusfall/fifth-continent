@@ -6,7 +6,7 @@ A single-player, browser-based god/builder game about smuggling, logistics, and
 the two kinds of magic you can use to hide a crime. Design spec and build brief:
 [the-fifth-continent-spec.md](./the-fifth-continent-spec.md).
 
-## Status: M5½b — the tub-boat ✅ (awaiting review)
+## Status: M5½b — the tub-boat, and the water made legible ✅ (awaiting review)
 
 **M5½ so far (spec §6.18, §21.1):** the mid-game's central verb arrives.
 **M5½a — the survey and the spade:** eight named channels of Romney's old
@@ -22,6 +22,19 @@ rides them and nothing else — near-silent bulk on a network you own, so
 long as the tide gives the channels depth. The blue coat never rides the
 water; a horse does not row. The channel hides the journey, never the
 mooring.
+**M5½b playtest — the water says what it is for:** the boat shipped able
+and unusable, and all three faults were legibility or grammar. The survey
+post now sells the **road, not the ditch** — it names the landings a cut
+would join before it names its price, and when a line joins nothing alone
+it points at the segment that would finish it. The hire picker asks the
+sim what floats where, and greys a hull's impossible destinations with
+their reason. And the order grammar learns **the light order**: the good
+becomes optional, so a boat can be told to *lie at the Shingle and bring
+brandy home to the Cutting House* — the shingle is a beach that keeps
+nothing, and until now the one sentence that put a tub to work could not
+be written. The letter to the societies gained the same courtesy: it
+names its subject, states its number, and says what the floor under
+London's memory actually is.
 
 **The Wealth Clock (§6.15):** a full economic rebalance after an audit
 found the wealth clock running at half the doom clock — earnings up,
@@ -31,7 +44,7 @@ the double fortress is day-22 money, for ever.
 Also live: the **Cellar Hide** (concealment you buy, invisible and
 informer-proof), **not worth the candle** (nobody prosecutes a pauper),
 the ledger's **cash-flow forecast** and **sound-the-alarm**, and the
-battle drawn as men, not meters. 346 tests green; save v23.
+battle drawn as men, not meters. 360 tests green; save v23.
 
 Earlier: **M5c — Leiden ✅.**
 

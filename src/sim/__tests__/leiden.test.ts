@@ -6,6 +6,7 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  DIFFICULTY,
   BINDING_CAPACITY,
   GALVANIC_ALPHA_MULT,
   GALVANIC_VISIBILITY,
@@ -20,6 +21,7 @@ import {
   SUPPRESS_STANDING,
   TICKS_PER_DAY,
 } from '../balance';
+import { LETTER_SUBJECTS, publicationRiseFor } from '../leiden';
 import { leidenPolicy, runPolicyGame } from '../policy';
 import { garrisonForce } from '../raid';
 import { coverOf, fortVisibility } from '../revenue';
@@ -237,6 +239,30 @@ describe('the bench and the letters (spec §6.14): Publication is the price', ()
     s = tick(s, [{ type: 'releaseLetter' }]);
     expect(s.nationalHeatFloor).toBe(6);
     expect(s.leiden.heldLetters.length).toBe(MAX_SUPPRESSIONS - 1);
+  });
+
+  // §6.14 (M5½ playtest) — the card must name the letter and state its
+  // number: the only permanently irreversible cost in the game was the
+  // vaguest sentence on the screen.
+  it('the letter names itself, and the card and the deed price it alike', () => {
+    let s = completeTier(housed());
+    expect(LETTER_SUBJECTS[s.leiden.letterPending!]).toBe('galvanic defence');
+    expect(LETTER_SUBJECTS.length).toBe(PUBLICATION_HEAT.length);
+    expect(s.log.some((e) => e.text.includes('galvanic defence'))).toBe(true);
+
+    const quoted = publicationRiseFor(s, s.leiden.letterPending!);
+    const before = s.nationalHeatFloor;
+    s = tick(s, [{ type: 'publishLetter' }]);
+    expect(s.nationalHeatFloor - before).toBeCloseTo(quoted); // the price on the button
+  });
+
+  it('the dial scales the quoted rise exactly as it scales the deed', () => {
+    const gentle = housed((st) => (st.difficulty = 'gentle'));
+    const hard = housed((st) => (st.difficulty = 'hard'));
+    expect(publicationRiseFor(gentle, 0)).toBeCloseTo(
+      PUBLICATION_HEAT[0] * DIFFICULTY.gentle.heatMult,
+    );
+    expect(publicationRiseFor(hard, 0)).toBeCloseTo(PUBLICATION_HEAT[0] * DIFFICULTY.hard.heatMult);
   });
 });
 
