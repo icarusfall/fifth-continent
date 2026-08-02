@@ -298,26 +298,34 @@ export interface DykeSegment {
   path: Array<{ x: number; y: number }>;
 }
 
+// M5½b: the coordinates are a NETWORK — chains of touching endpoints link
+// the landings (§6.18): farm ↔ the central spine ↔ the shingle, and the
+// southern run to Ryne's back waters. The white sewer stays a dead end on
+// purpose — not every channel is a route; some are only pasture.
 export const DYKE_SEGMENTS: readonly DykeSegment[] = [
-  { id: 'walland-cut', name: 'The Walland Cut', path: [{ x: 7, y: 13 }, { x: 7, y: 17 }] },
-  { id: 'petts-level', name: 'Petts Level Sewer', path: [{ x: 19, y: 17 }, { x: 26, y: 17 }] },
+  { id: 'walland-cut', name: 'The Walland Cut', path: [{ x: 8, y: 13 }, { x: 8, y: 17 }] },
+  {
+    id: 'petts-level',
+    name: 'Petts Level Sewer',
+    path: [{ x: 16, y: 20 }, { x: 20, y: 14 }],
+  },
   { id: 'white-sewer', name: 'The White Kemp Sewer', path: [{ x: 12, y: 8 }, { x: 12, y: 4 }] },
   {
     id: 'five-waterings',
     name: 'The Five Waterings',
-    path: [{ x: 14, y: 10 }, { x: 20, y: 10 }, { x: 20, y: 14 }],
+    path: [{ x: 10, y: 12 }, { x: 16, y: 12 }, { x: 20, y: 14 }],
   },
   {
     id: 'guldeford',
     name: 'The Guldeford Sewer',
     path: [{ x: 20, y: 14 }, { x: 26, y: 14 }],
   },
-  { id: 'camber-cut', name: 'The Camber Cut', path: [{ x: 26, y: 14 }, { x: 30, y: 10 }] },
-  { id: 'wainway', name: 'The Wainway Channel', path: [{ x: 10, y: 20 }, { x: 16, y: 20 }] },
+  { id: 'camber-cut', name: 'The Camber Cut', path: [{ x: 26, y: 14 }, { x: 31, y: 9 }] },
+  { id: 'wainway', name: 'The Wainway Channel', path: [{ x: 8, y: 17 }, { x: 16, y: 20 }] },
   {
     id: 'broomhill',
     name: 'The Broomhill Sewer',
-    path: [{ x: 16, y: 20 }, { x: 23, y: 21 }],
+    path: [{ x: 16, y: 20 }, { x: 24, y: 21 }],
   },
 ];
 

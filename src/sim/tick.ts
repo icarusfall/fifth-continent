@@ -59,6 +59,7 @@ import {
   MAX_FORT_TIER,
   MAX_LOG_EVENTS,
   MAX_SUPPRESSIONS,
+  MAX_TUB_BOATS,
   RENT_AMOUNT,
   RENT_PERIOD_DAYS,
   RYNE_PRICE,
@@ -67,9 +68,12 @@ import {
   STARTING_FLOCK,
   TICKS_PER_DAY,
   TICKS_PER_HOUR,
+  TUB_BOAT_CAPACITY,
+  TUB_BOAT_COST,
+  TUB_TIDE_MIN,
   WOOL_PRICE_DOMESTIC,
 } from './balance';
-import { FARM_SITE, edgeById, edgesFor, firstHop, isPlaceable, nodeById, otherEnd } from './map';
+import { FARM_SITE, edgesFor, firstHop, isPlaceable, nodeById, otherEnd } from './map';
 import {
   CONTRABAND,
   illicitCount,
@@ -82,7 +86,7 @@ import {
   officerTick,
 } from './revenue';
 import { raidTick, resolveRaid } from './raid';
-import { applyDigDyke, digProgress, flockCapOf } from './dykes';
+import { applyDigDyke, digProgress, dykeWaterways, flockCapOf } from './dykes';
 import {
   accrueNightMarsh,
   addDebt,
@@ -101,17 +105,19 @@ import {
   leidenTierCompleted,
 } from './leiden';
 import { seedRng } from './rng';
-import { clockOf, dayPhaseOf, isFlooded, tideIsRising } from './time';
+import { clockOf, dayPhaseOf, isFlooded, tideIsRising, tideLevel } from './time';
 import type {
   Action,
   Cart,
   CarterOrder,
   CutDepth,
   Difficulty,
+  EdgeId,
   GameState,
   Garrison,
   GarrisonKind,
   Good,
+  MapEdge,
   NodeId,
   Store,
 } from './types';
@@ -316,6 +322,29 @@ function underOrders(state: GameState, cart: Cart): boolean {
 function isDawn(tick: number): boolean {
   const { hour, minute } = clockOf(tick);
   return hour === SHEARING_HOUR && minute === 0;
+}
+
+/** §6.18 (M5½b) — every way a hauler could ride: the authored map plus the
+ *  dug waterways. The officer's map never includes the water (§6.10). */
+function worldEdges(state: GameState): MapEdge[] {
+  return [...edgesFor(state.farm, state.cuttingHouse), ...dykeWaterways(state)];
+}
+
+function worldEdgeById(state: GameState, id: EdgeId): MapEdge | null {
+  return worldEdges(state).find((e) => e.id === id) ?? null;
+}
+
+/** §6.14/§6.18 — hulls and wheels never share a way: the lighter answers the
+ *  sea lane, the tub the waterways, and no cart swims. */
+function wayAllows(edge: MapEdge, cart: Cart): boolean {
+  if (edge.id === 'sea-lane') return cart.vessel === 'sea';
+  if (edge.id.startsWith('waterway-')) return cart.vessel === 'dyke';
+  return cart.vessel === undefined;
+}
+
+/** §6.18 — the channels draw water from the tide: a tub moves only above it. */
+function tubHalted(edge: MapEdge, tick: number): boolean {
+  return edge.id.startsWith('waterway-') && tideLevel(tick) < TUB_TIDE_MIN;
 }
 
 /**
@@ -581,24 +610,34 @@ function applyAction(state: GameState, action: Action): void {
         logEvent(state, `${cart.name} is already on the road.`);
         return;
       }
-      const edge = edgeById(action.edgeId, state.farm, state.cuttingHouse);
+      const edge = worldEdgeById(state, action.edgeId);
+      if (!edge) {
+        logEvent(state, 'No such way runs yet.');
+        return;
+      }
       const from = cart.location.nodeId;
       if (edge.a !== from && edge.b !== from) {
         logEvent(state, `${edge.name} does not start here.`);
         return;
       }
-      // §6.14 (M5c) — hulls and wheels never share a way.
-      if ((edge.id === 'sea-lane') !== (cart.vessel === true)) {
+      // §6.14/§6.18 — hulls and wheels never share a way.
+      if (!wayAllows(edge, cart)) {
         logEvent(
           state,
-          cart.vessel
+          cart.vessel === 'sea'
             ? 'The lighter answers only the sea lane. Steam does not climb mud.'
-            : 'No cart swims. The sea lane is the lighter’s alone.',
+            : cart.vessel === 'dyke'
+              ? 'The tub-boat answers only the waterways you have dug.'
+              : 'No cart swims. The water belongs to the hulls.',
         );
         return;
       }
       if (edge.condition === 'tideLocked' && isFlooded(state.tick)) {
         logEvent(state, `${edge.name} is under the tide. The cart waits.`);
+        return;
+      }
+      if (tubHalted(edge, state.tick)) {
+        logEvent(state, `${edge.name} wants more tide under the keel. The tub waits.`);
         return;
       }
       cart.location = {
@@ -857,6 +896,39 @@ function applyAction(state: GameState, action: Action): void {
         carter: null,
       });
       logEvent(state, `${ordinal} stands in the yard, pony and all. ${CART_COST} coin.`);
+      return;
+    }
+
+    case 'buyTubBoat': {
+      // §6.18 (M5½b) — quiet bulk on the water you dug: a hull, not a stall.
+      if (dykeWaterways(state).length === 0) {
+        logEvent(state, 'No waterway runs yet. The boatwright builds for water, not for hope.');
+        return;
+      }
+      const tubs = state.carts.filter((c) => c.vessel === 'dyke').length;
+      if (tubs >= MAX_TUB_BOATS) {
+        logEvent(state, 'Three tubs is a fleet on these waters. The channels hold no more.');
+        return;
+      }
+      if (state.coin < TUB_BOAT_COST) {
+        logEvent(state, `A tub-boat runs ${TUB_BOAT_COST} coin, and the till is short.`);
+        return;
+      }
+      state.coin -= TUB_BOAT_COST;
+      const ordinal = ['The Tub-Boat', 'The Second Tub', 'The Third Tub'][tubs];
+      state.carts.push({
+        id: `tub-${tubs + 1}`,
+        name: ordinal,
+        capacity: TUB_BOAT_CAPACITY,
+        cargo: {},
+        location: { kind: 'node', nodeId: 'farm' },
+        carter: null,
+        vessel: 'dyke',
+      });
+      logEvent(
+        state,
+        `${ordinal} sits low in the channel by the farm, flat-bottomed and quiet as weed. ${TUB_BOAT_COST} coin.`,
+      );
       return;
     }
 
@@ -1526,10 +1598,10 @@ export const QUAY_RUMOURS: readonly string[] = [
 function carterDispatch(state: GameState, cart: Cart, target: NodeId): void {
   if (cart.location.kind !== 'node' || cart.location.nodeId === target) return;
   const from = cart.location.nodeId;
-  const hop = firstHop(from, target, edgesFor(state.farm, state.cuttingHouse), (e) => {
-    // §6.14 (M5c) — hulls and wheels never share a way: the lighter answers
-    // only the sea lane, and no cart swims.
-    if ((e.id === 'sea-lane') !== (cart.vessel === true)) return Infinity;
+  const hop = firstHop(from, target, worldEdges(state), (e) => {
+    // §6.14/§6.18 — hulls and wheels never share a way.
+    if (!wayAllows(e, cart)) return Infinity;
+    if (tubHalted(e, state.tick)) return Infinity; // he waits on the tide
     return e.condition === 'tideLocked' && isFlooded(state.tick) ? Infinity : e.latency;
   });
   if (!hop) return; // no open road: he waits for the tide like anyone
@@ -1862,7 +1934,23 @@ function payRent(state: GameState): void {
 function moveCarts(state: GameState): void {
   for (const cart of state.carts) {
     if (cart.location.kind !== 'edge') continue;
-    const edge = edgeById(cart.location.edgeId, state.farm, state.cuttingHouse);
+    const edge = worldEdgeById(state, cart.location.edgeId);
+    if (!edge) {
+      // The way vanished under the wheels (should not happen — dykes are
+      // permanent): stand the hauler at its origin rather than lose it.
+      cart.location = { kind: 'node', nodeId: cart.location.from };
+      continue;
+    }
+
+    // §6.18 — the tub waits on the tide, mid-channel or not.
+    if (tubHalted(edge, state.tick)) {
+      const last = state.log[state.log.length - 1];
+      const line = `${edge.name} runs shallow. ${cart.name} waits on the tide.`;
+      if (cart.location.progress > 0 && (!last || last.text !== line)) {
+        logEvent(state, line);
+      }
+      continue;
+    }
 
     // The low road floods at high tide. A cart caught on it halts —
     // it does not drown, it waits, and the player learns about tides.

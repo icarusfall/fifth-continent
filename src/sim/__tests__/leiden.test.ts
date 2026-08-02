@@ -291,7 +291,7 @@ describe('the tiers (spec §6.14): fence, lighter, and their prices', () => {
         cargo: {},
         location: { kind: 'node', nodeId: 'shingle' },
         carter: null,
-        vessel: true,
+        vessel: 'sea',
       });
       st.carts[0].location = { kind: 'node', nodeId: 'shingle' };
     });

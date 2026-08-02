@@ -131,7 +131,7 @@ export function leidenTierCompleted(state: GameState): void {
       cargo: {},
       location: { kind: 'node', nodeId: 'shingle' },
       carter: null,
-      vessel: true,
+      vessel: 'sea',
     });
   }
 }

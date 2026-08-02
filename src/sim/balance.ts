@@ -472,6 +472,20 @@ export const MARSH_VEIL_DIV = 4;
  *  (raw visibility > 0), per dawn, while the veil stands. */
 export const MARSH_VEIL_DEBT = 1;
 
+// ---- M5½b: the tub-boat (spec §6.18 / §21) ----
+// Quiet bulk on the water you dug: the hauler ladder climbs off the road.
+export const TUB_BOAT_COST = 60; // coin, at the farm, once any waterway runs
+export const TUB_BOAT_CAPACITY = 12;
+export const MAX_TUB_BOATS = 3; // hulls, never stalls (the lighter's rule)
+/** Water is fast: latency per tile of channel. */
+export const DYKE_TICKS_PER_TILE = 0.25;
+/** §21's promise — near-silent bulk. */
+export const DYKE_EXPOSURE = 0.1;
+/** The channels draw water from the tide: a tub moves only above this. */
+export const TUB_TIDE_MIN = 0.5;
+/** A segment endpoint lands at a place within this reach (Chebyshev). */
+export const DYKE_LANDING_REACH = 4;
+
 // ---- M5c: Leiden (spec §6.14) ----
 // He arrives as cargo, at random — you did not choose him, and could not have.
 /** Landings-with-purchases before the dice may put a man in a tub. */

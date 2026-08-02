@@ -169,7 +169,9 @@ export function accrueRouteHeat(state: GameState, cart: Cart, edge: MapEdge): vo
       : 1;
   // §6.14 (M5c) — the lighter's engine is audible over water: laden runs
   // read the louder, day or night.
-  const lighterMult = cart.vessel ? LIGHTER_EXPOSURE_MULT : 1;
+  // §6.18 — only the STEAM hull is loud; the tub is quiet as weed, and its
+  // waterway's own exposure (0.1) already prices the ride.
+  const lighterMult = cart.vessel === 'sea' ? LIGHTER_EXPOSURE_MULT : 1;
   const amount =
     ((illicit * edge.exposure) / edge.latency) *
     timeOfDayMod(state.tick) *

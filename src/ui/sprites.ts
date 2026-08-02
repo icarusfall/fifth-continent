@@ -910,3 +910,49 @@ export function drawSurveyPost(
   ctx.fill();
   ctx.stroke();
 }
+
+/** §6.18 (M5½b) — the tub-boat: flat-bottomed, low in the water, quiet as
+ *  weed. A dark hull, a plank thwart, and tubs when laden. */
+export function drawTubBoat(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  angle: number,
+  laden: boolean,
+): void {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  // Hull: a long flat oval, ink-lined.
+  ctx.fillStyle = '#3a2f28';
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = OUT * 0.8;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 9, 3.4, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  // The waterline sits high — it rides low.
+  ctx.strokeStyle = DYKE;
+  ctx.globalAlpha = 0.7;
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(-9, 1.6);
+  ctx.lineTo(9, 1.6);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  if (laden) {
+    // Tubs under a strapped tarpaulin.
+    ctx.fillStyle = CLAY;
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 0.9;
+    ctx.beginPath();
+    ctx.ellipse(-2.5, -1, 2.2, 1.6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(2.5, -1, 2.2, 1.6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.restore();
+}

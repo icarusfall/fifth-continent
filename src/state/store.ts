@@ -65,7 +65,10 @@ import type { Action, ActionLog, Difficulty, GameState, NodeId } from '../sim/ty
 // v21: M5½a — dykesDug + digging (§6.18, the survey and the spade).
 //      Migrates the whole chain, as ever.
 // v22: M5½ playtest — cellars (§6.12, the Cellar Hide). Chain migrates.
-const SAVE_KEY = 'fifth-continent-save-v22';
+// v23: M5½b — Cart.vessel widens to 'sea' | 'dyke' (the tub-boat, §6.18);
+//      the lighter's old `true` reads as 'sea'. Chain migrates.
+const SAVE_KEY = 'fifth-continent-save-v23';
+const SAVE_KEY_V22 = 'fifth-continent-save-v22';
 const SAVE_KEY_V21 = 'fifth-continent-save-v21';
 const SAVE_KEY_V20 = 'fifth-continent-save-v20';
 const SAVE_KEY_V19 = 'fifth-continent-save-v19';
@@ -727,6 +730,15 @@ function migrateV21(parsed: SaveFile): SaveFile {
   return parsed;
 }
 
+/** v22 → v23 (§6.18 M5½b): the lighter's `vessel: true` reads as 'sea'. */
+function migrateV22(parsed: SaveFile): SaveFile {
+  for (const cart of parsed.state?.carts ?? []) {
+    const c = cart as { vessel?: unknown };
+    if (c.vessel === true) c.vessel = 'sea';
+  }
+  return parsed;
+}
+
 function loadSave(): SaveFile | null {
   try {
     let raw = localStorage.getItem(SAVE_KEY);
@@ -734,6 +746,11 @@ function loadSave(): SaveFile | null {
     let fromV19 = false;
     let fromV20 = false;
     let fromV21 = false;
+    let fromV22 = false;
+    if (!raw) {
+      raw = localStorage.getItem(SAVE_KEY_V22);
+      fromV22 = raw !== null;
+    }
     if (!raw) {
       raw = localStorage.getItem(SAVE_KEY_V21);
       fromV21 = raw !== null;
@@ -756,6 +773,7 @@ function loadSave(): SaveFile | null {
     if (fromV18 || fromV19) parsed = migrateV19(parsed);
     if (fromV18 || fromV19 || fromV20) parsed = migrateV20(parsed);
     if (fromV18 || fromV19 || fromV20 || fromV21) parsed = migrateV21(parsed);
+    if (fromV18 || fromV19 || fromV20 || fromV21 || fromV22) parsed = migrateV22(parsed);
     if (parsed.version !== 1 || typeof parsed.state?.tick !== 'number') return null;
     if (typeof parsed.state.farm?.x !== 'number' || typeof parsed.state.fleeceReady !== 'number')
       return null;

@@ -1736,6 +1736,46 @@ price, days, and what the marsh will make of it); a dig in progress reads
 dashed; a dug dyke is a solid water line in the map's own blues, banked
 with drained-green margins. Reserved palette untouched.
 
+#### M5½b — the tub-boat: quiet bulk on the water you dug
+
+§21's hauler ladder climbs off the road. The survey's segments are laid
+so that chains of them link the marsh's **landings** — the farm, the
+shingle, Ryne's back waters, and wherever the cutting house stands within
+reach of a channel (siting near the water is now part of §6.9's siting
+decision). The model, deliberately simple:
+
+```
+landing      a segment endpoint within DYKE_LANDING_REACH 4 tiles of the
+             farm, the shingle, Ryne, or the cutting house (Ryne sits
+             behind its clay: the channel meets the town's own sewer)
+waterway     for each pair of landings joined by a chain of DUG segments
+             (endpoints touching within 1 tile), ONE edge: path = the
+             chain, latency = tiles × DYKE_TICKS_PER_TILE 0.25 (water is
+             fast), capacity TUB_BOAT_CAPACITY 12, exposure DYKE_EXPOSURE
+             0.1 — near-silent bulk, §21's promise. Junctions are never
+             nodes: a two-chain journey is two orders, like any relay.
+tub-boat     TUB_BOAT_COST 60 coin, bought at the farm once any waterway
+             runs; up to MAX_TUB_BOATS 3, never counting against the
+             yard's stalls (a hull, not a stall — the lighter's rule).
+             vessel: 'dyke' — it rides waterways only, as carts ride
+             land only and the lighter rides the sea lane
+tide         a laden or empty tub moves only while tideLevel ≥
+             TUB_TIDE_MIN 0.5 — the channels draw water from the tide;
+             at low water the boat waits where it lies (the low road's
+             lesson, afloat)
+crew         a carter takes the tiller at the ordinary rates (danger
+             money by the §6.11 rules, contraband or the shingle)
+officer      never rides a waterway — a horse does not row (§6.10); no
+             road stop reaches a boat. Yard searches at the landing see
+             a moored boat like any standing cart: water hides the
+             journey, never the wharf
+```
+
+`Cart.vessel` widens from the lighter's boolean to `'sea' | 'dyke'`
+(save bump, migrating `true → 'sea'`). The §20 buy/dispatch/hire verbs
+reuse the cart machinery whole; a mis-ordered boat idles exactly as a
+mis-ordered lighter does (the §6.11 refusal pattern).
+
 **What joins GameState (save bump v21, migrating v20):** `dykesDug:
 DykeId[]`, `digging: { id, doneTick } | null`. All JSON-plain; the
 segments themselves are authored map data, never state.

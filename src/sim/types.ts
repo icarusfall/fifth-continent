@@ -128,7 +128,10 @@ export interface Cart {
   marketPatienceUntil?: number;
   /** §6.14 (M5c) — the steam-lighter: a hull, not a cart. Moves only on the
    *  sea lane; carts never do. Absent on every land cart. */
-  vessel?: true;
+  /** §6.14/§6.18 — a hull, not a cart: 'sea' rides the sea lane (the
+   *  steam-lighter), 'dyke' rides the dug waterways (the tub-boat).
+   *  Absent = wheels, and roads. */
+  vessel?: 'sea' | 'dyke';
 }
 
 /** A building's posted men (spec §6.13): the two kinds of the §14.2 pair. */
@@ -437,6 +440,7 @@ export type Action =
   | { type: 'setVeil'; up: boolean }
   | { type: 'digDyke'; id: DykeId }
   | { type: 'digCellar'; nodeId: NodeId }
+  | { type: 'buyTubBoat' }
   | { type: 'resolveRaid'; calls?: ScheduledCall[] };
 
 /** Actions to apply at a given tick, for replay: actionLog[tick] = Action[]. */

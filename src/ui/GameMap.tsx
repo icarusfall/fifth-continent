@@ -52,6 +52,9 @@ import {
   SHEEP_PRICE_SELL,
   TICKS_PER_DAY,
   TRIBUTE_RELIEF,
+  TUB_BOAT_COST,
+  MAX_TUB_BOATS,
+  TUB_TIDE_MIN,
   WIGHT_TRAP_IRON,
   BINDING_CAPACITY,
   WOOL_PRICE_DOMESTIC,
@@ -70,10 +73,10 @@ import {
   officerEdgesFor,
   otherEnd,
 } from '../sim/map';
-import { dayPhaseOf, isFlooded, ticksUntilTideTurn } from '../sim/time';
+import { dayPhaseOf, isFlooded, ticksUntilTideTurn, tideLevel } from '../sim/time';
 import { carterWageOf, garrisonCap, woolOnTheBooks } from '../sim/tick';
 import { HEAT_RED, REVENUE_BLUE } from './palette';
-import { dykeCost, dykeDays, flockCapOf, stoneRefuses } from '../sim/dykes';
+import { dykeCost, dykeDays, dykeWaterways, flockCapOf, stoneRefuses } from '../sim/dykes';
 import { CONTRABAND, coverOf, fortVisibility, illicitAnywhere, illicitCount } from '../sim/revenue';
 import { GOOD_LABEL, spanOf, storeSummary } from './format';
 import type { Action, Cart, CutDepth, EdgeId, GameState, Good, NodeId } from '../sim/types';
@@ -101,6 +104,7 @@ import {
   drawStockChip,
   drawDyke,
   drawSurveyPost,
+  drawTubBoat,
   drawTileHighlight,
   drawLighter,
   drawSeaLane,
@@ -138,7 +142,8 @@ function cartWorldPosOf(
     const slot = state.carts.filter((c) => c.location.kind === 'node').indexOf(cart);
     return { x: anchor.x + 14 + slot * 9, y: anchor.y + 8 + slot * 5, angle: 0 };
   }
-  const edge = edgesFor(state.farm, state.cuttingHouse).find(
+  // §6.18 — the world's ways include the dug waterways (the tub rides them).
+  const edge = [...edgesFor(state.farm, state.cuttingHouse), ...dykeWaterways(state)].find(
     (e) => e.id === (cart.location as { edgeId: string }).edgeId,
   );
   if (!edge) return null;
@@ -206,11 +211,14 @@ function backOptionsFor(state: GameState, to: NodeId): Good[] {
 }
 
 /** §6.11 / §10 (M5 tutorial pass) — the Dutchman tutorial, done by hand:
- *  met at the gunwale, and contraband sold in town (the fence counts).
- *  Until then no standing order names the shingle and no backhaul exists —
- *  no carter automates a trade his master has never made. */
+ *  met at the gunwale, and the trade itself made once — wool over the
+ *  gunwale, or contraband sold in town (the fence counts). Until then no
+ *  standing order names the shingle and no backhaul exists — no carter
+ *  automates a trade his master has never made. (M5½ playtest: the old
+ *  gate demanded a TOWN contraband sale even for the wool run, which read
+ *  as the shingle arriving broken.) */
 function shingleRoutesOpen(state: GameState): boolean {
-  return state.dutchman.met && state.contrabandSold > 0;
+  return state.dutchman.met && (state.dutchman.fleeceBought > 0 || state.contrabandSold > 0);
 }
 
 /** §10 — one-line whispers for the smuggled goods, so nothing arrives unnamed. */
@@ -596,8 +604,16 @@ export function GameMap({ state }: { state: GameState }) {
       for (const cart of s.carts) {
         const cp = cartWorldPosOf(s, cart);
         if (!cp) continue;
-        if (cart.vessel) {
+        if (cart.vessel === 'sea') {
           drawLighter(ctx, cp.x, cp.y, cart.location.kind === 'edge' ? cp.angle : 0, wightPhase);
+        } else if (cart.vessel === 'dyke') {
+          drawTubBoat(
+            ctx,
+            cp.x,
+            cp.y,
+            cart.location.kind === 'edge' ? cp.angle : 0,
+            cargoCount(cart.cargo) > 0,
+          );
         } else {
           drawCart(
             ctx,
@@ -1852,6 +1868,17 @@ function FarmMenu({
                   Buy a cart · {CART_COST} coin
                 </button>
               )}
+            {/* §6.18 (M5½b) — a hull, not a stall: offered once water runs. */}
+            {dykeWaterways(state).length > 0 &&
+              state.carts.filter((c) => c.vessel === 'dyke').length < MAX_TUB_BOATS && (
+                <button
+                  disabled={state.coin < TUB_BOAT_COST}
+                  title="Flat-bottomed, quiet as weed, and twelve tubs to the load. It rides the waterways you have dug, when the tide gives them depth."
+                  onClick={() => enqueue({ type: 'buyTubBoat' })}
+                >
+                  Buy a tub-boat · {TUB_BOAT_COST} coin
+                </button>
+              )}
           </div>
         </div>
 
@@ -2354,7 +2381,7 @@ function roadButtons(
   const tideSpan = spanOf(ticksUntilTideTurn(state.tick));
   // §6.14 (M5c) — the lighter answers only the sea lane: its buttons are its
   // own, and no cart is ever offered the water.
-  if (cart.vessel) {
+  if (cart.vessel === 'sea') {
     if (nodeId === 'shingle') {
       btns.push(
         <button
@@ -2373,6 +2400,31 @@ function roadButtons(
           onClick={() => send(cart.id, 'sea-lane')}
         >
           Steam for the shingle · the sea lane
+        </button>,
+      );
+    }
+    return btns;
+  }
+  // §6.18 (M5½b) — the tub-boat answers the waterways from this landing.
+  if (cart.vessel === 'dyke') {
+    for (const w of dykeWaterways(state)) {
+      if (w.a !== nodeId && w.b !== nodeId) continue;
+      const farEnd = w.a === nodeId ? w.b : w.a;
+      const lowWater = tideLevel(state.tick) < TUB_TIDE_MIN;
+      btns.push(
+        <button
+          key={w.id}
+          disabled={lowWater}
+          title={
+            lowWater
+              ? 'The channel wants more tide under the keel. It will come.'
+              : 'Quiet as weed, and nobody counts what moves under the banks.'
+          }
+          onClick={() => send(cart.id, w.id)}
+        >
+          Pole {name} down {w.name.toLowerCase()} — to{' '}
+          {nodeById(farEnd, state.farm, state.cuttingHouse).name}
+          {lowWater ? ' · waits on the tide' : ''}
         </button>,
       );
     }
@@ -2581,8 +2633,11 @@ function CartsAtNode({
       (n) =>
         n !== from &&
         (n !== 'cutting-house' || state.cuttingHouse) &&
-        // §6.11 — the shingle gate: the tutorial done by hand first.
-        (n !== 'shingle' || shingleRoutesOpen(state)),
+        // §6.11 — the shingle gate: the tutorial done by hand first. Once the
+        // Dutchman is KNOWN the option shows greyed with its reason (M5½
+        // playtest — an invisible gate reads as the shingle arriving broken);
+        // before that it stays unspoken (§10).
+        (n !== 'shingle' || shingleRoutesOpen(state) || state.dutchman.unlocked),
     );
   // §6.17 — where a backhaul may be dropped on the way home: a covered store
   // that is neither end of the run. Home (`from`) is always the default.
@@ -2678,28 +2733,38 @@ function CartsAtNode({
                   </>
                 ) : hiring.to === undefined ? (
                   <>
-                    {destinationsFrom(hiring.from).map((to) => (
-                      <button
-                        key={to}
-                        title={
-                          to === 'shingle' && hiring.good === 'fleece'
-                            ? 'He sells over the gunwale whenever the lugger stands off — and the books will not record it (§6.10).'
-                            : undefined
-                        }
-                        onClick={() => {
-                          // Destinations with something worth fetching ask one
-                          // more question (§6.11: the back leg); the rest hire.
-                          if (backOptionsFor(state, to).length > 0) setHiring({ ...hiring, to });
-                          else hire(cart.id, hiring.from, to, hiring.good!);
-                        }}
-                      >
-                        {to === 'shingle' && hiring.good === 'fleece'
-                          ? `${GOOD_LABEL[hiring.good]} to the shingle — over the gunwale when the lugger comes · danger money`
-                          : `${GOOD_LABEL[hiring.good!]} to ${
-                              nodeById(to, state.farm, state.cuttingHouse).name
-                            }${to === 'shingle' ? ' · danger money' : ''}`}
-                      </button>
-                    ))}
+                    {destinationsFrom(hiring.from).map((to) => {
+                      // §6.11 (M5½ playtest) — the shingle gate, greyed with
+                      // its reason instead of invisible: run the trade once
+                      // by hand, then the carter may learn it.
+                      const gated = to === 'shingle' && !shingleRoutesOpen(state);
+                      return (
+                        <button
+                          key={to}
+                          disabled={gated}
+                          title={
+                            gated
+                              ? 'No carter automates a trade his master has never made: sell over the gunwale once yourself (wool counts), and the run is his.'
+                              : to === 'shingle' && hiring.good === 'fleece'
+                                ? 'He sells over the gunwale whenever the lugger stands off — and the books will not record it (§6.10).'
+                                : undefined
+                          }
+                          onClick={() => {
+                            // Destinations with something worth fetching ask one
+                            // more question (§6.11: the back leg); the rest hire.
+                            if (backOptionsFor(state, to).length > 0) setHiring({ ...hiring, to });
+                            else hire(cart.id, hiring.from, to, hiring.good!);
+                          }}
+                        >
+                          {to === 'shingle' && hiring.good === 'fleece'
+                            ? `${GOOD_LABEL[hiring.good]} to the shingle — over the gunwale when the lugger comes · danger money`
+                            : `${GOOD_LABEL[hiring.good!]} to ${
+                                nodeById(to, state.farm, state.cuttingHouse).name
+                              }${to === 'shingle' ? ' · danger money' : ''}`}
+                          {gated ? ' · make the run yourself first' : ''}
+                        </button>
+                      );
+                    })}
                     {/* §6.11 (M5c playtest) — the glut valve: sell into the
                         appetite, and the fence takes the remainder the same
                         visit. Offered only where the fence deals. */}
@@ -2889,7 +2954,8 @@ function CartMenu({
     );
   }
 
-  const edge = edgesFor(state.farm, state.cuttingHouse).find(
+  // §6.18 — the world's ways include the dug waterways (the tub rides them).
+  const edge = [...edgesFor(state.farm, state.cuttingHouse), ...dykeWaterways(state)].find(
     (e) => e.id === (cart.location as { edgeId: string }).edgeId,
   );
   const pct = edge ? Math.round((cart.location.progress / edge.latency) * 100) : 0;
