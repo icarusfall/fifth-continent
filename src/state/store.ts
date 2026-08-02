@@ -10,6 +10,7 @@ import {
   CART_COST,
   COLLECTION_GRACE_DAYS,
   FLOCK_CAP,
+  CROSSING_FRONTAGE,
   MAX_SUPPRESSIONS,
   PERSON_DEBT,
   FLOCK_SPOTLIGHT_DAY,
@@ -27,6 +28,7 @@ import {
   SHEEP_VALUE,
   TICKS_PER_DAY,
 } from '../sim/balance';
+import { moatedAt } from '../sim/dykes';
 import { LETTER_SUBJECTS, publicationRiseFor } from '../sim/leiden';
 import { CONTRABAND, illicitAnywhere } from '../sim/revenue';
 import { simulateBattle } from '../sim/combat';
@@ -130,31 +132,52 @@ function battleResultCard(b: BattlePlayback): EventCard {
   return { id: `result-${b.setup.attacker.strength}-${b.frame}`, kind: 'info', title, body };
 }
 
-/** The muster warning (spec §6.13): a Company force is riding for a building. */
+/** Who is actually riding — the cards said "the Company" even when it was the
+ *  Crown, which is the one thing the player most needs to know (§6.13). */
+const RAIDER_NAME: Record<string, string> = {
+  hawksmere: 'the Hawksmere Company',
+  'water-guard': 'the Preventive Water Guard',
+  dragoons: 'Dragoons',
+};
+
+/** The muster warning (spec §6.13): a force is riding for one of your buildings. */
 function musterCard(next: GameState): EventCard {
   const r = next.raid!;
   const name = nodeById(r.target, next.farm, next.cuttingHouse).name;
   const days = Math.max(1, Math.round((r.battleTick - next.tick) / TICKS_PER_DAY));
+  const who = RAIDER_NAME[r.faction] ?? 'A force';
   return {
     id: `muster-${r.battleTick}`,
     kind: 'info',
     title: 'A muster gathers',
-    body: `The Hawksmere Company is riding for ${name} — the blow falls in about ${days} day${days === 1 ? '' : 's'}. Post men and dig in, or lose the goods.`,
+    body:
+      `${who[0].toUpperCase()}${who.slice(1)} is riding for ${name} — the blow falls in about ${days} day${days === 1 ? '' : 's'}. Post men and dig in, or lose the goods.` +
+      (r.faction === 'dragoons' ? ' They are soldiers. They do not rout, and coin does not move them.' : ''),
   };
 }
 
-/** The blow itself (spec §6.13): the raiders are at the wall, and it must be answered. */
+/** The blow itself (spec §6.13): the raiders are at the wall, and it must be
+ *  answered — with the ground stated, since the ground decides it (§6.18). */
 function raidCard(next: GameState): EventCard {
   const r = next.raid!;
   const name = nodeById(r.target, next.farm, next.cuttingHouse).name;
   const g = next.garrisons[r.target];
   const men = (g?.militia ?? 0) + (g?.crew ?? 0);
   const defence = men > 0 ? `${men} of your men hold the wall` : 'and no one holds the wall';
+  const who = RAIDER_NAME[r.faction] ?? 'raiders';
+  // §6.18 (M5½c) — the water at the foot is the difference between a fight
+  // and a formality, so the card says which one this is.
+  const moated = moatedAt(next, r.target);
+  const ground = moated
+    ? men >= CROSSING_FRONTAGE
+      ? ` The cut channel runs at its foot: they can come at you ${CROSSING_FRONTAGE} abreast, and no more — while ${CROSSING_FRONTAGE} of yours are standing.`
+      : ` The cut channel runs at its foot, but it takes ${CROSSING_FRONTAGE} men to hold a crossing and you have ${men}.`
+    : '';
   return {
     id: `raid-${r.battleTick}`,
     kind: 'raid',
-    title: 'The Company is at the gate',
-    body: `${r.size} of the Hawksmere Company fall on ${name}, ${defence}.`,
+    title: r.faction === 'hawksmere' ? 'The Company is at the gate' : 'The Crown is at the gate',
+    body: `${r.size} of ${who} fall on ${name}, ${defence}.${ground}`,
   };
 }
 

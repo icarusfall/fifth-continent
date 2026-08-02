@@ -983,7 +983,12 @@ the two who bring it.
 target      the building holding the most contraband (illicitCount), tie-break
             to the cutting house, then the farm — they take what they can carry
 size        HAWKSMERE_BASE 12 + raidsSurvived × HAWKSMERE_GROWTH 2
-            + floor(contrabandSold / HAWKSMERE_SCALE 40); Crown raids read their
+            + floor(contrabandSold / HAWKSMERE_SCALE 40), capped at
+            HAWKSMERE_MAX_MUSTER 14 (M5½c) — the Company is a gang with a
+            payroll, not an army, and an unbounded growth term against a
+            garrison hard-capped at 12 was the whole of the raid bug. The
+            CROWN is deliberately NOT capped: its growth is the doom clock,
+            and outrunning it is what §6.3 is for. Crown raids read their
             base off the faction (WATER_GUARD_BASE, DRAGOON_BASE)
 first raid  a deliberate gentle introduction (design call): HAWKSMERE_FIRST_RAID
             6, well under the base, announced with FIRST_RAID_LEAD +2 extra days
@@ -1904,6 +1909,98 @@ happened to open (Shingle–Ryne) was the one pair where neither end holds
 goods that are theirs. The fix is not a bigger number. It is telling the
 truth earlier.
 
+#### M5½c — the water fights back, and the raid is straightened
+
+The last stop of M5½, taken on a playtest report: *a fully fortified, fully
+crewed Cutting House still lost a raid.* It was not bad luck. Measured against
+the built engine, a full defence — twelve crew behind tier-4 works — turned
+back **twelve** of the Company, while the Company's second raid onward musters
+`HAWKSMERE_BASE 12 + 2 per raid survived + contrabandSold / 40`. The
+defender's ceiling was hard-capped at `GARRISON_BASE 4 + 2 × tier = 12` men
+while the attacker grew without bound, and four tiers of stonework bought
++0.20 alpha against a term that squares headcount. The works were decoration.
+
+**The three rungs, and what answers each.** This is the promise M5½c makes,
+and the 200-seed pass holds it:
+
+```
+the Company (Hawksmere)   answered by WORKS AND MEN. Their muster is capped:
+                          HAWKSMERE_MAX_MUSTER 14 — a gang is not an army,
+                          and the growth term now stops there
+the Crown's Water Guard   answered by THE WATER. A full defence on open
+                          ground loses to them; the same defence behind a
+                          cut channel turns back thirty
+the Dragoons              answered by NOTHING you can post. They do not rout
+                          (§14.3), so the frontage only slows the bleeding.
+                          Heat, fog, water under the keel, or do not be there
+```
+
+**The moat — what makes ground prepared.** No topology, no ring: a raid is
+narrowed by *water at the foot of the walls*, which is exactly what a drained
+level looks like. (A crossing rule keyed to which roads the channels cut was
+designed and rejected: the cutting house is player-sited, so its three tracks
+are straight lines from an arbitrary tile and no authored segment can be
+guaranteed to cross them. A rule the map cannot honour is not a rule.)
+
+```
+moatTilesAt(state, node)  dug channel tiles within DYKE_MOAT_REACH 3 of the
+                          building — pure, no dice, no clocks
+moated                    moatTilesAt >= MOAT_MIN_TILES 4
+frontage when moated      CROSSING_FRONTAGE 5, flat. One number: the works
+                          give alpha, the water gives the frontage, the men
+                          give depth — one lever each, and none of them
+                          doing another's job
+```
+
+Siting the cutting house on a channel was already part of §6.9's decision for
+the tub-boat's sake (§6.18 M5½b). Now it is also where you would stand and
+fight, and the two reasons are the same reason. The farm's ground is decided
+for you; the house's is not.
+
+**Measured ceilings** — the largest raid each defence turns back, with
+`FORT_ALPHA_PER_TIER 0.10` and `CROSSING_FRONTAGE 5` (the tuning harness runs
+`simulateBattle` directly; these are the numbers the tests pin):
+
+| Defence | Open ground | Moated |
+|---|---|---|
+| bare, 4 men, tier 0 | 3 | 3 — *five men are needed to man a crossing* |
+| dogs & hedge, 6 men, tier 1 | 4 | 4 |
+| bolted doors, 8 men, tier 2 | 7 | 11 |
+| tier 3, 10 men | 11 | 25 |
+| **full: tier 4, 12 crew** | **15** | **46** |
+
+Depth is the story the table tells: at tier 4 behind water, 4 crew turn back
+5, six turn back 11, eight turn back 20, ten turn back 32, twelve turn back
+46. Every man is another body before the line thins below the frontage and
+the crossing is forced.
+
+Against that full fortress the Crown reads: Water Guard **13 open / 34
+moated** — the water is the answer. Dragoons **5 either way** — there is no
+answer, and there was never meant to be one.
+
+**Cut the Crossing — the fourth Call (§14.4), and it costs you the network.**
+Offered only where there is a bank to break, and it is decisive: everyone not
+yet across is stranded on the far side for good.
+
+```
+in the battle   attacker.strength = min(strength, frontage) at that frame —
+                the men already over are all that is left to fight
+the price       the nearest dug segment is UNDUG. The water takes back the
+                level: DYKE_PASTURE_HEAD 2 of grazing gone, any waterway
+                that ran through it broken (the tub-boat's road — M5½b's
+                gift is the hostage), and re-cutting costs the full price
+                and the full days again
+the parish      loseStanding(CUT_CROSSING_STANDING 10) — they flooded a
+                level the commoners graze, and everyone knows who did it
+the Debt        NOT forgiven. The marsh keeps its own account and it does
+                not decay (§6.14's invariant); giving a field back under
+                duress is not tribute, and the stone is not fooled
+```
+
+The trump card eats the logistics network that justified the digging. That is
+the shape the game wants: no consequence-free choices, and the strongest verb
+in the milestone is the one that costs you the milestone.
+
 **Not a random-raid system.** The Revenue maintains its own data structure:
 
 ```ts
@@ -2125,6 +2222,57 @@ Losses scale with *both* sides. Being outnumbered hurts far less, because they c
 
 A tile's combat law is a property of the terrain + your placed concealment tech. Show it in the pre-battle readout.
 
+**THE FRONTAGE — the bounded form of the same idea (M5½c).** The linear law
+above was measured against the built engine before M5½c shipped, and it does
+not do what this section promised. Under `lossesOn`, a side's *fractional*
+loss rate under linear law is `alpha_enemy × enemyStrength × dt / REF` — it
+does not depend on your own numbers at all. So the outnumbered side's morale
+erodes no faster than the enemy's however many they bring, and the defender
+wins against **any** number: a moated tier-3 building turned back 120 raiders
+and would have turned back a thousand. "Numbers stop telling" became "numbers
+never told", and an invulnerable building is not pressure — it is the end of
+the game's argument.
+
+So prepared ground is modelled instead as **frontage**: how many attackers
+can bring a weapon to bear at once, whatever they brought.
+
+```
+BattleSetup.frontage    men the ground admits to the fight; absent = open
+engaged(attacker)       = min(strength, frontage)   — only these kill
+the defenders           are NEVER capped: the ground narrows the assault,
+                        not the men holding it
+```
+
+And — this is the whole of it — **a crossing is held, never owned**:
+
+```
+held this frame  = frontage > 0 AND defenderStrength >= frontage
+while held       the attacker is capped, and the terrain's law applies
+once not held    'crossing_forced' fires: open ground, square law, no cap.
+                 They are over the ditch, and numbers tell again
+```
+
+The consequences are the design, and they were measured against the engine
+rather than assumed:
+
+- **A crossing needs enough men to man it.** Fewer defenders than the frontage
+  and it never holds at all — the water buys such a garrison exactly nothing.
+- **A garrison of *exactly* the frontage is a trap**: the first man to fall
+  drops it below the line and `crossing_forced` fires on the spot. Five men
+  man a crossing; five men do not *hold* one.
+- **Depth is what buys time**, and it is bought in morale, not in bodies. A
+  deep garrison behind a held crossing does not usually lose the line — it
+  **breaks**. Twelve crew against sixty rout with nine still standing, because
+  the constant bleed of a frontage fight erodes morale steadily while nobody
+  ever forces the ditch. That is the bound, and it is why the fortress is not
+  invulnerable: `crossing_forced` is the thin-garrison ending, and the rout is
+  everyone else's.
+
+A fortress is a delaying engine with a price, not a wall that cannot be
+climbed.
+
+Linear law stays in the engine, unused by raids, for M6's business.
+
 ### 14.2 Alpha values (starting point — tune in `balance.ts`)
 
 | Force | alpha | Notes |
@@ -2136,7 +2284,7 @@ A tile's combat law is a property of the terrain + your placed concealment tech.
 | Preventive Water Guard | 0.35 | Professionals. |
 | Dragoons | 0.55 | |
 | Wights | 0.40 | Ignore fortification entirely. Halved by iron & salt. |
-| *Fortification bonus* | +0.05/tier | To the defender's alpha. |
+| *Fortification bonus* | **+0.10/tier** | To the defender's alpha, tier 2 up (the dogs give intelligence, not alpha). Doubled in M5½c: at +0.05 the whole works ladder moved a full defence's ceiling by three men, and the player could not feel 450 coin of stonework. |
 | *Galvanic fence* | +0.12 | |
 | *Steam-ram* | +0.20 | |
 | *Bound Guardian* | +0.35 | Adds Debt every sub-tick it is active. |
@@ -2174,7 +2322,8 @@ Two rows of that table are the whole threat model. `breakPoint = 0` should be vi
 
 Pure spectating is Mega-Lo-Mania's one weakness. The player gets **three Calls per battle**, queued as actions into the sub-tick loop so determinism survives.
 
-- **Commit the Reserve** — held-back men enter at sub-tick *n*. Timing is everything: too early and they are ground down under square law; too late and morale has already broken.
+- **Commit the Reserve** — held-back men enter at sub-tick *n*. Timing is everything: too early and they are ground down under square law; too late and morale has already broken. *(Engine feature; no raid posts a reserve yet — the garrison stands as one. M6's business, and the button says so rather than pretending.)*
+- **Cut the Crossing** (M5½c) — break your own bank under them. Everyone not yet across is out of the fight for good; the price is the channel itself. See §6.18.
 - **Fire the Engine** — one-shot Sluice-Cannon / Bound Guardian. Huge alpha spike, huge Heat or Debt cost.
 - **Sound Retreat** — rout *voluntarily*, before morale collapses. Cargo lost, buildings burn, but your people live. **This is usually correct and players will hate doing it.**
 - **Pay Them Off** — mid-battle, Coin cost scaled to how badly you are losing. Works on the Company and on Riding Officers. Does **not** work on Dragoons or wights — and the button is rendered **greyed out**, which tells the player everything they need to know without a line of dialogue.

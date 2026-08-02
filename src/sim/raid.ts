@@ -18,6 +18,9 @@ import {
   HAWKSMERE_GROWTH,
   HAWKSMERE_PROVOKE,
   HAWKSMERE_SCALE,
+  HAWKSMERE_MAX_MUSTER,
+  CROSSING_FRONTAGE,
+  CUT_CROSSING_STANDING,
   DRAGOON_BASE,
   DRAGOON_HEAT,
   MAX_LOG_EVENTS,
@@ -31,6 +34,7 @@ import { simulateBattle } from './combat';
 import type { BattleSetup, CombatLog, Faction, ForceSpec, ScheduledCall } from './combat';
 import { nodeById } from './map';
 import { CONTRABAND, goodsSummary, illicitCount, loseStanding, underTheCandle } from './revenue';
+import { moatedAt, nearestDugSegment } from './dykes';
 import { fenceActiveAt } from './leiden';
 import { addDebt } from './wights';
 import type { GameState, NodeId, Store } from './types';
@@ -82,7 +86,14 @@ function raidSize(state: GameState, faction: Faction): number {
   if (faction === 'dragoons') size = DRAGOON_BASE + grown;
   else if (faction === 'water-guard') size = WATER_GUARD_BASE + grown;
   else if (state.hawksmere.raidsSurvived === 0) size = HAWKSMERE_FIRST_RAID;
-  else size = HAWKSMERE_BASE + grown + Math.floor(state.contrabandSold / HAWKSMERE_SCALE);
+  else {
+    // §6.13 (M5½c) — the Company is a gang with a payroll, not an army. The
+    // Crown above is deliberately uncapped: its growth is the doom clock.
+    size = Math.min(
+      HAWKSMERE_MAX_MUSTER,
+      HAWKSMERE_BASE + grown + Math.floor(state.contrabandSold / HAWKSMERE_SCALE),
+    );
+  }
   return Math.max(1, Math.round(size * DIFFICULTY[state.difficulty].raidMult));
 }
 
@@ -116,8 +127,14 @@ export function garrisonForce(state: GameState, node: NodeId): ForceSpec {
   };
 }
 
-/** The pre-battle setup, for the readout and the fight (§14). Square law: no
- *  dykes yet (§21 is mid-game), so numbers dominate and the readout says so. */
+/**
+ * The pre-battle setup, for the readout and the fight (§14).
+ *
+ * Square law throughout: §14.1's linear law was measured and makes numbers
+ * stop mattering *at all* — an invulnerable building. M5½c's prepared ground
+ * is the **frontage** instead: water at the foot of the walls admits only so
+ * many attackers at once, and only while there are men enough to hold it.
+ */
 export function raidBattleSetup(state: GameState, calls?: ScheduledCall[]): BattleSetup | null {
   const raid = state.raid;
   if (!raid) return null;
@@ -125,6 +142,7 @@ export function raidBattleSetup(state: GameState, calls?: ScheduledCall[]): Batt
     attacker: { faction: raid.faction, strength: raid.size },
     defender: garrisonForce(state, raid.target),
     law: 'square',
+    frontage: moatedAt(state, raid.target) ? CROSSING_FRONTAGE : undefined,
     playerSide: 'defender',
     calls,
   };
@@ -155,6 +173,25 @@ function applyGarrisonLosses(state: GameState, node: NodeId, survivors: number):
   g.militia = Math.min(g.militia, kept - crew);
 }
 
+/**
+ * §6.18 (M5½c) — the price of cutting your own bank, paid outside the battle.
+ * The water takes the level back: the channel at the building's foot is UNDUG
+ * — its grazing gone, any waterway that ran through it broken, and re-cutting
+ * costs the full price and the full days again. The parish grazed that level
+ * and knows who flooded it. The Debt is NOT forgiven: the marsh keeps its own
+ * account (§6.14), and a field given back under duress is not tribute.
+ */
+function applyCrossingCut(state: GameState, target: NodeId): void {
+  const seg = nearestDugSegment(state, target);
+  if (!seg) return;
+  state.dykesDug = state.dykesDug.filter((id) => id !== seg.id);
+  loseStanding(state, CUT_CROSSING_STANDING);
+  logEvent(
+    state,
+    `The bank of ${seg.name} goes out under them, and the level drowns. The men on the far side stay there. So does your channel: the water has it back, the grazing with it, and the parish saw whose spade did it.`,
+  );
+}
+
 /** Land the §14.6 consequences of a resolved raid on the world. */
 function applyRaidConsequences(state: GameState, target: NodeId, isFirst: boolean, log: CombatLog): void {
   const c = log.consequences;
@@ -162,6 +199,7 @@ function applyRaidConsequences(state: GameState, target: NodeId, isFirst: boolea
   state.heat.national += c.nationalHeat; // 0 against the Company, unless the engine fired
   addDebt(state, c.debt); // §6.14 — wight-fog and the Guardian are priced in Debt
   applyGarrisonLosses(state, target, log.survivors.defenders);
+  if (c.crossingCut) applyCrossingCut(state, target);
   const name = nodeById(target, state.farm, state.cuttingHouse).name;
 
   // Bought off (§14.4): coin changes hands, they ride away, the goods stay.

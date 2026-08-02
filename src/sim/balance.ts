@@ -238,6 +238,13 @@ export const FIRST_RAID_SEIZE_FRAC = 1 / 3;
 export const HAWKSMERE_BASE = 12;
 export const HAWKSMERE_GROWTH = 2; // M5c retune: the spiral tightens, it does not snap
 export const HAWKSMERE_SCALE = 40; // +1 raider per this many contraband units sold
+/**
+ * §6.13 (M5½c) — the Company is a gang with a payroll, not an army. An
+ * unbounded growth term against a garrison hard-capped at 12 men WAS the raid
+ * bug: a full works + full crew turned back 12, and raid #2 already mustered
+ * more. The Crown is deliberately uncapped — its growth is the doom clock.
+ */
+export const HAWKSMERE_MAX_MUSTER = 14;
 
 // The Crown escalates on the *other* meter (§6.13): national Heat. The raider
 // who comes is the worst your doom clock has earned — and Dragoons do not rout.
@@ -346,7 +353,13 @@ export const FACTION_BREAKPOINT = {
 } as const;
 
 /** Alpha added to the *defender* per tier of ground works (spec §14.2). */
-export const FORT_ALPHA_PER_TIER = 0.05;
+/**
+ * §14.2 (M5½c) — doubled from 0.05. At the old rate the whole works ladder
+ * moved a full defence's ceiling by three men, and 450 coin of stonework
+ * could not be felt. Tier 1 (the dogs) still gives none: intelligence, not
+ * alpha.
+ */
+export const FORT_ALPHA_PER_TIER = 0.1;
 /** Leiden fence / ram and the marsh's Guardian — additive alpha (spec §14.2). */
 export const GALVANIC_FENCE_ALPHA = 0.12;
 export const STEAM_RAM_ALPHA = 0.2;
@@ -485,6 +498,18 @@ export const DYKE_EXPOSURE = 0.1;
 export const TUB_TIDE_MIN = 0.5;
 /** A segment endpoint lands at a place within this reach (Chebyshev). */
 export const DYKE_LANDING_REACH = 4;
+
+// ---- M5½c: the water fights back (spec §6.18 / §14.1) ----
+// Water at the foot of the walls narrows the assault. The works give alpha,
+// the water gives the frontage, the men give depth — one lever each.
+/** Dug channel within this reach of a building counts as its moat (Chebyshev). */
+export const DYKE_MOAT_REACH = 3;
+/** …and this many such tiles make the ground prepared. */
+export const MOAT_MIN_TILES = 4;
+/** Attackers the crossing admits at once, whatever they brought (§14.1). */
+export const CROSSING_FRONTAGE = 5;
+/** Standing lost for breaking your own bank: the commoners grazed that level. */
+export const CUT_CROSSING_STANDING = 10;
 
 // ---- M5c: Leiden (spec §6.14) ----
 // He arrives as cargo, at random — you did not choose him, and could not have.

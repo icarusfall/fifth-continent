@@ -69,6 +69,7 @@ export type Call =
   | 'commitReserve' // held-back men enter now; timing is everything
   | 'fireEngine' // one-shot Sluice-Cannon / Guardian: an alpha spike, at a price
   | 'wightFog' // §6.14 Marsh 2: the raiders fight half-blind, at 8 Debt
+  | 'cutCrossing' // §6.18 M5½c: break your own bank — and lose the channel
   | 'soundRetreat' // rout voluntarily, before morale collapses; your people live
   | 'payOff'; // coin to end it — works on the Company and Officers, no one else
 
@@ -83,6 +84,13 @@ export interface BattleSetup {
   defender: ForceSpec;
   /** A property of the terrain plus the defender's concealment tech (§14.1). */
   law: CombatLaw;
+  /**
+   * §14.1 (M5½c) — **the frontage**: how many attackers can bring a weapon to
+   * bear at once, whatever they brought. A property of the ground: open marsh
+   * has none, a cut channel at the foot of the walls has a narrow one. Absent
+   * or 0 = open ground, and numbers tell as they always did.
+   */
+  frontage?: number;
   /** Which side is the player's — it gets the reserve and the three Calls. */
   playerSide: 'attacker' | 'defender';
   /** Under wight-fog the enemy counter is hidden in the render (§14.5). */
@@ -99,6 +107,8 @@ export type CombatEventKind =
   | 'fog_called'
   | 'leader_down'
   | 'rout'
+  | 'crossing_forced'
+  | 'crossing_cut'
   | 'reserve_committed';
 
 export interface CombatEvent {
@@ -133,6 +143,12 @@ export interface CombatConsequences {
   debt: number;
   /** Coin owed if the battle ended in a pay-off, else 0. */
   payOffCost: number;
+  /**
+   * §6.18 (M5½c) — the player broke the bank under them. The caller undigs
+   * the channel at the building's foot and takes the parish's opinion: the
+   * strongest verb in the milestone costs you the milestone.
+   */
+  crossingCut: boolean;
 }
 
 export interface CombatLog {
@@ -194,10 +210,22 @@ function makeSide(force: ForceSpec, isDefender: boolean): SideRuntime {
 /** Losses inflicted *on* a side this sub-tick (§14.1). Square: enemy headcount
  *  only, so numbers dominate superlinearly. Linear: scaled by how many of your
  *  own you can bring to bear against a reference cohort — outnumbered hurts less. */
-function lossesOn(victim: SideRuntime, killer: SideRuntime, law: CombatLaw): number {
-  const base = killer.alpha * killer.strength * COMBAT_DT;
+function lossesOn(
+  victim: SideRuntime,
+  killer: SideRuntime,
+  law: CombatLaw,
+  killerEngaged: number,
+): number {
+  const base = killer.alpha * killerEngaged * COMBAT_DT;
   if (law === 'square') return base;
   return base * (victim.strength / COMBAT_LINEAR_REF);
+}
+
+/** §14.1 (M5½c) — the men a side can actually get at the enemy this frame.
+ *  The ground narrows the assault; it never narrows the men holding it. */
+function engaged(side: SideRuntime, frontage: number | undefined, isAttacker: boolean): number {
+  if (!isAttacker || !frontage || frontage <= 0) return side.strength;
+  return Math.min(side.strength, frontage);
 }
 
 export function simulateBattle(setup: BattleSetup): CombatLog {
@@ -210,6 +238,11 @@ export function simulateBattle(setup: BattleSetup): CombatLog {
   const calls = [...(setup.calls ?? [])].sort((a, b) => a.frame - b.frame).slice(0, 3);
 
   const frames: CombatFrame[] = [];
+  // §14.1 (M5½c) — starts held if there is a crossing at all; the frame it
+  // gives way is worth announcing (the renderer says so, and it decides
+  // fights).
+  let crossingHeld = !!setup.frontage && setup.frontage > 0;
+  let crossingCut = false;
   let guardianActiveFrames = 0;
   let engineFired = false;
   let fogCalled = false;
@@ -232,6 +265,13 @@ export function simulateBattle(setup: BattleSetup): CombatLog {
         player.alpha += ENGINE_SPIKE_ALPHA;
         engineFired = true;
         events.push({ kind: 'engine_fired', side: sideOf(player) });
+      } else if (c.call === 'cutCrossing' && !crossingCut && setup.frontage) {
+        // §6.18 (M5½c) — the bank goes under them: everyone not already over
+        // is stranded on the far side, and stays there. The price is paid
+        // outside the battle, in the channel itself.
+        enemy.strength = Math.min(enemy.strength, setup.frontage);
+        crossingCut = true;
+        events.push({ kind: 'crossing_cut', side: sideOf(player) });
       } else if (c.call === 'wightFog' && !fogCalled) {
         // §6.14 Marsh 2 — the fog comes up off the dykes: the raiders swing
         // at shapes for the rest of the battle. Priced in Debt, not coin.
@@ -258,9 +298,20 @@ export function simulateBattle(setup: BattleSetup): CombatLog {
       break;
     }
 
-    // 3. The volley: simultaneous attrition under the tile's law (§14.1).
-    const attLoss = lossesOn(att, def, setup.law);
-    const defLoss = lossesOn(def, att, setup.law);
+    // 3. The volley: simultaneous attrition under the tile's law (§14.1), and
+    //    only as many attackers as the ground will let at the wall (§14.1's
+    //    frontage — M5½c: the channel at the foot decides how many that is).
+    //
+    //    The crossing is HELD, never owned: the narrow ground counts only
+    //    while there are enough defenders to man it. Thin them below the
+    //    frontage and they are over the ditch — open ground, and numbers tell
+    //    again. Depth of garrison is what buys the chokepoint its time.
+    const held = !!setup.frontage && setup.frontage > 0 && def.strength >= setup.frontage;
+    if (!held && crossingHeld) events.push({ kind: 'crossing_forced', side: 'attacker' });
+    crossingHeld = held;
+    const law: CombatLaw = held ? setup.law : 'square';
+    const attLoss = lossesOn(att, def, law, def.strength);
+    const defLoss = lossesOn(def, att, law, engaged(att, held ? setup.frontage : 0, true));
     const attRate = att.strength > 0 ? attLoss / att.strength : 0;
     const defRate = def.strength > 0 ? defLoss / def.strength : 0;
     att.strength = Math.max(0, att.strength - attLoss);
@@ -331,7 +382,16 @@ export function simulateBattle(setup: BattleSetup): CombatLog {
     law: setup.law,
     fogged: setup.fog ?? false,
     playerWon,
-    consequences: tally(att, def, player, guardianActiveFrames, engineFired, fogCalled, payOffCost),
+    consequences: tally(
+      att,
+      def,
+      player,
+      guardianActiveFrames,
+      engineFired,
+      fogCalled,
+      payOffCost,
+      crossingCut,
+    ),
   };
 }
 
@@ -396,6 +456,7 @@ function tally(
   engineFired: boolean,
   fogCalled: boolean,
   payOffCost: number,
+  crossingCut: boolean,
 ): CombatConsequences {
   const enemy = player === att ? def : att;
   const friendlyDead = Math.max(0, Math.round(player.entered - player.strength));
@@ -419,5 +480,6 @@ function tally(
     nationalHeat,
     debt,
     payOffCost,
+    crossingCut,
   };
 }

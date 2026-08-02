@@ -6,7 +6,38 @@ A single-player, browser-based god/builder game about smuggling, logistics, and
 the two kinds of magic you can use to hide a crime. Design spec and build brief:
 [the-fifth-continent-spec.md](./the-fifth-continent-spec.md).
 
-## Status: M5½b — the tub-boat, and the water made legible ✅ (awaiting review)
+## Status: M5½c — the water fights back ✅ (awaiting review)
+
+**M5½c (spec §6.18, §14.1):** the last stop of M5½, built on a playtest
+report — *a fully fortified, fully crewed Cutting House still lost a raid.*
+It was not bad luck. A full defence turned back **twelve** of the Company
+while their second raid already mustered more: the garrison was hard-capped
+at twelve men, the Company's muster grew without bound, and four tiers of
+stonework bought +0.20 against a term that squares headcount. The works were
+decoration.
+
+Straightened, and the dykes are the reason. Prepared ground is now
+**frontage** — how many attackers the ground admits at once — and *a crossing
+is held, never owned*: it counts only while there are men enough to man it.
+Water at the foot of the walls (a dug channel within three tiles) admits five
+abreast; the works give alpha, the water gives the frontage, the men give
+depth. A full defence turns back **15** in the open and **46** behind the
+water. Five men *man* a crossing but do not hold one — lose one and it is
+forced. And a deep garrison behind a held crossing does not lose the ditch:
+it **breaks**, morale-first, with nine of twelve still standing. A fortress
+is a delaying engine, not a wall that cannot be climbed.
+
+Three rungs, each with its own answer: the **Company** by works and men (its
+muster is capped now — a gang is not an army); the **Water Guard** by the
+water (13 open, 34 moated); the **Dragoons** by nothing you can post, ever.
+
+And the fourth Call: **Cut the Crossing.** Break your own bank and everyone
+not yet across stays across — then the water takes the level back. The
+channel is undug, its grazing drowned, the tub-boat's road broken where it
+ran, and the parish saw whose spade did it. The Debt is never forgiven. The
+strongest verb in the milestone costs you the milestone.
+
+Earlier: **M5½b — the tub-boat, and the water made legible ✅**
 
 **M5½ so far (spec §6.18, §21.1):** the mid-game's central verb arrives.
 **M5½a — the survey and the spade:** eight named channels of Romney's old
@@ -44,7 +75,8 @@ the double fortress is day-22 money, for ever.
 Also live: the **Cellar Hide** (concealment you buy, invisible and
 informer-proof), **not worth the candle** (nobody prosecutes a pauper),
 the ledger's **cash-flow forecast** and **sound-the-alarm**, and the
-battle drawn as men, not meters. 360 tests green; save v23.
+battle drawn as men, not meters. 382 tests green; save v23 (M5½c needed no
+bump — the water it takes back was already in the save).
 
 Earlier: **M5c — Leiden ✅.**
 

@@ -14,6 +14,8 @@ import {
   DYKE_DEBT,
   DYKE_EXPOSURE,
   DYKE_LANDING_REACH,
+  DYKE_MOAT_REACH,
+  MOAT_MIN_TILES,
   DYKE_PARISH_STANDING,
   DYKE_PASTURE_HEAD,
   DYKE_TICKS_PER_TILE,
@@ -286,6 +288,74 @@ export function dykePreview(
     }
   }
   return { opens, nextStep: null };
+}
+
+// ---- M5½c: the water fights back (spec §6.18 / §14.1) ----
+// No topology, no ring — a raid is narrowed by water at the foot of the
+// walls, which is what a drained level looks like. (A rule keyed to which
+// ROADS the channels cut was designed and rejected: the cutting house is
+// player-sited, so its tracks are straight lines from an arbitrary tile and
+// no authored segment can be guaranteed to cross them.)
+
+/** Where a node stands on the tile grid — the farm and the house move. */
+function siteOf(state: GameState, node: NodeId): Pt | null {
+  if (node === 'farm') return state.farm;
+  if (node === 'cutting-house') return state.cuttingHouse ?? null;
+  return null; // Ryne, the shingle and the Customs House are nobody's to hold
+}
+
+/** §6.18 — dug channel tiles within DYKE_MOAT_REACH of a building. */
+export function moatTilesAt(state: GameState, node: NodeId): number {
+  const at = siteOf(state, node);
+  if (!at) return 0;
+  let tiles = 0;
+  for (const seg of DYKE_SEGMENTS) {
+    if (!state.dykesDug.includes(seg.id)) continue;
+    for (const p of walkPath(seg.path)) {
+      if (near(p, at, DYKE_MOAT_REACH)) tiles++;
+    }
+  }
+  return tiles;
+}
+
+/** §6.18 — is there water enough at the foot to narrow the approach? */
+export function moatedAt(state: GameState, node: NodeId): boolean {
+  return moatTilesAt(state, node) >= MOAT_MIN_TILES;
+}
+
+/**
+ * §6.18 (M5½c) — the bank they cut: the dug segment with most of itself at
+ * this building's foot, and so the one the water takes back when the
+ * crossing goes. Null when nothing is near enough to break.
+ */
+export function nearestDugSegment(state: GameState, node: NodeId): DykeSegment | null {
+  const at = siteOf(state, node);
+  if (!at) return null;
+  let best: { seg: DykeSegment; tiles: number } | null = null;
+  for (const seg of DYKE_SEGMENTS) {
+    if (!state.dykesDug.includes(seg.id)) continue;
+    let tiles = 0;
+    for (const p of walkPath(seg.path)) if (near(p, at, DYKE_MOAT_REACH)) tiles++;
+    if (tiles > 0 && (!best || tiles > best.tiles)) best = { seg, tiles };
+  }
+  return best?.seg ?? null;
+}
+
+/** Every whole tile a segment's polyline passes through, ends included. */
+function walkPath(path: readonly Pt[]): Pt[] {
+  const out: Pt[] = [];
+  for (let i = 1; i < path.length; i++) {
+    const a = path[i - 1];
+    const b = path[i];
+    const steps = Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y));
+    for (let s = i === 1 ? 0 : 1; s <= steps; s++) {
+      out.push({
+        x: Math.round(a.x + ((b.x - a.x) * s) / steps),
+        y: Math.round(a.y + ((b.y - a.y) * s) / steps),
+      });
+    }
+  }
+  return out;
 }
 
 /** Orient and concatenate a chain's paths so the polyline flows from the

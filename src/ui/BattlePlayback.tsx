@@ -44,6 +44,9 @@ const EVENT_TEXT: Record<string, string> = {
   reserve_committed: 'The reserve is in',
   engine_fired: 'The engine roars',
   fog_called: 'The fog comes up off the dykes',
+  // §6.18 (M5½c) — the two moments the ground decides the fight.
+  crossing_forced: 'THE CROSSING IS FORCED — they are over',
+  crossing_cut: 'The bank goes out under them',
 };
 
 const GOLDEN = 2.399963; // the golden angle spreads any headcount evenly
@@ -147,6 +150,24 @@ export function BattlePlayback() {
 
   const attRout = routFrameOf(log, frame, 'attacker');
   const defRout = routFrameOf(log, frame, 'defender');
+
+  // §6.18/§14.1 (M5½c) — the ground, read aloud and kept honest as it changes:
+  // the crossing holds only while there are men enough to man it.
+  const frontage = setup.frontage ?? 0;
+  const forced =
+    frontage > 0 &&
+    log.frames
+      .slice(0, frame + 1)
+      .some((fr) => fr.events.some((e) => e.kind === 'crossing_forced'));
+  const alreadyCut = battle.calls.some((c) => c.call === 'cutCrossing');
+  const groundLine =
+    frontage <= 0
+      ? `Open ground · square law · numbers tell${dragoons ? ' · they do not rout' : ''}`
+      : forced
+        ? `The crossing is forced · open ground now · numbers tell${dragoons ? ' · they do not rout' : ''}`
+        : `Behind the water · ${frontage} abreast at the crossing · held while ${frontage} of yours stand${
+            dragoons ? ' · they do not rout' : ''
+          }`;
   const attackers = sideDots({
     side: 'attacker',
     start: Math.round(attStart),
@@ -177,9 +198,7 @@ export function BattlePlayback() {
         style={{ '--frame-ms': `${Math.round(frameMs)}ms` } as CSSProperties}
       >
         <h2>{battle.targetName} — the wall</h2>
-        <p className="battle-law">
-          Open ground · square law · numbers tell{dragoons ? ' · they do not rout' : ''}
-        </p>
+        <p className="battle-law">{groundLine}</p>
 
         <div className="battle-line">
           <span style={{ color: attColor }}>{FACTION_NAME[attFaction] ?? attFaction}</span>
@@ -237,11 +256,26 @@ export function BattlePlayback() {
           <span className="calls-left">
             {callsLeft} call{callsLeft === 1 ? '' : 's'} left
           </span>
-          <button disabled title="No reserve is posted here">
+          <button disabled title="No reserve is posted here — the garrison stands as one.">
             Commit the reserve
           </button>
-          <button disabled title="No engine — that is Leiden's work">
+          <button disabled title="No engine — that is Leiden's last work, and it is not built.">
             Fire the engine
+          </button>
+          {/* §6.18 (M5½c) — the strongest verb in the milestone, and it eats
+              the milestone: the channel goes with the men on the far bank. */}
+          <button
+            disabled={!(frontage > 0 && !forced && callsLeft > 0 && !alreadyCut)}
+            title={
+              frontage <= 0
+                ? 'There is no bank here to break.'
+                : forced
+                  ? 'Too late — they are over.'
+                  : 'Everyone not yet across stays across. The water takes the channel back, the grazing with it, and the parish knows whose spade did it.'
+            }
+            onClick={() => soundCall('cutCrossing')}
+          >
+            Cut the crossing
           </button>
           <button
             disabled={!(marshTier >= 2 && callsLeft > 0 && !battle.calls.some((c) => c.call === 'wightFog'))}
