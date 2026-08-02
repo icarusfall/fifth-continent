@@ -1545,6 +1545,14 @@ function GarrisonRow({ state, nodeId }: { state: GameState; nodeId: NodeId }) {
           ? 'Works without men stop nothing — a raid walks in over empty steps.'
           : `Wages at dawn: ${wageBill} coin. A wall that cannot be paid deserts.`}
       </p>
+      {/* §6.13 / §14 — the difference, on the face (read-the-charge rule):
+          the smuggler's price buys alpha AND nerve, and the card must say so. */}
+      <p className="flavour">
+        A militiaman is a marsh farmer with a fowling piece: he shoots at half a
+        smuggler&rsquo;s rate and runs at twice the losses — he has a family to get back
+        to. A smuggler is armed, willing, and stays for the worst of it. Cheap walls
+        waver; dear walls hold.
+      </p>
       <div className="menu-buttons">
         <button
           disabled={full || state.coin < MILITIA_MUSTER}
