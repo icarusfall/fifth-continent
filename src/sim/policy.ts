@@ -29,7 +29,26 @@ import {
 import { flockCapOf } from './dykes';
 import { isFlooded } from './time';
 import { initialState, tick } from './tick';
-import type { Action, Cart, CarterOrder, GameState, Good } from './types';
+import type {
+  Action,
+  Cart,
+  CarterOrder,
+  GameState,
+  Good,
+  LegacyCarterOrder,
+  NodeId,
+} from './types';
+
+// §6.19 — the scripted bots ask about rounds, not about `to`: a standing order
+// is a list of stops now, so "is he owling?" is "does his round call at the
+// shingle?". Orders are still WRITTEN in the old four-beat shape, which the
+// sim normalises — that is the compatibility the replay log depends on.
+function visits(order: CarterOrder | null | undefined, at: NodeId): boolean {
+  return !!order && order.stops.some((s) => s.at === at);
+}
+function takes(order: CarterOrder | null | undefined, good: Good): boolean {
+  return !!order && order.stops.some((s) => s.take === good);
+}
 
 export function greedyCarterPolicy(state: GameState): Action[] {
   const actions: Action[] = [];
@@ -290,8 +309,8 @@ export function relayPolicy(state: GameState): Action[] {
   // dedicated tea cart exists yet.
   const teaBanked = (state.stores.farm?.tea ?? 0) + (first.cargo.tea ?? 0);
   const wantFlush = !third && teaBanked >= CART_CAPACITY;
-  const onFlush = first.carter?.to === 'ryne' && first.carter.good === 'tea';
-  const onOwl = first.carter?.to === 'shingle';
+  const onFlush = visits(first.carter, 'ryne') && takes(first.carter, 'tea');
+  const onOwl = visits(first.carter, 'shingle');
   if (wantFlush ? !onFlush : !onOwl) {
     if (first.carter) actions.push({ type: 'dismissCarter', cartId: first.id });
     actions.push({
@@ -383,10 +402,14 @@ function runHub(state: GameState, alibi: boolean): Action[] {
   // Cart-1 owls from the first unlocked night. Once the house stands, the
   // same order grows the back leg (§6.17): fleece over the gunwale, home
   // with tea, the tea dropped where it will be smouched.
-  const owl: CarterOrder = state.cuttingHouse
+  const owl: LegacyCarterOrder = state.cuttingHouse
     ? { from: 'farm', to: 'shingle', good: 'fleece', back: 'tea', backTo: 'cutting-house' }
     : { from: 'farm', to: 'shingle', good: 'fleece' };
-  if (!first.carter || first.carter.to !== owl.to || first.carter.backTo !== owl.backTo) {
+  if (
+    !first.carter ||
+    !visits(first.carter, 'shingle') ||
+    visits(first.carter, 'cutting-house') !== !!state.cuttingHouse
+  ) {
     actions.push({ type: 'hireCarter', cartId: first.id, order: owl });
   }
 
@@ -412,7 +435,7 @@ function runHub(state: GameState, alibi: boolean): Action[] {
           order: { from: 'farm', to: 'ryne', good: 'fleece' },
         });
       } else if (
-        second.carter?.to === 'ryne' &&
+        visits(second.carter, 'ryne') &&
         woolBanked <= CART_CAPACITY &&
         (second.cargo.fleece ?? 0) === 0
       ) {

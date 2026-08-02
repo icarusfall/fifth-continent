@@ -20,12 +20,13 @@ import {
   RENT_AMOUNT,
   TICKS_PER_DAY,
   WATER_GUARD_HEAT,
+  WATER_GUARD_MAX_MUSTER,
 } from '../balance';
 import { simulateBattle } from '../combat';
 import type { CombatLog } from '../combat';
 import { dykeWaterways, flockCapOf, moatTilesAt, moatedAt, nearestDugSegment } from '../dykes';
 import { hubPolicy, runPolicyGame } from '../policy';
-import { raidBattleSetup, raidTick, resolveRaid } from '../raid';
+import { defenceCeiling, raidBattleSetup, raidTick, resolveRaid } from '../raid';
 import { initialState } from '../tick';
 import type { Action, GameState } from '../types';
 
@@ -201,10 +202,93 @@ describe('the muster (§6.13): a gang has a payroll, the Crown does not', () => 
     expect(provoked().raid!.size).toBe(HAWKSMERE_MAX_MUSTER);
   });
 
-  it('does not cap the Crown — its growth is the doom clock', () => {
+  it('brings the Crown heavier than the Company, and caps it too (§6.18 M5½d)', () => {
+    // M5½c left the Crown uncapped: "its growth IS the doom clock". M5½d takes
+    // that back — with the heat cap making the Water Guard the permanent top
+    // rung, uncapped growth is the same doom clock one rung down.
     const crown = provoked((s) => (s.heat.national = WATER_GUARD_HEAT + 1));
     expect(crown.raid!.faction).toBe('water-guard');
     expect(crown.raid!.size).toBeGreaterThan(HAWKSMERE_MAX_MUSTER);
+    expect(crown.raid!.size).toBeLessThanOrEqual(WATER_GUARD_MAX_MUSTER);
+  });
+
+  it('the capped Crown is held by men behind water, and not by stone alone', () => {
+    // The promise the cap is chosen against (§6.18): the answer stays "dig".
+    const wet = (crew: number): GameState => {
+      const s = initialState(1);
+      s.dykesDug = ['walland-cut', 'five-waterings'];
+      s.garrisons.farm = { militia: 0, crew };
+      s.fortifications.farm = 4;
+      return s;
+    };
+    const dry = (crew: number): GameState => {
+      const s = initialState(1);
+      s.garrisons.farm = { militia: 0, crew };
+      s.fortifications.farm = 4;
+      return s;
+    };
+    expect(defenceCeiling(wet(10), 'farm', 'water-guard')).toBeGreaterThanOrEqual(
+      WATER_GUARD_MAX_MUSTER,
+    );
+    expect(defenceCeiling(dry(12), 'farm', 'water-guard')).toBeLessThan(WATER_GUARD_MAX_MUSTER);
+  });
+});
+
+describe('defenceCeiling (§6.13, M5½d): the card reads the charge aloud', () => {
+  /** Walland Farm, `crew` posted behind `tier` of works, wet or dry. */
+  const walland = (crew: number, tier: number, dug: string[] = []): GameState => {
+    const s = initialState(1);
+    s.dykesDug = [...dug];
+    s.garrisons.farm = { militia: 0, crew };
+    s.fortifications.farm = tier;
+    return s;
+  };
+  const WET = ['walland-cut', 'five-waterings'];
+
+  it('agrees with the engine it is quoting — that is its whole job', () => {
+    for (const crew of [4, 8, 10, 12]) {
+      for (const foe of ['hawksmere', 'water-guard', 'dragoons'] as Foe[]) {
+        expect(defenceCeiling(walland(crew, 4), 'farm', foe)).toBe(ceiling(crew, 4, foe));
+        expect(defenceCeiling(walland(crew, 4, WET), 'farm', foe)).toBe(
+          ceiling(crew, 4, foe, CROSSING_FRONTAGE),
+        );
+      }
+    }
+  });
+
+  it('pins the playtest that forced it: ten behind full stone hold twelve', () => {
+    // 2026-08 report — "fully fortified with 10 smugglers, and they still
+    // lost". They did, and correctly: the Company musters fourteen.
+    expect(defenceCeiling(walland(10, 4), 'farm', 'hawksmere')).toBe(12);
+    expect(HAWKSMERE_MAX_MUSTER).toBeGreaterThan(12);
+    // The two men, and the water: the levers the card now names.
+    expect(defenceCeiling(walland(12, 4), 'farm', 'hawksmere')).toBe(15);
+    expect(defenceCeiling(walland(10, 4, WET), 'farm', 'hawksmere')).toBe(32);
+  });
+
+  it('offers the counterfactual on dry ground, and nothing extra on wet', () => {
+    const dry = walland(10, 4);
+    expect(defenceCeiling(dry, 'farm', 'hawksmere', 'moated')).toBeGreaterThan(
+      defenceCeiling(dry, 'farm', 'hawksmere'),
+    );
+    // Already moated: the reading is the same either way — no double-counting.
+    const wet = walland(10, 4, WET);
+    expect(defenceCeiling(wet, 'farm', 'hawksmere', 'moated')).toBe(
+      defenceCeiling(wet, 'farm', 'hawksmere'),
+    );
+  });
+
+  it('an unheld wall holds nothing, and the water does not change that', () => {
+    expect(defenceCeiling(walland(0, 4), 'farm', 'hawksmere')).toBe(0);
+    expect(defenceCeiling(walland(0, 4, WET), 'farm', 'hawksmere', 'moated')).toBe(0);
+  });
+
+  it('reads state and never touches it (house rule 1)', () => {
+    const s = walland(10, 4, WET);
+    const before = JSON.stringify(s);
+    defenceCeiling(s, 'farm', 'hawksmere');
+    defenceCeiling(s, 'farm', 'dragoons', 'moated');
+    expect(JSON.stringify(s)).toBe(before);
   });
 });
 

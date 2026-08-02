@@ -56,7 +56,7 @@ describe('the light order (§6.18): he runs out empty and comes home laden', () 
         order: { from: 'farm', to: 'cutting-house', back: 'brandy-fair' },
       },
     ]);
-    expect(s.carts[0].carter?.good).toBeUndefined();
+    expect(s.carts[0].carter?.stops[0].take).toBeUndefined();
 
     // He leaves with nothing aboard — the one order that departs empty.
     s = tick(s, []);

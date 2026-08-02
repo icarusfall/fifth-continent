@@ -11,6 +11,7 @@ import {
   CART_RESALE,
   CARTER_DANGER_WAGE,
   CARTER_UNLOCK_FLEECE,
+  CARTER_MAX_STOPS,
   CARTER_WAGE,
   CREW_MUSTER,
   CREW_WAGE,
@@ -92,6 +93,7 @@ import type {
   Action,
   Cart,
   CarterOrder,
+  CarterStop,
   CutDepth,
   EdgeId,
   GameState,
@@ -149,10 +151,18 @@ function cargoCount(cargo: Partial<Record<Good, number>>): number {
   return Object.values(cargo).reduce((a, b) => a + (b ?? 0), 0);
 }
 
-/** §6.18 — how a standing order's outbound leg reads: a named load, or the
- *  light run that carries nothing and goes to fetch. */
-function outboundLabel(order: CarterOrder): string {
-  return order.good ? GOOD_LABEL[order.good] : 'out light, to fetch';
+/** §6.19 — a standing order read aloud: the stops in order, each naming what
+ *  he picks up there. This is the sentence the picker builds, spoken back. */
+function orderLabel(state: GameState, order: CarterOrder): string {
+  return order.stops
+    .map((s) => {
+      const where = nodeById(s.at, state.farm, state.cuttingHouse).name;
+      if (s.take === undefined) return where;
+      return `${GOOD_LABEL[s.take]} from ${where}${s.max !== undefined ? ` (up to ${s.max})` : ''}${
+        s.fenceRest ? ' — fence the rest' : ''
+      }`;
+    })
+    .join(', then ');
 }
 
 /** One cart's position in world coords; carts at a node fan out in the yard. */
@@ -292,9 +302,9 @@ function carterRouteEdges(state: GameState): Set<EdgeId> {
   for (const cart of state.carts) {
     const order = cart.carter;
     if (!order) continue;
-    const stops: NodeId[] = [order.from, order.to];
-    if (order.back && order.backTo) stops.push(order.backTo);
-    stops.push(order.from);
+    // §6.19 — the round is a loop: every leg, and the wrap back to the first.
+    if (order.stops.length === 0) continue;
+    const stops: NodeId[] = [...order.stops.map((x) => x.at), order.stops[0].at];
     for (let i = 0; i < stops.length - 1; i++) {
       let at = stops[i];
       let guard = 0;
@@ -2625,51 +2635,50 @@ function CartsAtNode({
   // carter's existing base when re-ordering a man already on the reins.
   const [hiring, setHiring] = useState<{
     cartId: string;
-    from: NodeId;
-    good?: Good;
-    /** §6.18 — the light order: chosen to carry nothing out, so an unset
-     *  `good` means "gone to fetch" rather than "not asked yet". */
-    light?: boolean;
-    /** §6.11 — load cap per run; 0 means the full cart. */
-    max?: number;
-    to?: NodeId;
-    back?: Good;
-    /** §6.11 (M5c playtest) — the fence takes what Ryne's appetite leaves. */
-    fenceRest?: boolean;
+    /** The stops answered so far. */
+    stops: CarterStop[];
+    /** A stop chosen but not yet answered ("and what does he pick up there?"). */
+    where?: NodeId;
+    /** The stop whose load cap is being asked about (§6.11's wool-split lever). */
+    capFor?: number;
   } | null>(null);
   const carts = stable
     ? state.carts
     : state.carts.filter((c) => c.location.kind === 'node' && c.location.nodeId === nodeId);
   if (carts.length === 0) return null;
 
-  const hire = (
-    cartId: string,
-    from: NodeId,
-    to: NodeId,
-    good: Good | undefined,
-    back?: Good,
-    backTo?: NodeId,
-    fenceRest?: boolean,
-  ) => {
-    const maxLoad = hiring?.max && hiring.max > 0 ? hiring.max : undefined;
-    enqueue({
-      type: 'hireCarter',
-      cartId,
-      order: {
-        from,
-        to,
-        ...(good ? { good } : {}), // §6.18 — absent = he runs out light
-        ...(maxLoad ? { maxLoad } : {}),
-        ...(back ? { back } : {}),
-        ...(backTo ? { backTo } : {}),
-        ...((fenceRest ?? hiring?.fenceRest) ? { fenceRest: true } : {}),
-      },
-    });
+  const hire = (cartId: string, stops: CarterStop[]) => {
+    enqueue({ type: 'hireCarter', cartId, order: { stops } });
     setHiring(null);
     // A directed cart is dealt with: if that was the last undirected one, the
     // visit is over (§20). Re-orders never empty the yard (the cart was
     // already crewed), so they leave the menu open.
     if (undirectedCartsAt(state, nodeId, cartId) === 0) close();
+  };
+
+  /** Add the stop just answered. The first load asks its cap (the wool-split
+   *  lever, §6.11); later stops take what they can and go on. */
+  const addStop = (at: NodeId, take: Good | undefined, fenceRest?: boolean) => {
+    if (!hiring) return;
+    const stop: CarterStop = { at };
+    if (take !== undefined) stop.take = take;
+    if (fenceRest) stop.fenceRest = true;
+    const stops = [...hiring.stops, stop];
+    const firstLoad = take !== undefined && !hiring.stops.some((x) => x.take !== undefined);
+    setHiring({
+      cartId: hiring.cartId,
+      stops,
+      ...(firstLoad ? { capFor: stops.length - 1 } : {}),
+    });
+  };
+
+  const setCap = (max: number | undefined) => {
+    if (!hiring || hiring.capFor === undefined) return;
+    const at = hiring.capFor;
+    setHiring({
+      cartId: hiring.cartId,
+      stops: hiring.stops.map((s, i) => (i === at && max !== undefined ? { ...s, max } : s)),
+    });
   };
 
   // §6.11 / §10 — a carter is offered only once the manual round is a felt
@@ -2681,32 +2690,28 @@ function CartsAtNode({
   // A standing order loads from a node: what it can haul, and where to. The
   // shingle is named only once the Dutchman is (§6.11) — no menu speaks of
   // the trade before the coast has.
-  const haulablesFrom = (from: NodeId): Good[] =>
-    Array.from(
-      new Set([
-        ...(Object.entries(state.stores[from] ?? {}) as Array<[Good, number]>)
-          .filter(([, n]) => n > 0)
-          .map(([g]) => g),
-        ...(from === 'farm' ? (['fleece'] as Good[]) : []),
-        // §6.17 — name a product not yet made: the house always offers what it
-        // produces, exactly as the farm always offers fleece. Without this,
-        // "run brandy to Ryne" could not be written until brandy existed.
-        ...(from === 'cutting-house'
-          ? (['brandy-gent', 'brandy-fair', 'brandy-rough', 'bulked-tea'] as Good[])
-          : []),
-      ]),
-    );
-  const destinationsFrom = (from: NodeId): NodeId[] =>
-    (['farm', 'ryne', 'shingle', 'cutting-house'] as NodeId[]).filter(
-      (n) =>
-        n !== from &&
-        (n !== 'cutting-house' || state.cuttingHouse) &&
-        // §6.11 — the shingle gate: the tutorial done by hand first. Once the
-        // Dutchman is KNOWN the option shows greyed with its reason (M5½
-        // playtest — an invisible gate reads as the shingle arriving broken);
-        // before that it stays unspoken (§10).
-        (n !== 'shingle' || shingleRoutesOpen(state) || state.dutchman.unlocked),
-    );
+  /**
+   * §6.19 — the KNOWLEDGE gate, which replaces the old stock gate. A stop may
+   * name any good the player knows of, whether or not one sits in the store
+   * today: an order is a sentence about the future, and the second cart of a
+   * relay has to be writable before the first has run. What gates a good is
+   * the ladder the game already climbs (§10 — no menu names a good before the
+   * coast or the still has), never a barn's contents this instant.
+   */
+  const knownGoods = (): Good[] => {
+    const goods: Good[] = ['fleece'];
+    if (state.dutchman.met) goods.push('lace');
+    if (state.dutchman.fleeceBought >= DUTCHMAN_TRUST_TEA) goods.push('tea');
+    if (state.dutchman.fleeceBought >= DUTCHMAN_TRUST_JENEVER) goods.push('jenever');
+    if (state.cuttingHouse) {
+      goods.push('bulked-tea', 'brandy-rough', 'brandy-fair', 'brandy-gent');
+    }
+    return goods;
+  };
+  /** What he can pick up at a stop: off the lugger at the shingle, out of the
+   *  store anywhere that keeps one. A market sells; it does not supply. */
+  const takeOptionsAt = (at: NodeId): Good[] =>
+    at === 'shingle' ? backOptionsFor(state, 'shingle') : at === 'ryne' ? [] : knownGoods();
   // §6.18 (M5½b playtest) — a hull answers only its own element. The picker
   // asks the sim which nodes this cart could ever reach and greys the rest
   // with the reason: a tub ordered to a landlocked node used to take the
@@ -2718,12 +2723,32 @@ function CartsAtNode({
       ? 'No sea lane runs there. Steam does not climb mud.'
       : 'No water of yours runs there yet. Dig the channels that join these two, and the tub will go.';
   };
-  // §6.17 — where a backhaul may be dropped on the way home: a covered store
-  // that is neither end of the run. Home (`from`) is always the default.
-  const dropNodesFor = (from: NodeId, to: NodeId): NodeId[] =>
-    (['farm', 'cutting-house'] as NodeId[]).filter(
-      (n) => n !== from && n !== to && (n !== 'cutting-house' || state.cuttingHouse),
-    );
+  /**
+   * §6.19 — where the round may call next: never the stop it already stands
+   * on, never past CARTER_MAX_STOPS, and the shingle only once the coast has
+   * spoken (§6.11's gate, §10). Unreachable-for-this-hull nodes come back with
+   * their reason rather than vanishing.
+   */
+  const nextNodesFor = (
+    cart: Cart,
+    stops: CarterStop[],
+  ): Array<{ node: NodeId; adrift: string | null }> => {
+    if (stops.length >= CARTER_MAX_STOPS) return [];
+    const last = stops.length > 0 ? stops[stops.length - 1].at : null;
+    const here = cart.location.kind === 'node' ? cart.location.nodeId : 'farm';
+    return (['farm', 'ryne', 'shingle', 'cutting-house'] as NodeId[])
+      .filter(
+        (n) =>
+          n !== last &&
+          (n !== 'cutting-house' || state.cuttingHouse) &&
+          (n !== 'shingle' || shingleRoutesOpen(state) || state.dutchman.unlocked),
+      )
+      .map((node) => ({ node, adrift: adriftFor(cart, last ?? here, node) }));
+  };
+  /** §6.19's refusals, asked before the button is offered rather than after:
+   *  two stops at least, and something picked up somewhere. */
+  const roundIsSayable = (stops: CarterStop[]): boolean =>
+    stops.length >= 2 && stops.some((s) => s.take !== undefined);
 
   return (
     <>
@@ -2741,223 +2766,119 @@ function CartsAtNode({
               <strong>{cart.name}</strong>: {storeSummary(cart.cargo, 'empty')}
               {!present ? ` · ${cartWhereabouts(state, cart)}` : ''}
               {cart.carter
-                ? ` · standing order: ${outboundLabel(cart.carter)}${
-                    cart.carter.maxLoad !== undefined ? ` (up to ${cart.carter.maxLoad} a run)` : ''
-                  }${cart.carter.fenceRest ? ' (fence takes the remainder)' : ''} → ${
-                    nodeById(cart.carter.to, state.farm, state.cuttingHouse).name
-                  }${
-                    cart.carter.back
-                      ? `, home with ${GOOD_LABEL[cart.carter.back]}${
-                          cart.carter.backTo
-                            ? ` dropped at ${nodeById(cart.carter.backTo, state.farm, state.cuttingHouse).name}`
-                            : ''
-                        }`
-                      : ''
-                  }, ${carterWageOf(cart.carter)} coin a day${
+                ? ` · standing order: ${orderLabel(state, cart.carter)}, and round again — ${carterWageOf(
+                    cart.carter,
+                  )} coin a day${
                     carterWageOf(cart.carter) > CARTER_WAGE ? ' (danger money)' : ''
                   }. ` +
-                  (cart.carter.to === 'shingle' && cart.carter.good === 'fleece'
-                    ? 'He sells over the gunwale when the lugger stands off, and waits when it does not.'
-                    : cart.carter.good === undefined
-                      ? 'He carries nothing out: he goes to fetch, and lies where he is sent until there is something to bring home.'
-                      : 'He minds the tide and nothing else.')
+                  (cart.carter.stops.some((s) => s.at === 'shingle')
+                    ? 'He deals over the gunwale when the lugger stands off, and waits when it does not.'
+                    : 'He minds the tide and nothing else.')
                 : ' · no carter — yours to drive'}
             </p>
             <div className="menu-buttons">
               {drivable && cargoButtons(nodeId, state, cart, enqueue)}
               {drivable && roadButtons(nodeId, state, cart, send, flooded)}
               {hiring?.cartId === cart.id ? (
-                hiring.good === undefined && !hiring.light ? (
-                  // The load, at the chosen origin (§6.11 / §6.17): the current
-                  // load is always offered, so the picker never dead-ends, and
-                  // the origin itself is switchable — any loop among the known
-                  // nodes is a standing order, not just farm-and-back.
+                hiring.capFor !== undefined ? (
+                  // §6.11 (M5b playtest) — the load cap: how much of the shared
+                  // store each round may take. The wool-split lever.
                   <>
-                    {Array.from(
-                      new Set(
-                        [
-                          ...haulablesFrom(hiring.from),
-                          ...(cart.carter?.good ? [cart.carter.good] : []),
-                        ].filter(Boolean),
-                      ),
-                    ).map((good) => (
-                      <button key={good} onClick={() => setHiring({ ...hiring, good })}>
-                        Have him load {GOOD_LABEL[good]} at{' '}
-                        {nodeById(hiring.from, state.farm, state.cuttingHouse).name}
-                      </button>
-                    ))}
-                    {/* §6.18 (M5½b playtest) — the light order: the shingle is
-                        a beach and keeps nothing, so the only sentence that
-                        puts a tub to work is one with an empty outbound leg. */}
+                    <button onClick={() => setCap(undefined)}>…as much as he can carry</button>
                     <button
-                      title="He carries nothing out — he goes to fetch, and lies where he is sent until there is something to bring home."
-                      onClick={() => setHiring({ ...hiring, light: true, max: 0 })}
+                      title="Half the cart, so the barn keeps enough for the other round."
+                      onClick={() => setCap(cart.capacity / 2)}
                     >
-                      …or have him run out light, and fetch
+                      …no more than {cart.capacity / 2} a run
                     </button>
-                    {destinationsFrom(hiring.from).map((n) => {
-                      const adrift = adriftFor(cart, n, hiring.from);
-                      return (
-                        <button
-                          key={`load-${n}`}
-                          disabled={!!adrift}
-                          title={adrift ?? undefined}
-                          onClick={() => setHiring({ ...hiring, from: n })}
-                        >
-                          …or have him load at{' '}
-                          {nodeById(n, state.farm, state.cuttingHouse).name} instead
-                          {adrift ? ' · no way there for this hull' : ''}
-                        </button>
-                      );
-                    })}
+                    <button
+                      title="A token load — the alibi, not the trade."
+                      onClick={() => setCap(cart.capacity / 4)}
+                    >
+                      …no more than {cart.capacity / 4} a run
+                    </button>
+                    {/* Playtest 2026-08: the old picker offered a way out on
+                        its first step only, so a mis-click had to be clicked
+                        through to the end. Every step can be left. */}
                     <button onClick={() => setHiring(null)}>Never mind — leave the order</button>
                   </>
-                ) : hiring.max === undefined ? (
-                  // §6.11 (M5b playtest) — the load cap: how much of the
-                  // shared store each round may take. The wool-split lever.
+                ) : hiring.where !== undefined ? (
+                  // What he picks up at the stop just named. §6.19 — the goods
+                  // offered are the ones the PLAYER KNOWS, not the ones that
+                  // happen to be in the store this instant: an order is a
+                  // sentence about the future, and the second cart of a relay
+                  // must be writable before the first has run.
                   <>
-                    <button onClick={() => setHiring({ ...hiring, max: 0 })}>
-                      Load all the cart holds ({cart.capacity})
-                    </button>
-                    <button
-                      title="Leaves the rest in the store for another round — or another buyer."
-                      onClick={() => setHiring({ ...hiring, max: cart.capacity / 2 })}
-                    >
-                      No more than half a load ({cart.capacity / 2})
-                    </button>
-                    <button
-                      title="A token round: the store stays full for whatever else wants it."
-                      onClick={() => setHiring({ ...hiring, max: cart.capacity / 4 })}
-                    >
-                      No more than a couple ({cart.capacity / 4})
-                    </button>
-                  </>
-                ) : hiring.to === undefined ? (
-                  <>
-                    {destinationsFrom(hiring.from).map((to) => {
-                      // §6.11 (M5½ playtest) — the shingle gate, greyed with
-                      // its reason instead of invisible: run the trade once
-                      // by hand, then the carter may learn it.
-                      const gated = to === 'shingle' && !shingleRoutesOpen(state);
-                      // §6.18 — and the same courtesy for a hull with no way there.
-                      const adrift = adriftFor(cart, hiring.from, to);
-                      const light = hiring.light === true;
+                    {takeOptionsAt(hiring.where).map((good) => {
+                      const inStore = (state.stores[hiring.where!]?.[good] ?? 0) > 0;
+                      const beach = hiring.where === 'shingle';
                       return (
                         <button
-                          key={to}
-                          disabled={gated || !!adrift}
+                          key={good}
                           title={
-                            adrift ??
-                            (gated
-                              ? 'No carter automates a trade his master has never made: sell over the gunwale once yourself (wool counts), and the run is his.'
-                              : to === 'shingle' && hiring.good === 'fleece'
-                                ? 'He sells over the gunwale whenever the lugger stands off — and the books will not record it (§6.10).'
-                                : undefined)
+                            beach
+                              ? `${GOOD_WHISPER[good] ?? ''} He buys with the coin in the till, to the cart’s room. No credit, and no keeping back the rent.`
+                              : inStore
+                                ? GOOD_WHISPER[good]
+                                : 'None there today — he loads what he finds, and lies waiting when he finds none.'
                           }
-                          onClick={() => {
-                            // Destinations with something worth fetching ask one
-                            // more question (§6.11: the back leg); the rest hire.
-                            // A light order has nothing BUT the back leg, so it
-                            // always asks (§6.18).
-                            if (light || backOptionsFor(state, to).length > 0) {
-                              setHiring({ ...hiring, to });
-                            } else hire(cart.id, hiring.from, to, hiring.good);
-                          }}
+                          onClick={() => addStop(hiring.where!, good)}
                         >
-                          {light
-                            ? `Have him lie at ${
-                                nodeById(to, state.farm, state.cuttingHouse).name
-                              } and fetch${to === 'shingle' ? ' · danger money' : ''}`
-                            : to === 'shingle' && hiring.good === 'fleece'
-                              ? `${GOOD_LABEL[hiring.good]} to the shingle — over the gunwale when the lugger comes · danger money`
-                              : `${GOOD_LABEL[hiring.good!]} to ${
-                                  nodeById(to, state.farm, state.cuttingHouse).name
-                                }${to === 'shingle' ? ' · danger money' : ''}`}
-                          {adrift
-                            ? ' · no way there for this hull'
-                            : gated
-                              ? ' · make the run yourself first'
-                              : ''}
+                          {beach ? 'Take' : 'Load'} {GOOD_LABEL[good]} at{' '}
+                          {nodeById(hiring.where!, state.farm, state.cuttingHouse).name}
+                          {!beach && !inStore ? ' · none there today' : ''}
                         </button>
                       );
                     })}
-                    {/* §6.11 (M5c playtest) — the glut valve: sell into the
-                        appetite, and the fence takes the remainder the same
-                        visit. Offered only where the fence deals. */}
-                    {hiring.good !== undefined &&
-                      destinationsFrom(hiring.from).includes('ryne') &&
-                      !adriftFor(cart, hiring.from, 'ryne') &&
-                      CONTRABAND.includes(hiring.good) &&
-                      RYNE_PRICE[hiring.good] > 0 && (
-                        <button
-                          title="What Ryne's appetite leaves, the back door takes at a 40% haircut — no waiting laden in plain view, and the town still talks."
-                          onClick={() => {
-                            const next = { ...hiring, fenceRest: true };
-                            if (backOptionsFor(state, 'ryne').length > 0)
-                              setHiring({ ...next, to: 'ryne' });
-                            else
-                              hire(cart.id, hiring.from, 'ryne', hiring.good!, undefined, undefined, true);
-                          }}
-                        >
-                          {GOOD_LABEL[hiring.good]} to Ryne — and the fence takes the remainder
-                        </button>
-                      )}
-                  </>
-                ) : hiring.back === undefined ? (
-                  <>
-                    {/* §6.18 — a light order is the back leg: "out empty and
-                        home empty" is not an order, and is never offered. */}
-                    {!hiring.light && (
-                      <button onClick={() => hire(cart.id, hiring.from, hiring.to!, hiring.good)}>
-                        …and home empty-handed, until told otherwise
+                    <button
+                      title="He calls, unloads what he is carrying, and goes on. This is how a load is delivered somewhere that is not the end of the round."
+                      onClick={() => addStop(hiring.where!, undefined)}
+                    >
+                      …just call at {nodeById(hiring.where, state.farm, state.cuttingHouse).name} and
+                      unload
+                    </button>
+                    {hiring.where === 'ryne' && (
+                      <button
+                        title="The whole remainder, round the back, at the haircut — the carter looks away, then goes on."
+                        onClick={() => addStop('ryne', undefined, true)}
+                      >
+                        …sell at Ryne, and the fence takes the remainder
                       </button>
                     )}
-                    {backOptionsFor(state, hiring.to).map((g) => (
-                      <button
-                        key={g}
-                        title={
-                          hiring.to === 'shingle'
-                            ? `${GOOD_WHISPER[g] ?? ''} He buys with the coin in the till, to the cart’s room. No credit, and no keeping back the rent.`
-                            : undefined
-                        }
-                        onClick={() => {
-                          // A drop node worth naming asks one more question
-                          // (§6.17: the backhaul's destination); else hire.
-                          if (dropNodesFor(hiring.from, hiring.to!).length > 0) {
-                            setHiring({ ...hiring, back: g });
-                          } else {
-                            hire(cart.id, hiring.from, hiring.to!, hiring.good, g);
-                          }
-                        }}
-                      >
-                        {hiring.to === 'shingle'
-                          ? `…and home with ${GOOD_LABEL[g]}, bought off the lugger with the till’s coin`
-                          : `…and home with ${GOOD_LABEL[g]}, when the store holds any`}
-                      </button>
-                    ))}
+                    <button onClick={() => setHiring(null)}>Never mind — leave the order</button>
                   </>
                 ) : (
+                  // Where next? The round is a loop, so the last stop is
+                  // followed by the first — "and home again" is not a stop.
                   <>
-                    <button
-                      onClick={() =>
-                        hire(cart.id, hiring.from, hiring.to!, hiring.good, hiring.back)
-                      }
-                    >
-                      …dropped at home —{' '}
-                      {nodeById(hiring.from, state.farm, state.cuttingHouse).name}
-                    </button>
-                    {dropNodesFor(hiring.from, hiring.to!).map((n) => (
+                    {nextNodesFor(cart, hiring.stops).map(({ node, adrift }) => (
                       <button
-                        key={n}
-                        title="Delivered on the way home, so the backhaul never touches the wool barn."
-                        onClick={() =>
-                          hire(cart.id, hiring.from, hiring.to!, hiring.good, hiring.back, n)
-                        }
+                        key={node}
+                        disabled={!!adrift}
+                        title={adrift ?? undefined}
+                        onClick={() => setHiring({ ...hiring, where: node })}
                       >
-                        …dropped at {nodeById(n, state.farm, state.cuttingHouse).name} on the way
-                        home
+                        {hiring.stops.length === 0 ? 'Start the round at' : '…then on to'}{' '}
+                        {nodeById(node, state.farm, state.cuttingHouse).name}
+                        {node === 'shingle' ? ' · danger money' : ''}
+                        {adrift ? ' · no way there for this hull' : ''}
                       </button>
                     ))}
+                    {roundIsSayable(hiring.stops) && (
+                      <button
+                        title="The round closes: from the last stop he goes back to the first, and round again."
+                        onClick={() => hire(cart.id, hiring.stops)}
+                      >
+                        …and that is the round — {orderLabel(state, { stops: hiring.stops })} ·{' '}
+                        {carterWageOf({ stops: hiring.stops })} coin a day
+                      </button>
+                    )}
+                    {hiring.stops.length >= CARTER_MAX_STOPS && (
+                      <p className="flavour">
+                        Four calls is as long a sentence as a man will hold in his head.
+                      </p>
+                    )}
+                    <button onClick={() => setHiring(null)}>Never mind — leave the order</button>
                   </>
                 )
               ) : cart.carter ? (
@@ -2984,7 +2905,8 @@ function CartsAtNode({
                       );
                     })}
                   <button
-                    onClick={() => setHiring({ cartId: cart.id, from: cart.carter!.from })}
+                    title="The same man keeps the reins; the round is written afresh."
+                    onClick={() => setHiring({ cartId: cart.id, stops: [] })}
                   >
                     Change standing order
                   </button>
@@ -3001,26 +2923,19 @@ function CartsAtNode({
                 </>
               ) : !present ? null : carterAvailable ? (
                 <>
-                  {haulablesFrom(nodeId).map((good) => (
-                    <button
-                      key={good}
-                      title={GOOD_WHISPER[good]}
-                      onClick={() => setHiring({ cartId: cart.id, from: nodeId, good })}
-                    >
-                      Hire a carter to haul {GOOD_LABEL[good]} ·{' '}
-                      {CONTRABAND.includes(good)
-                        ? `${CARTER_DANGER_WAGE} coin a day — danger money`
-                        : `${CARTER_WAGE} coin a day`}
-                    </button>
-                  ))}
-                  {destinationsFrom(nodeId).length > 0 && (
-                    <button
-                      title="Any loop among the known places is a standing order — the round need not start here."
-                      onClick={() => setHiring({ cartId: cart.id, from: nodeId })}
-                    >
-                      Hire a carter for a round starting elsewhere…
-                    </button>
-                  )}
+                  {/* §6.19 — one door into the picker, and the round is
+                      written a stop at a time from there. The old menu offered
+                      a button per good in the barn, which is where the stock
+                      gate leaked into the UI in the first place. */}
+                  <button
+                    title="Where he calls, and what he picks up at each — any loop among the known places, up to four calls."
+                    onClick={() => setHiring({ cartId: cart.id, stops: [] })}
+                  >
+                    Hire a carter, and write him a round · {CARTER_WAGE} coin a day
+                    {shingleRoutesOpen(state) || state.dutchman.unlocked
+                      ? `, ${CARTER_DANGER_WAGE} if it touches the coast`
+                      : ''}
+                  </button>
                 </>
               ) : null}
               {laden && drivable && (
@@ -3092,10 +3007,9 @@ function CartMenu({
       {cart.carter && (
         <>
           <p className="flavour">
-            A carter holds the reins: {outboundLabel(cart.carter)},{' '}
-            {nodeById(cart.carter.from, state.farm, state.cuttingHouse).name} to{' '}
-            {nodeById(cart.carter.to, state.farm, state.cuttingHouse).name}, {CARTER_WAGE} coin a
-            day. He minds the tide and nothing else — not even the blue coat.
+            A carter holds the reins: {orderLabel(state, cart.carter)}, and round again —{' '}
+            {carterWageOf(cart.carter)} coin a day. He minds the tide and nothing else — not even
+            the blue coat.
           </p>
           <div className="menu-buttons">
             <button onClick={() => enqueue({ type: 'dismissCarter', cartId: cart.id })}>

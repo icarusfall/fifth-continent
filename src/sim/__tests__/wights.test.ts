@@ -23,7 +23,7 @@ import {
 } from '../balance';
 import { simulateBattle } from '../combat';
 import type { BattleSetup } from '../combat';
-import { initialState, tick } from '../tick';
+import { initialState, tick, stopsFromLegacy } from '../tick';
 import type { GameState } from '../types';
 
 const DAWN = SHEARING_HOUR * TICKS_PER_HOUR;
@@ -251,7 +251,7 @@ describe('collection (spec §6.14): they do not raid — they collect', () => {
   it('the taking runs down the payroll: carter, then shearer, then refiner', () => {
     let s = breached((st) => {
       st.coin = 100; // wages must not fell the men before the wights do
-      st.carts[0].carter = { from: 'farm', to: 'ryne', good: 'fleece' };
+      st.carts[0].carter = stopsFromLegacy({ from: 'farm', to: 'ryne', good: 'fleece' });
       st.shearer.hired = true;
     });
     for (let i = 0; i < COLLECTION_GRACE_DAYS + 1; i++) s = throughNextDawn(s);

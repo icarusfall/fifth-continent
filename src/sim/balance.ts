@@ -136,6 +136,33 @@ export const DAILY_DEMAND: Record<Good, number> = {
 // ---- M3: Heat, two pools (spec §6.10) ----
 export const REGIONAL_HEAT_DECAY = 0.97; // × at dawn — the parish forgets, slowly
 export const NATIONAL_HEAT_DECAY = 0.995; // × at dawn — London barely forgets
+/**
+ * §6.18 (M5½d) — the quiet season. London's attention is the one meter the
+ * player could never spend back down, which made DRAGOON_HEAT a one-way door
+ * (measured 2026-08: soldiers every 9 days against a ceiling of five, for
+ * ever). Sell no contraband for this many days running and the national side
+ * cools at the quiet rate instead — about six days off the Dragoon rung, paid
+ * in six days of not trading.
+ */
+export const QUIET_SEASON_DAYS = 4;
+export const NATIONAL_HEAT_QUIET_DECAY = 0.9;
+/**
+ * §6.18 (M5½d) — **the cap, and it is the load-bearing one.** Designer's call,
+ * 2026-08: players will make every maximum-heat choice, because that is how
+ * the game is fun, and nobody reads a meter to find the mechanic that lowers
+ * it. So ordinary play — however hot, however greedy — can never carry the
+ * national side past this. It sits below DRAGOON_HEAT (110): soldiers are not
+ * a consequence of smuggling well, and must wait for an act the game names
+ * loudly (§7's violence against officers), not for a number quietly filling.
+ */
+export const NATIONAL_HEAT_CAP = 100;
+/**
+ * §6.14/§6.18 — publication's floor is permanent, but capped below
+ * DRAGOON_HEAT: the societies can pin you in the Water Guard's parish for
+ * good, and can never on their own summon soldiers. Soldiers answer to crime
+ * you are committing now, so there is always a road back.
+ */
+export const NATIONAL_FLOOR_CAP = 100;
 export const PROMOTION_THRESHOLD = 100; // regional above this spills upward at dawn
 export const PROMOTION_RATE = 0.1; // share of the excess that promotes
 export const SUSPICION_SHARE = 0.5; // every heat event stains its nearest node by this
@@ -205,6 +232,13 @@ export const CARTER_UNLOCK_FLEECE = 2 * CART_CAPACITY;
  * carries the remainder home to cover rather than bleed Heat forever.
  */
 export const CARTER_MARKET_PATIENCE_DAYS = 2;
+/**
+ * §6.19 (M5½d) — stops in one standing order. Not an engine limit: four is
+ * the longest round that still reads aloud in one breath ("fleece to the
+ * shingle, lace on to Ryne, and home"), and the marsh has only five places
+ * worth naming. The order must stay a sentence, not a program.
+ */
+export const CARTER_MAX_STOPS = 4;
 
 // ---- M5a-4: asking on the quay (spec §6.9) ----
 export const ROUND_COST = 2; // coin, a round for the alehouse, once a day
@@ -254,6 +288,15 @@ export const WATER_GUARD_HEAT = 55;
 export const DRAGOON_HEAT = 110;
 export const WATER_GUARD_BASE = 14;
 export const DRAGOON_BASE = 20;
+/**
+ * §6.13 (M5½d) — the Crown's muster is capped too. With NATIONAL_HEAT_CAP
+ * making the Water Guard the permanent top rung of ordinary play, an uncapped
+ * +2 a raid would simply move the old doom clock down a rung: a defence good
+ * enough this month is overrun next month, for ever. Measured against §14:
+ * 20 is held by ten men behind water (ceiling 23) and NOT by twelve behind dry
+ * stone (13), so the answer stays "dig", which is §6.18's whole argument.
+ */
+export const WATER_GUARD_MAX_MUSTER = 20;
 
 // ---- M4c: the garrison & Standing (spec §6.13) ----
 // Men posted at a building against the raid to come. Muster is up-front, wages
@@ -510,6 +553,12 @@ export const MOAT_MIN_TILES = 4;
 export const CROSSING_FRONTAGE = 5;
 /** Standing lost for breaking your own bank: the commoners grazed that level. */
 export const CUT_CROSSING_STANDING = 10;
+/**
+ * §6.13 (M5½d) — the bound on `defenceCeiling`'s search, not a claim about the
+ * world: a reading that runs off the end reads "more than this", and the card
+ * says so. Far above any muster the game raises (Dragoons open at 20).
+ */
+export const CEILING_SEARCH_MAX = 200;
 
 // ---- M5c: Leiden (spec §6.14) ----
 // He arrives as cargo, at random — you did not choose him, and could not have.

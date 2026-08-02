@@ -23,7 +23,10 @@ import {
   MAX_CELLAR_TIER,
   MAX_FORT_TIER,
   MAX_LOG_EVENTS,
+  NATIONAL_HEAT_CAP,
   NATIONAL_HEAT_DECAY,
+  NATIONAL_HEAT_QUIET_DECAY,
+  QUIET_SEASON_DAYS,
   OFFICER_ARRIVAL_HEAT,
   PATROL_THRESHOLD,
   PAUPER_FLOOR,
@@ -235,6 +238,10 @@ export function accrueMarketTattle(state: GameState, good: Good, qty: number): v
   if (!CONTRABAND.includes(good)) return;
   addHeat(state, qty * MARKET_TATTLE, 'ryne');
   state.contrabandSold += qty;
+  // §6.18 (M5½d) — the quiet season's clock is reset by the *sale*, not the
+  // landing: what London notices is goods reaching a market. Tubs on a beach
+  // are the parish's business (and the barn's heat, §18).
+  state.lastContrabandTick = state.tick;
 }
 
 /** Tubs carry no name: regional heat only, no stain (§6.10). */
@@ -258,10 +265,27 @@ export function dawnRevenue(state: GameState): void {
   // (§6.14, M5c) floors the national side: London can never entirely forget
   // a parish the societies keep reading about.
   state.heat.regional *= REGIONAL_HEAT_DECAY;
+  // §6.18 (M5½d) — the quiet season: London's attention is the one meter the
+  // player could not spend down, which made the Dragoon rung a door with no
+  // way back. Sell nothing for QUIET_SEASON_DAYS and it cools at the quiet
+  // rate — bought with the trade you are not doing, never with coin.
+  const quiet = state.tick - state.lastContrabandTick >= QUIET_SEASON_DAYS * TICKS_PER_DAY;
+  const before = state.heat.national;
   state.heat.national = Math.max(
-    state.heat.national * NATIONAL_HEAT_DECAY,
+    state.heat.national * (quiet ? NATIONAL_HEAT_QUIET_DECAY : NATIONAL_HEAT_DECAY),
     state.nationalHeatFloor,
   );
+  // Announced the dawn it begins, once, so it is read and not inferred (§10).
+  // `before` guards the floor case: no line when there is nothing left to cool.
+  if (quiet && before > state.nationalHeatFloor && !state.quietSeason) {
+    state.quietSeason = true;
+    logEvent(
+      state,
+      'Nothing of yours has reached a market in four days. The talk in London turns to other counties — and the barn sits full while it does.',
+    );
+  } else if (!quiet && state.quietSeason) {
+    state.quietSeason = false;
+  }
   for (const k of Object.keys(state.revenue.suspicion)) {
     state.revenue.suspicion[k] *= SUSPICION_DECAY;
   }
@@ -270,6 +294,12 @@ export function dawnRevenue(state: GameState): void {
   const spill = Math.max(0, state.heat.regional - PROMOTION_THRESHOLD) * PROMOTION_RATE;
   state.heat.regional -= spill;
   state.heat.national += spill;
+  // §6.18 (M5½d) — and there it stops. The cap goes on AFTER the spill so
+  // nothing routes around it: every road into the national meter (sales,
+  // storage, the works' tell, the parish's noise) ends here. Ordinary play,
+  // however greedy, never summons soldiers — that must be an act the game
+  // names, not a number quietly filling (designer's call, 2026-08).
+  state.heat.national = Math.min(state.heat.national, NATIONAL_HEAT_CAP);
 
   // A hard building is a tell even when nothing moves through it (§6.12): each
   // dawn its works stand off fresh suspicion of their own. Before the gossip

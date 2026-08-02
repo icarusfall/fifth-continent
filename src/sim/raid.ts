@@ -19,6 +19,7 @@ import {
   HAWKSMERE_PROVOKE,
   HAWKSMERE_SCALE,
   HAWKSMERE_MAX_MUSTER,
+  CEILING_SEARCH_MAX,
   CROSSING_FRONTAGE,
   CUT_CROSSING_STANDING,
   DRAGOON_BASE,
@@ -29,6 +30,7 @@ import {
   TICKS_PER_DAY,
   WATER_GUARD_BASE,
   WATER_GUARD_HEAT,
+  WATER_GUARD_MAX_MUSTER,
 } from './balance';
 import { simulateBattle } from './combat';
 import type { BattleSetup, CombatLog, Faction, ForceSpec, ScheduledCall } from './combat';
@@ -84,7 +86,11 @@ function raidSize(state: GameState, faction: Faction): number {
   const grown = state.hawksmere.raidsSurvived * HAWKSMERE_GROWTH;
   let size: number;
   if (faction === 'dragoons') size = DRAGOON_BASE + grown;
-  else if (faction === 'water-guard') size = WATER_GUARD_BASE + grown;
+  // §6.13 (M5½d) — the Crown is capped as the Company is. Uncapped growth on
+  // the rung the heat cap makes permanent is just the old doom clock, one
+  // rung down: it would overrun any defence eventually, and "eventually" is
+  // not a decision the player can act on.
+  else if (faction === 'water-guard') size = Math.min(WATER_GUARD_MAX_MUSTER, WATER_GUARD_BASE + grown);
   else if (state.hawksmere.raidsSurvived === 0) size = HAWKSMERE_FIRST_RAID;
   else {
     // §6.13 (M5½c) — the Company is a gang with a payroll, not an army. The
@@ -146,6 +152,54 @@ export function raidBattleSetup(state: GameState, calls?: ScheduledCall[]): Batt
     playerSide: 'defender',
     calls,
   };
+}
+
+/**
+ * §6.13 (M5½d) — read the charge aloud. The largest force of `faction` this
+ * building's men and works turn back, asked of `simulateBattle` itself rather
+ * than of a formula beside it: the card can then never drift from the fight it
+ * is describing, however §14 is later re-tuned. The engine has no dice, so the
+ * answer is exact.
+ *
+ * `ground` is the ground the reading is taken on — 'asIs' for the ground the
+ * building actually stands on, 'moated' for the counterfactual the card offers
+ * a player who has not dug yet (§21.1). 0 means they hold nothing: an unheld
+ * wall, or a crossing with too few men to man it (§6.18's HELD frontage).
+ */
+export function defenceCeiling(
+  state: GameState,
+  node: NodeId,
+  faction: Faction,
+  ground: 'asIs' | 'moated' = 'asIs',
+): number {
+  const defender = garrisonForce(state, node);
+  if (defender.strength <= 0) return 0;
+  const frontage =
+    ground === 'moated' || moatedAt(state, node) ? CROSSING_FRONTAGE : undefined;
+  const holds = (size: number): boolean =>
+    simulateBattle({
+      attacker: { faction, strength: size },
+      defender,
+      law: 'square',
+      frontage,
+      playerSide: 'defender',
+    }).playerWon;
+  if (!holds(1)) return 0;
+  // Losing is monotone in the attacker's numbers, so bracket then bisect —
+  // CEILING_SEARCH_MAX is a search bound, never a promise about the world.
+  let lo = 1;
+  let hi = 2;
+  while (hi <= CEILING_SEARCH_MAX && holds(hi)) {
+    lo = hi;
+    hi *= 2;
+  }
+  if (hi > CEILING_SEARCH_MAX) return CEILING_SEARCH_MAX;
+  while (hi - lo > 1) {
+    const mid = Math.floor((lo + hi) / 2);
+    if (holds(mid)) lo = mid;
+    else hi = mid;
+  }
+  return lo;
 }
 
 /** Seize a share of a store's contraband. `frac >= 1` takes it all. */

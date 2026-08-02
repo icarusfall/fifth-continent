@@ -2001,6 +2001,372 @@ The trump card eats the logistics network that justified the digging. That is
 the shape the game wants: no consequence-free choices, and the strongest verb
 in the milestone is the one that costs you the milestone.
 
+#### M5½d playtest — the card reads the odds aloud
+
+**The report (2026-08):** *"Walland Farm was fully fortified with 10 smugglers
+and they still lost."* Measured against the engine, this is not a bug and not
+a tuning miss — it is the model working exactly as §6.18 specified, and saying
+nothing about it:
+
+```
+fort tier 4      Company   Water Guard   Dragoons
+10 crew, open      12          11            4
+10 crew, moated    32          23            4
+12 crew, open      15          13            5      ← the M5½c promise, CI-pinned
+12 crew, moated    46          34            5
+```
+
+The pinned ceilings are for **twelve** men. Ten is a different game: ten behind
+full stone on dry ground hold twelve, and the Company musters fourteen
+(`HAWKSMERE_MAX_MUSTER`) while the Water Guard *opens* at fourteen and grows.
+So a defence the player has every reason to call finished loses by about two
+men — and the two facts that would have saved it are both invisible:
+
+- **The ceiling is steeply superlinear in headcount.** Two more crew (80 coin)
+  moves 12 → 15 and wins the fight. Four hundred and fifty coin of stonework
+  cannot: tier 4 is already the top of the ladder.
+- **The water is the wall, not the works.** The same ten men behind a cut
+  channel hold thirty-two instead of twelve. `raidCard` names the crossing
+  when the building *has* one — and is silent when it does not, so the warning
+  never reaches the player who needs it.
+
+This violates §6.15's read-the-charge rule (the wall explains its prices;
+M5½ playtest) and §4's *say what a mechanic is for*. **No numbers are re-tuned
+here.** The M5½c arithmetic is sound; what it lacks is a mouth. Two changes:
+
+```
+defenceCeiling   raid.ts exports the largest force of a given faction that a
+   (new)         building's men and works turn back, on the ground it stands
+                 on — searched against simulateBattle ITSELF, so the card can
+                 never drift from the fight it is describing. Deterministic;
+                 the engine has no dice (§14)
+the raid card    states the charge before it is paid: what your men hold, what
+                 is coming, and — when there is no water at the foot — what
+                 the same men WOULD hold behind a cut channel. The counter-
+                 factual is the point: it names the verb the player has not
+                 used yet (§21.1's central mid-game verb), at the only moment
+                 it is legible
+the result card  records faction, muster, garrison, works and ground, so a
+                 lost raid is self-diagnosing and the next play report carries
+                 its own evidence
+```
+
+The card must not become a win-probability meter: it states two headcounts and
+a counterfactual, in the marsh's own words, and the player draws the
+conclusion. If a later playtest shows ten-and-walled *should* beat fourteen,
+that is a numbers argument to have then — with the card's own figures as the
+evidence, which is exactly what this change makes possible.
+
+#### M5½d — the quiet season: the one way London forgets
+
+**The second report, same day, and it is a different animal.** *"Cutting
+House, fully fortified, twelve men, still lost."* Measured: **24 Dragoons**.
+Every Call the screen offered loses:
+
+```
+                        outcome        your men left   your dead
+see it through          overrun              8             4
+call the wight-fog      overrun              9             3
+sound the retreat       goods lost          12             0
+fog and retreat         goods lost          12             0
+
+to actually hold 24 Dragoons, tier 4 works:
+  open ground 57 men · +fog 40 · +moat 35 · moat and fog 25
+```
+
+Twelve men turn back **five** Dragoons, moat or no moat. So the fight was
+decided days earlier, and §6.13's three-rung answer holds exactly as written:
+*Dragoons → nothing you can post.* The rung is not the bug.
+
+**The bug is that the rung has no exit.** National Heat decays at
+`NATIONAL_HEAT_DECAY = 0.995` a dawn — a half-life near 140 days, longer than
+a game — and `nationalHeatFloor` ratchets it permanently *upward* with every
+published letter (§6.14), never downward. Nothing anywhere spends it back
+down. So `DRAGOON_HEAT = 110` is a one-way door: cross it once and soldiers
+come every `RAID_INTERVAL_DAYS`, growing +2 a time, against a ceiling of five,
+for the rest of the game. That is not a doom clock the player races. It is a
+state entered without noticing and never left, and it fails §6.15's Floor:
+pressure is supposed to shape *which* money at *what* meter cost, not grind a
+hub off the board every nine days for ever.
+
+**Designer's call, 2026-08, and it governs this whole section.** The first
+draft of this fix was a *drain*: lie low, and London forgets. The designer
+rejected it as the load-bearing answer:
+
+> *"Most people playing this will be making all the maximum-heat choices.
+> That's the way to play the game. No-one is going to understand any of the
+> mechanics that lower the heat. So unless we're going to add lots of nicely
+> legible mechanics to lower heat, heat needs to be more aggressively capped."*
+
+This is right, and it generalises past this bug: **a meter the player is
+expected to manage down, by a verb they must first deduce, is not a mechanic —
+it is a trap with a tutorial debt.** The game's own §10 rule says a mechanic
+arrives only when the player has the problem it solves; a heat *drain* arrives
+only when the player has already lost. So the cap does the work, and the drain
+survives only as a bonus for the player who happens to stop trading.
+
+```
+NATIONAL_HEAT_CAP    = 100. Every road into the national meter — sales,
+                     storage, the works' tell, the parish's noise promoted
+                     from regional — ends here. Applied at dawn AFTER the
+                     spill, so nothing routes around it. It sits below
+                     DRAGOON_HEAT: soldiers are not a consequence of smuggling
+                     well. They must wait on an act the game names loudly
+                     (§7's violence against officers), not on a number quietly
+                     filling while the player does the fun thing
+WATER_GUARD_         = 20. With the cap making the Water Guard the permanent
+   MAX_MUSTER        top rung, their old uncapped +2 a raid would just be the
+                     doom clock one rung down: any defence overrun eventually,
+                     and "eventually" is not something a player can act on.
+                     Measured against §14: 20 is held by ten men behind water
+                     (ceiling 23) and NOT by twelve behind dry stone (13), so
+                     the answer stays *dig* — §6.18's whole argument, now
+                     actually reachable
+```
+
+The Company was capped in M5½c for the same reason and the same fiction: a
+gang has a payroll. The Crown's cap is a different fiction — the Crown has
+other counties — and it is the honest consequence of capping the meter that
+summons them.
+
+**And the drain, demoted.** Smugglers did stop for a while, and the world
+should model it, but as a reward for the player who notices rather than a duty
+for the player who doesn't:
+
+```
+lastContrabandTick   set whenever a contraband sale registers
+                     (accrueMarketTattle — the town's tattle IS the trigger:
+                     what London notices is goods reaching a market, not tubs
+                     landing on a beach)
+the quiet season     no contraband sold for QUIET_SEASON_DAYS = 4 running,
+                     and the national side decays at
+                     NATIONAL_HEAT_QUIET_DECAY = 0.90 a dawn instead of 0.995
+                     — announced in the log the dawn it begins, once, so the
+                     mechanic is discovered by reading (§10) and never by
+                     inference from a meter
+the floor still      the quiet season never drops you below nationalHeatFloor:
+holds                what the societies printed, London keeps. Lying low buys
+                     back your own noise, not Leiden's fame
+NATIONAL_FLOOR_CAP   …and the floor itself is capped at 100, below
+   = 100             DRAGOON_HEAT. Publication can pin you in the Water
+                     Guard's parish for good — a real and permanent price for
+                     the philosopher's tree — but it can never *alone* summon
+                     soldiers. Soldiers require crime you are committing now,
+                     which means there is always a way back
+```
+
+With the cap in place the drain is no longer load-bearing — it decides how
+fast you fall from 100 toward the Water Guard's 55, never whether you are
+ruined. That is the right weight for a mechanic nobody is required to find.
+
+It also gives the storage rules the teeth they were promised (§18): a player
+who lies low is sitting on a full barn, and stored contraband goes on accruing
+regional heat every dawn that spills national (§6.3). You cannot wait it out
+comfortably. You wait it out *nervously*, which is the game.
+
+#### What joins GameState (save bump)
+
+```
+lastContrabandTick   number — the quiet season's clock
+quietSeason          boolean — so the log says it once, not every dawn
+```
+
+v24 migrates the chain in place and, uniquely, **migrates the world as well as
+the shape**: a live save above the cap is walked back down, and a muster of
+Dragoons already riding is re-read as the Water Guard at the new cap. The save
+that forced this change is a player standing on a rung that no longer exists;
+leaving them there because the data loaded cleanly would be a rules-lawyer's
+answer to a design bug.
+
+---
+
+### 6.19 M5½d — the round: an order with more than one stop
+
+**The playtest that forced it (2026-08).** Two complaints, one cause:
+
+1. *"I still cannot order a carter to carry goods that aren't in stock at the
+   farm."* The picker offered, as an outbound load, only what sat in the
+   origin's store that instant — plus fleece at the farm and the cutting
+   house's own products (§6.17's *name a product not yet made*). So the second
+   cart of an owling relay — tea, farm → Ryne — could not be **written** until
+   tea was already in the barn. The player had to wait for the goods to arrive
+   in order to write the order that would move them, which is backwards: an
+   order is a sentence about the future.
+2. *"I want a round that sells twice."* Fleece out to the shingle, sell it over
+   the gunwale, buy lace, carry the lace on to Ryne, sell what the town will
+   take, fence the rest, then home. The four-beat order — `from → to → backTo →
+   from`, §6.17 — cannot say this: it sells at exactly one stop, and it buys
+   only at the turn-around.
+
+§6.17 said *"true many-stop routes are deliberately not built"*, on the ground
+that one extra delivery node covered the relay the marsh asked for. Two
+milestones of marsh later that is no longer true: the cutting house, the
+shingle, the town and the dug water make four places worth visiting in one
+round, and the four-beat sentence turns every extra stop into another cart and
+another wage. **That decision is overturned here.** What is *not* overturned is
+its reason — the order must still read as a sentence spoken to a man, never as
+a program. Hence: stops are named, verbs are inferred.
+
+**The model.** The order becomes an ordered list of stops, and the round is a
+loop — the last stop is followed by the first:
+
+```ts
+interface CarterStop {
+  at: NodeId;
+  /** What he picks up here. Absent = he picks up nothing; he only delivers.
+   *  At the shingle this is a purchase off the lugger with the till's coin
+   *  (§6.11's backhaul rule, unchanged); anywhere else it comes out of the
+   *  node's own store. */
+  take?: Good;
+  /** Cap per visit — the wool-split lever (§6.11, M5b). Absent = fill him. */
+  max?: number;
+  /** Market stops only: the fence takes what the appetite left, same visit
+   *  (§6.17's glut valve). */
+  fenceRest?: boolean;
+}
+interface CarterOrder { stops: CarterStop[] }   // 2..CARTER_MAX_STOPS
+```
+
+`CARTER_MAX_STOPS = 4`. Not an engine limit — a readability one. Four stops is
+the longest round that still reads aloud in one breath ("fleece to the shingle,
+lace on to Ryne, and home"), and the marsh has only five places worth naming.
+
+**What happens at a stop** — inferred from the node, in this order, every time
+he arrives:
+
+```
+1. deliver   market  → sell everything aboard the market buys, into each
+                       good's remaining appetite for the day (§6.10's books
+                       still cap lawful wool). `fenceRest` → the remainder of
+                       what the fence deals in goes round the back at the
+                       haircut, same visit
+             beach   → fleece over the gunwale to the Dutchman's appetite
+                       when the lugger stands off (§6.11's shingle order,
+                       unchanged). He waits on the beach for it as before
+             store   → everything aboard is unloaded into the store, as far
+                       as its walls allow (§6.9/§18). What will not fit stays
+                       aboard and eats his room, as it always has
+2. take      the stop's `take`, up to `max` and the cart's room: off the
+             lugger at the shingle (his hold, the cart's room and the till
+             are the caps; no credit), out of the store anywhere else
+3. move on   to the next stop in the list, wrapping at the end
+```
+
+The verbs are never written down by the player, and a stop that says nothing
+but its node is legal and useful: it means *call here and unload*, which is
+exactly §6.17's drop node, now spelled as itself.
+
+**Waiting — the two rules that were already there, generalised.**
+
+```
+nothing to take   he waits where he is SENT TO LOAD — the round's first
+                  pick-up — and nowhere else: a carter shuttles loads, not
+                  air (§6.11). Everywhere else he calls, does what the place
+                  allows, and moves on. Measured the hard way: waiting at
+                  every unfulfilled `take` strands the owling round on the
+                  beach every night the lugger fails to come, which is that
+                  round's normal case. The light order's vigil is this same
+                  rule — its first pick-up IS the shingle, so the tub lies
+                  there until there is something to bring home
+sated market      ANYTHING still aboard holds him at a market up to
+                  CARTER_MARKET_PATIENCE_DAYS, exposed and without cover
+                  (§6.17), then he moves on to the next stop carrying the
+                  remainder — not "home": the next stop may be the one that
+                  can take it. "Anything" includes goods the town will never
+                  buy at any price, and that is deliberate: §6.11's lesson is
+                  that an order full of jenever is legal to write and stupid
+                  to keep, and it is learned by watching a laden cart stand
+                  in the square
+```
+
+**The pass-through rule (a trap this model would otherwise open).** The
+dispatcher already paths across the whole graph (`firstHop`), so a leg the map
+has no direct edge for is walked in hops — shingle → Ryne goes by way of the
+farm, since the sea lane is for hulls (§6.14). A carter therefore *stands at
+nodes that are not his stop*. He must do nothing at them: no unloading, no
+loading, no selling. Only the stop he is bound for acts. Without this an owling
+round would drop its lace in the wool barn every time it crossed the yard —
+precisely the contraband-in-the-barn deadlock §6.17 built `backTo` to avoid.
+The cart carries a cursor for this: `Cart.stop`, the index of the stop he is
+bound for.
+
+**Naming a good before it exists — the stock gate replaced by the knowledge
+gate.** A stop may name any good the player *knows*, whether or not a single
+one sits in the store today. Knowledge is the ladder the game already climbs;
+no new state:
+
+```
+fleece                    always
+lace                      the Dutchman met (§6.9 — his hold always carries it)
+tea                       fleeceBought ≥ DUTCHMAN_TRUST_TEA
+jenever                   fleeceBought ≥ DUTCHMAN_TRUST_JENEVER
+brandy ×3, bulked-tea     the cutting house stands (§6.17)
+```
+
+This keeps §10 exactly — no menu names a good before the coast or the still
+has — while dropping the accident that a *store's contents this instant* stood
+in for knowledge. §6.17's *name a product not yet made* is now the general
+case rather than a two-building exception. An order naming a good that never
+turns up is legal and stupid, and it costs a wage until the player reads the
+log: the game says what a mechanic is for, and then lets it be misused.
+
+**Refusals** (the sim is the judge; the picker simply never offers these):
+
+```
+< 2 stops                    a round is a journey, not a place
+same node twice running      including the wrap: stops[last] === stops[0]
+no `take` anywhere           an order that picks nothing up moves nothing —
+                             the old "neither good nor back" refusal (§6.18)
+```
+
+**Danger money, wages, the ledger.** `CARTER_DANGER_WAGE` is now read over the
+whole round: any stop at the shingle, or any `take` of a contraband good, and
+the round costs 5 a day instead of 3 (§6.11 — the ordinary carting folk will
+not run this at the honest rate). One round, one wage, however many stops: this
+is deliberately generous, and it is the point. Collapsing a two-cart relay into
+one round saves a cart (50) and a wage (3–5/day), which is the reward for
+reading the marsh properly. The Wealth Clock (§20.1) prices the round by
+walking its stops: every market stop earns, every other stop is stock moved.
+
+#### What joins GameState (save bump)
+
+```
+CarterOrder      { stops: CarterStop[] } replaces { from, to, good, maxLoad,
+                 fenceRest, back, backTo }
+Cart.stop        number — the index of the stop he is bound for (the cursor
+                 the pass-through rule needs)
+```
+
+v24 migrates the chain in place, as ever — a family playtest is running, and
+mid-milestone the old abandon-silently policy would cost a live tenancy. The
+old four-beat order maps onto the new list exactly, which is the proof the
+model is a generalisation and not a rewrite:
+
+```
+{ from, to, good, maxLoad, back, backTo, fenceRest }
+  → [ { at: from, take: good, max: maxLoad },
+      { at: to,   take: back, fenceRest },
+      ...(backTo ? [{ at: backTo }] : []) ]
+```
+
+`Cart.stop` migrates to the stop matching where the cart stands, and to 0
+otherwise — one wasted leg on a save loaded mid-round, and nothing worse.
+`runCarters` applies the same rule when the cursor is absent for any reason:
+defaulting blindly to stop 0 marches a man already standing at the shingle
+back to the farm to begin again, which is how this was first got wrong.
+
+#### Build order (stop at each, as ever)
+
+1. The model and the migration: types, `runCarters` rewritten around the
+   cursor, v25. Every *behavioural* test (backhaul, light order, distribution,
+   the 200-game bots) must go green unchanged — that is the generalisation
+   proof. Tests that inspect an order's *shape* are rewritten against stops;
+   the action keeps accepting the four-beat form for ever, because a saved
+   action log replays through `hireCarter`.
+2. The picker: the sentence-walker grows "…and then?", and the knowledge gate
+   replaces the stock gate.
+3. The forecast and the scripted policy walk stops.
+
 **Not a random-raid system.** The Revenue maintains its own data structure:
 
 ```ts

@@ -15,7 +15,7 @@ import {
 } from '../balance';
 import { forecastDay } from '../forecast';
 import { edgesFor } from '../map';
-import { carterWageOf } from '../tick';
+import { carterWageOf, stopsFromLegacy } from '../tick';
 import { initialState } from '../tick';
 
 function tripsFor(fromToLatency: number): number {
@@ -25,7 +25,7 @@ function tripsFor(fromToLatency: number): number {
 describe('the day ahead (§20.1): orders priced, hands ignored', () => {
   it('prices a wool round into the appetite, and the wages against it', () => {
     const s = initialState(1);
-    s.carts[0].carter = { from: 'farm', to: 'ryne', good: 'fleece' };
+    s.carts[0].carter = stopsFromLegacy({ from: 'farm', to: 'ryne', good: 'fleece' });
     s.shearer.hired = true;
     const { takings, wages } = forecastDay(s);
 
@@ -42,7 +42,7 @@ describe('the day ahead (§20.1): orders priced, hands ignored', () => {
 
   it('the gunwale order prices at the Dutchman’s rate, capped by his appetite', () => {
     const s = initialState(1);
-    s.carts[0].carter = { from: 'farm', to: 'shingle', good: 'fleece' };
+    s.carts[0].carter = stopsFromLegacy({ from: 'farm', to: 'shingle', good: 'fleece' });
     const { takings } = forecastDay(s);
     const marsh = Math.min(
       ...edgesFor(s.farm, s.cuttingHouse)
@@ -59,12 +59,12 @@ describe('the day ahead (§20.1): orders priced, hands ignored', () => {
   it('a fenced remainder prices the surplus at the haircut', () => {
     const s = initialState(1);
     s.cuttingHouse = { x: 24, y: 12 };
-    s.carts[0].carter = {
+    s.carts[0].carter = stopsFromLegacy({
       from: 'cutting-house',
       to: 'ryne',
       good: 'brandy-fair',
       fenceRest: true,
-    };
+    });
     const { takings } = forecastDay(s);
     const track = Math.min(
       ...edgesFor(s.farm, s.cuttingHouse)

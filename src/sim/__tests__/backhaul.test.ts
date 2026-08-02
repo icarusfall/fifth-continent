@@ -15,7 +15,7 @@ import {
   WOOL_PRICE_DOMESTIC,
 } from '../balance';
 import { BOT_CUTTING_HOUSE_SITE } from '../policy';
-import { carterWageOf, initialState, tick } from '../tick';
+import { carterWageOf, initialState, tick, stopsFromLegacy } from '../tick';
 import type { GameState } from '../types';
 
 function runTicks(s: GameState, n: number): GameState {
@@ -107,7 +107,9 @@ describe("the carter's back leg (spec §6.11, M5a-4)", () => {
         order: { from: 'farm', to: 'shingle', good: 'fleece', back: 'jenever', backTo: 'shingle' },
       },
     ]);
-    expect(s.carts[0].carter?.backTo).toBeUndefined();
+    // §6.19 — a drop at either end of the run is the same call twice, and
+    // collapses: the round is the two stops it always was.
+    expect(s.carts[0].carter?.stops.map((x) => x.at)).toEqual(['farm', 'shingle']);
     // And a node the map does not know (no cutting house stands) degrades too.
     s = tick(s, [
       {
@@ -122,7 +124,7 @@ describe("the carter's back leg (spec §6.11, M5a-4)", () => {
         },
       },
     ]);
-    expect(s.carts[0].carter?.backTo).toBeUndefined();
+    expect(s.carts[0].carter?.stops.map((x) => x.at)).toEqual(['farm', 'shingle']);
   });
 
   it('no credit: an empty till buys only what the night’s wool paid for', () => {
@@ -224,7 +226,7 @@ describe('danger money (spec §6.11, M5 tutorial pass)', () => {
     let s = initialState(2);
     s.coin = 20;
     s.dutchman.unlocked = true;
-    s.carts[0].carter = { from: 'farm', to: 'shingle', good: 'fleece' };
+    s.carts[0].carter = stopsFromLegacy({ from: 'farm', to: 'shingle', good: 'fleece' });
     s = runTicks(s, TICKS_PER_DAY); // through one dawn; no goods move (empty barn)
     // One dawn's wage at the danger rate has left the purse.
     expect(s.coin).toBe(20 - CARTER_DANGER_WAGE);
@@ -259,7 +261,7 @@ describe('the load cap (spec §6.11, M5b playtest) — the wool-split lever', ()
         order: { from: 'farm', to: 'ryne', good: 'fleece', maxLoad: 99 },
       },
     ]);
-    expect(s.carts[0].carter?.maxLoad).toBeUndefined(); // ≥ capacity: dropped
+    expect(s.carts[0].carter?.stops[0].max).toBeUndefined(); // ≥ capacity: dropped
     s = tick(s, []);
     expect(s.carts[0].cargo.fleece).toBe(CART_CAPACITY);
 
@@ -272,7 +274,7 @@ describe('the load cap (spec §6.11, M5b playtest) — the wool-split lever', ()
         order: { from: 'farm', to: 'ryne', good: 'fleece', maxLoad: 0 },
       },
     ]);
-    expect(z.carts[0].carter?.maxLoad).toBeUndefined(); // a cap of nothing is no order
+    expect(z.carts[0].carter?.stops[0].max).toBeUndefined(); // a cap of nothing is no order
   });
 
   it('the cap counts what already rides aboard, so a returning remainder is honoured', () => {

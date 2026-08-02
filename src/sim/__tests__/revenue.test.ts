@@ -11,8 +11,14 @@ import {
   DITCH_HEAT,
   LEIDEN_PRICE_MULT,
   MARKET_TATTLE,
+  DRAGOON_HEAT,
   MAX_CARTS,
+  NATIONAL_FLOOR_CAP,
+  NATIONAL_HEAT_CAP,
   NATIONAL_HEAT_DECAY,
+  NATIONAL_HEAT_QUIET_DECAY,
+  QUIET_SEASON_DAYS,
+  WATER_GUARD_HEAT,
   OFFICER_ARRIVAL_HEAT,
   PROMOTION_RATE,
   PROMOTION_THRESHOLD,
@@ -29,8 +35,10 @@ import {
   WOOL_GAP_COEFF,
   WOOL_PRICE_DOMESTIC,
 } from '../balance';
+import { applyPublishLetter } from '../leiden';
 import { officerEdgesFor, FARM_SITE } from '../map';
-import { initialState, tick } from '../tick';
+import { accrueMarketTattle } from '../revenue';
+import { initialState, tick, stopsFromLegacy } from '../tick';
 import type { Action, GameState } from '../types';
 
 function runTicks(state: GameState, n: number, actionsAt: Record<number, Action[]> = {}): GameState {
@@ -159,6 +167,75 @@ describe('heat decay and promotion at dawn (spec §6.3)', () => {
     s0.heat.regional = 50;
     const s = toNextDawn(s0);
     expect(s.heat.national).toBe(0);
+  });
+});
+
+describe('the heat cap (§6.18 M5½d): ordinary play never summons soldiers', () => {
+  it('caps the national side however hard the parish is worked', () => {
+    const s0 = initialState(1);
+    s0.heat.regional = 5000; // an absurd day: every road into the meter, at once
+    s0.heat.national = NATIONAL_HEAT_CAP;
+    const s = toNextDawn(s0);
+    expect(s.heat.national).toBeLessThanOrEqual(NATIONAL_HEAT_CAP);
+  });
+
+  it('caps AFTER the spill — the promotion cannot route around it', () => {
+    const s0 = initialState(1);
+    s0.heat.regional = 5000;
+    s0.heat.national = 99;
+    const s = toNextDawn(s0);
+    // Un-capped this would clear 150 on the spill alone.
+    expect(s.heat.national).toBe(NATIONAL_HEAT_CAP);
+  });
+
+  it('keeps the Dragoon rung out of reach of ordinary play', () => {
+    expect(NATIONAL_HEAT_CAP).toBeLessThan(DRAGOON_HEAT);
+    // …and the Water Guard's rung stays reachable, or the ladder has one step.
+    expect(NATIONAL_HEAT_CAP).toBeGreaterThan(WATER_GUARD_HEAT);
+  });
+
+  it('bounds publication’s permanent floor below the soldiers too', () => {
+    const s = initialState(1);
+    s.leiden.state = 'housed';
+    // Seven letters is far past any real game; the floor still cannot summon.
+    for (let i = 0; i < 7; i++) {
+      s.leiden.letterPending = 2;
+      applyPublishLetter(s);
+    }
+    expect(s.nationalHeatFloor).toBeLessThanOrEqual(NATIONAL_FLOOR_CAP);
+    expect(s.nationalHeatFloor).toBeLessThan(DRAGOON_HEAT);
+  });
+});
+
+describe('the quiet season (§6.18 M5½d): London’s attention can be spent down', () => {
+  it('cools at the quiet rate once nothing has sold for four days', () => {
+    const s0 = initialState(1);
+    s0.heat.national = 80;
+    s0.tick = QUIET_SEASON_DAYS * TICKS_PER_DAY + 1;
+    s0.lastContrabandTick = 0; // nothing sold since the beginning
+    const s = toNextDawn(s0);
+    expect(s.heat.national).toBeCloseTo(80 * NATIONAL_HEAT_QUIET_DECAY, 5);
+    expect(s.quietSeason).toBe(true);
+  });
+
+  it('a sale resets the clock — the tattle is the trigger', () => {
+    const s = initialState(1);
+    s.tick = QUIET_SEASON_DAYS * TICKS_PER_DAY + 1;
+    accrueMarketTattle(s, 'tea', 3);
+    expect(s.lastContrabandTick).toBe(s.tick);
+    const after = toNextDawn(s);
+    expect(after.heat.national).toBeLessThan(NATIONAL_HEAT_CAP);
+    expect(after.quietSeason).toBe(false);
+  });
+
+  it('never digs below what the societies printed', () => {
+    const s0 = initialState(1);
+    s0.heat.national = 60;
+    s0.nationalHeatFloor = 58;
+    s0.tick = QUIET_SEASON_DAYS * TICKS_PER_DAY + 1;
+    s0.lastContrabandTick = 0;
+    const s = toNextDawn(s0);
+    expect(s.heat.national).toBe(58);
   });
 });
 
@@ -390,7 +467,7 @@ describe('bought carts and the hired carter (spec §6.11)', () => {
   it('the manual fence works over a carter’s shoulder at the market — and only there', () => {
     const s0 = initialState(1);
     s0.coin = 0;
-    s0.carts[0].carter = { from: 'farm', to: 'ryne', good: 'lace' };
+    s0.carts[0].carter = stopsFromLegacy({ from: 'farm', to: 'ryne', good: 'lace' });
     s0.carts[0].cargo = { lace: 5 };
     s0.carts[0].location = { kind: 'node', nodeId: 'ryne' };
     const s = tick(s0, [{ type: 'sellToFence', cartId: 'cart-1', good: 'lace' }]);
@@ -399,7 +476,7 @@ describe('bought carts and the hired carter (spec §6.11)', () => {
     expect(s.contrabandSold).toBe(5); // tattle paid in full
 
     const home = initialState(1);
-    home.carts[0].carter = { from: 'farm', to: 'ryne', good: 'lace' };
+    home.carts[0].carter = stopsFromLegacy({ from: 'farm', to: 'ryne', good: 'lace' });
     home.carts[0].cargo = { lace: 5 };
     const refused = tick(home, [{ type: 'sellToFence', cartId: 'cart-1', good: 'lace' }]);
     expect(refused.carts[0].cargo.lace).toBe(5); // off the market, he keeps the reins
@@ -416,7 +493,7 @@ describe('bought carts and the hired carter (spec §6.11)', () => {
         order: { from: 'farm', to: 'ryne', good: 'fleece', fenceRest: true },
       },
     ]);
-    expect(s.carts[0].carter?.fenceRest).toBeUndefined(); // wool has no fence
+    expect(s.carts[0].carter?.stops.every((x) => !x.fenceRest)).toBe(true); // wool has no fence
   });
 
   // House rule 5: the glut valve across 200 seeded games — the sated-market
@@ -447,7 +524,7 @@ describe('bought carts and the hired carter (spec §6.11)', () => {
   it('a crewed cart refuses the player’s reins', () => {
     const s0 = initialState(1);
     s0.stores.farm = { fleece: 12 };
-    s0.carts[0].carter = { from: 'farm', to: 'ryne', good: 'fleece' };
+    s0.carts[0].carter = stopsFromLegacy({ from: 'farm', to: 'ryne', good: 'fleece' });
     const s = tick(s0, [{ type: 'dispatchCart', cartId: 'cart-1', edgeId: 'marsh-track' }]);
     expect(s.log.some((e) => e.text.includes('Dismiss him'))).toBe(true);
   });
@@ -455,7 +532,7 @@ describe('bought carts and the hired carter (spec §6.11)', () => {
   it('wages fall due at dawn; an unpaid man walks the same morning', () => {
     const paid = initialState(1);
     paid.coin = 10;
-    paid.carts[0].carter = { from: 'farm', to: 'ryne', good: 'fleece' };
+    paid.carts[0].carter = stopsFromLegacy({ from: 'farm', to: 'ryne', good: 'fleece' });
     paid.stores.farm = { fleece: 0 }; // nothing to haul: coin only moves by wage
     const afterDawn = toNextDawn(paid);
     expect(afterDawn.coin).toBe(10 - CARTER_WAGE);
@@ -463,7 +540,7 @@ describe('bought carts and the hired carter (spec §6.11)', () => {
 
     const broke = initialState(1);
     broke.coin = 0;
-    broke.carts[0].carter = { from: 'farm', to: 'ryne', good: 'fleece' };
+    broke.carts[0].carter = stopsFromLegacy({ from: 'farm', to: 'ryne', good: 'fleece' });
     broke.stores.farm = { fleece: 0 };
     const walked = toNextDawn(broke);
     expect(walked.carts[0].carter).toBeNull();
@@ -492,7 +569,7 @@ describe('the shingle order (spec §6.11, M5a-3)', () => {
     s.dutchman.unlocked = true;
     s.carts[0].location = { kind: 'node', nodeId: 'shingle' };
     s.carts[0].cargo = { fleece };
-    s.carts[0].carter = { from: 'farm', to: 'shingle', good: 'fleece' };
+    s.carts[0].carter = stopsFromLegacy({ from: 'farm', to: 'shingle', good: 'fleece' });
     return s;
   }
 

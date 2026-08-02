@@ -16,6 +16,7 @@ import {
   LIGHTER_CAPACITY,
   MAX_LOG_EVENTS,
   MAX_SUPPRESSIONS,
+  NATIONAL_FLOOR_CAP,
   PUBLICATION_HEAT,
   SUPPRESS_STANDING,
 } from './balance';
@@ -162,7 +163,9 @@ export function applyPublishLetter(state: GameState): void {
     return;
   }
   const rise = publicationRiseFor(state, l.letterPending);
-  state.nationalHeatFloor += rise;
+  // §6.18 (M5½d) — fame is permanent but bounded: the societies can pin you in
+  // the Water Guard's parish for good and never, on their own, summon soldiers.
+  state.nationalHeatFloor = Math.min(NATIONAL_FLOOR_CAP, state.nationalHeatFloor + rise);
   l.letterPending = null;
   logEvent(
     state,
@@ -200,7 +203,10 @@ export function applyReleaseLetter(state: GameState): void {
     logEvent(state, 'The strongbox holds no letters.');
     return;
   }
-  state.nationalHeatFloor += held * DIFFICULTY[state.difficulty].heatMult;
+  state.nationalHeatFloor = Math.min(
+    NATIONAL_FLOOR_CAP,
+    state.nationalHeatFloor + held * DIFFICULTY[state.difficulty].heatMult,
+  );
   logEvent(
     state,
     'An old letter leaves the strongbox at last. The societies read it hungrily — late news from this parish is still news.',

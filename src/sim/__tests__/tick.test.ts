@@ -345,7 +345,10 @@ describe('the carter takes new orders in place (spec §6.11)', () => {
     let s = tick(initialState(1), [
       { type: 'hireCarter', cartId: 'cart-1', order: { from: 'farm', to: 'ryne', good: 'fleece' } },
     ]);
-    expect(s.carts[0].carter).toEqual({ from: 'farm', to: 'ryne', good: 'fleece' });
+    // §6.19 — the four-beat order normalises to stops the moment it lands.
+    expect(s.carts[0].carter).toEqual({
+      stops: [{ at: 'farm', take: 'fleece' }, { at: 'ryne' }],
+    });
     // Redirect without dismissing first: the order is overwritten in place.
     s = tick(s, [
       {
@@ -355,10 +358,10 @@ describe('the carter takes new orders in place (spec §6.11)', () => {
       },
     ]);
     expect(s.carts[0].carter).toEqual({
-      from: 'farm',
-      to: 'shingle',
-      good: 'fleece',
-      back: 'jenever',
+      stops: [
+        { at: 'farm', take: 'fleece' },
+        { at: 'shingle', take: 'jenever' },
+      ],
     });
     expect(s.carts).toHaveLength(1);
   });

@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { ROUND_COST, RUMOUR_TRUST, TICKS_PER_DAY } from '../balance';
-import { initialState, tick } from '../tick';
+import { initialState, tick, stopsFromLegacy } from '../tick';
 import type { GameState } from '../types';
 
 /** A farmer with his own cart on the Ryne quay and some wool on the books. */
@@ -51,7 +51,7 @@ describe('asking on the quay (spec §6.9, M5a-4)', () => {
 
   it('a hired carter does not stop you drinking: the round still stands', () => {
     const s0 = quayState(RUMOUR_TRUST[0]);
-    s0.carts[0].carter = { from: 'farm', to: 'ryne', good: 'fleece' };
+    s0.carts[0].carter = stopsFromLegacy({ from: 'farm', to: 'ryne', good: 'fleece' });
     const s = tick(s0, [{ type: 'buyRound' }]);
     expect(s.rumoursHeard).toBe(1);
     expect(s.coin).toBe(50 - ROUND_COST);

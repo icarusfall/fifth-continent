@@ -91,30 +91,50 @@ export type CartLocation =
       progress: number;
     };
 
-/** A hired carter's standing order (spec §6.11): shuttle `good` from → to.
- *  `back` (M5a-4) is the optional return leg: loaded at `to` from the store,
- *  or bought over the gunwale with the till's coin. `backTo` (M5, §6.17) is
- *  where that backhaul is dropped — delivered on the way home, from → to →
- *  backTo → from — so one cart runs a whole owling loop and contraband need
- *  never enter the wool barn. Default: `from`. */
+/**
+ * One call on a carter's round (spec §6.19, M5½d). The player names the place;
+ * what happens there is inferred from the node, so the order stays a sentence
+ * spoken to a man rather than a program: at a market he sells what he carries,
+ * at the shingle he deals over the gunwale, at a store he unloads.
+ */
+export interface CarterStop {
+  at: NodeId;
+  /**
+   * What he picks up here. Absent = he only delivers. At the shingle this is a
+   * purchase off the lugger with the till's coin (his hold, the cart's room and
+   * the purse are the caps; no credit); anywhere else it comes out of the
+   * node's own store.
+   */
+  take?: Good;
+  /** §6.11 (M5b playtest) — take at most this much per visit; absent = fill
+   *  the cart. The wool-split lever. */
+  max?: number;
+  /** §6.11 (M5c playtest) — market stops only: what the town's appetite
+   *  leaves, the fence takes at the haircut, same visit. The glut valve. */
+  fenceRest?: boolean;
+}
+
+/**
+ * A hired carter's standing order (spec §6.19): an ordered list of stops, run
+ * as a loop — the last is followed by the first. Two stops is the old
+ * four-beat sentence; `CARTER_MAX_STOPS` is a readability bound, not an
+ * engine one. An order that picks nothing up anywhere is refused.
+ */
 export interface CarterOrder {
+  stops: CarterStop[];
+}
+
+/**
+ * The pre-§6.19 order shape. Kept for ever as an *input*: saved action logs
+ * replay through `hireCarter`, so a shape the game once accepted it must go
+ * on accepting. Normalised to `stops` the moment it lands (§6.19's migration
+ * table) and never stored.
+ */
+export interface LegacyCarterOrder {
   from: NodeId;
   to: NodeId;
-  /**
-   * §6.18 (M5½b playtest) — absent = **the light order**: he runs out empty
-   * and comes home with the back leg alone. The shingle is a beach with no
-   * cover: nothing may be kept there, so nothing can be loaded from it, and
-   * the tub-boat's whole job ("lie at the shingle, take twelve off the
-   * lugger, carry them home on quiet water") is an order with an empty
-   * outbound leg. An order with neither `good` nor `back` is refused.
-   */
   good?: Good;
-  /** §6.11 (M5b playtest) — load at most this much of `good` per run;
-   *  absent = fill the cart. The wool-split lever. */
   maxLoad?: number;
-  /** §6.11 (M5c playtest) — what the town's appetite leaves, the fence takes
-   *  at the haircut, same visit: the glut valve. Only meaningful on a
-   *  contraband order into the market; the tattle is paid in full. */
   fenceRest?: boolean;
   back?: Good;
   backTo?: NodeId;
@@ -128,6 +148,13 @@ export interface Cart {
   location: CartLocation;
   /** Non-null = a hired man drives this cart on a standing order (§6.11). */
   carter: CarterOrder | null;
+  /**
+   * §6.19 — the index of the stop he is bound for. The pass-through rule needs
+   * it: the dispatcher paths across the whole graph, so a carter stands at
+   * nodes that are not his stop (shingle → Ryne goes by way of the farm), and
+   * he must do nothing at them. Absent on a cart with no carter.
+   */
+  stop?: number;
   /**
    * §6.11 / §6.17 — set while the carter waits at a sated market for the
    * appetite to refresh: the tick his patience runs out and he turns for
@@ -393,8 +420,19 @@ export interface GameState {
      *  MAX_SUPPRESSIONS held he refuses the bench until one goes out. */
     heldLetters: number[];
   };
-  /** Spec §6.14 — Publication: decay can never take national Heat below this. */
+  /** Spec §6.14 — Publication: decay can never take national Heat below this.
+   *  Capped at NATIONAL_FLOOR_CAP (§6.18 M5½d) so fame alone never summons
+   *  soldiers — there must always be a road back off the Dragoon rung. */
   nationalHeatFloor: number;
+  /**
+   * Spec §6.18 (M5½d) — the tick a contraband sale last registered. Four days
+   * without one and London's attention starts cooling at the quiet rate: the
+   * only verb that spends national Heat back down is *stopping for a while*.
+   */
+  lastContrabandTick: number;
+  /** §6.18 (M5½d) — true while the quiet season is running, so the log says it
+   *  once and not every dawn (§20's log is a history, not a heartbeat). */
+  quietSeason: boolean;
   /**
    * Spec §6.18 (M5½a) — the survey and the spade. Segments dug are permanent
    * (a dyke is never filled in); the crew is one crew, so at most one dig
@@ -428,7 +466,7 @@ export type Action =
   | { type: 'fortifyBuilding'; nodeId: NodeId }
   | { type: 'raiseGarrison'; nodeId: NodeId; kind: GarrisonKind }
   | { type: 'dismissGarrison'; nodeId: NodeId; kind: GarrisonKind }
-  | { type: 'hireCarter'; cartId: CartId; order: CarterOrder }
+  | { type: 'hireCarter'; cartId: CartId; order: CarterOrder | LegacyCarterOrder }
   | { type: 'dismissCarter'; cartId: CartId }
   | { type: 'setDeclaredYield'; fleecePerDay: number }
   | { type: 'returnPen' }

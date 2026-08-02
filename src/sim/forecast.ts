@@ -48,30 +48,47 @@ export function forecastDay(state: GameState): DayForecast {
 
   for (const cart of state.carts) {
     const order = cart.carter;
-    if (!order) continue;
-    const trips = Math.max(1, Math.floor(TICKS_PER_DAY / roundTripTicks(state, order.from, order.to)));
-    const perTrip = Math.min(order.maxLoad ?? cart.capacity, cart.capacity);
-    const hauled = trips * perTrip;
+    if (!order || order.stops.length === 0) continue;
+    // §6.19 — the round is walked stop by stop: a lap is every leg of the
+    // loop, and what he picks up at one stop is what he can sell at the next.
+    // The clock prices the round, not a there-and-back.
+    const stops = order.stops;
+    const lap = stops.reduce(
+      (t, s, i) => t + roundTripTicks(state, s.at, stops[(i + 1) % stops.length].at) / 2,
+      0,
+    );
+    const trips = Math.max(1, Math.floor(TICKS_PER_DAY / Math.max(1, lap)));
 
-    if (order.to === 'shingle' && order.good === 'fleece') {
-      // Over the gunwale at the Dutchman's price, up to his appetite.
-      const sold = Math.min(hauled, gunwale);
-      gunwale -= sold;
-      takings += sold * WOOL_PRICE_DOMESTIC * LEIDEN_PRICE_MULT;
-      continue;
-    }
-    if (order.to !== 'ryne') continue; // stocking a store earns nothing today
-    // §6.18 — the light order sells nothing outbound: it goes to fetch.
-    const good = order.good;
-    if (good === undefined) continue;
-
-    const room = appetite[good] ?? 0;
-    const sold = Math.min(hauled, room);
-    appetite[good] = room - sold;
-    takings += sold * RYNE_PRICE[good];
-    // §6.17 — "…and fence the remainder": the rest at the haircut, same visit.
-    if (order.fenceRest && CONTRABAND.includes(good) && hauled > sold) {
-      takings += (hauled - sold) * Math.round(RYNE_PRICE[good] * FENCE_PRICE_MULT);
+    for (let i = 0; i < stops.length; i++) {
+      const picked = stops[i].take;
+      if (picked === undefined) continue;
+      const perTrip = Math.min(stops[i].max ?? cart.capacity, cart.capacity);
+      const hauled = trips * perTrip;
+      // Where does this load get sold? The next stop that is a market — or the
+      // gunwale, if the wool reaches the shingle before any town.
+      for (let step = 1; step <= stops.length; step++) {
+        const there = stops[(i + step) % stops.length].at;
+        if (there === 'shingle' && picked === 'fleece') {
+          const sold = Math.min(hauled, gunwale);
+          gunwale -= sold;
+          takings += sold * WOOL_PRICE_DOMESTIC * LEIDEN_PRICE_MULT;
+          break;
+        }
+        if (there === 'ryne') {
+          const room = appetite[picked] ?? 0;
+          const sold = Math.min(hauled, room);
+          appetite[picked] = room - sold;
+          takings += sold * RYNE_PRICE[picked];
+          // §6.17 — "…and fence the remainder", at the haircut, same visit.
+          const at = stops[(i + step) % stops.length];
+          if (at.fenceRest && CONTRABAND.includes(picked) && hauled > sold) {
+            takings += (hauled - sold) * Math.round(RYNE_PRICE[picked] * FENCE_PRICE_MULT);
+          }
+          break;
+        }
+        // Any other stop is a store: it lands there, and earns nothing today.
+        if (there !== 'shingle') break;
+      }
     }
   }
 

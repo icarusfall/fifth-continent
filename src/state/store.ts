@@ -12,6 +12,9 @@ import {
   FLOCK_CAP,
   CROSSING_FRONTAGE,
   MAX_SUPPRESSIONS,
+  NATIONAL_FLOOR_CAP,
+  NATIONAL_HEAT_CAP,
+  WATER_GUARD_MAX_MUSTER,
   PERSON_DEBT,
   FLOCK_SPOTLIGHT_DAY,
   SUPPRESS_STANDING,
@@ -34,10 +37,19 @@ import { CONTRABAND, illicitAnywhere } from '../sim/revenue';
 import { simulateBattle } from '../sim/combat';
 import type { BattleSetup, Call, CombatLog, ScheduledCall } from '../sim/combat';
 import { nodeById } from '../sim/map';
-import { raidBattleSetup } from '../sim/raid';
+import { defenceCeiling, raidBattleSetup } from '../sim/raid';
 import { clockOf } from '../sim/time';
-import { initialState, QUAY_RUMOURS, rentAmount, tick } from '../sim/tick';
-import type { Action, ActionLog, Difficulty, GameState, NodeId } from '../sim/types';
+import { initialState, QUAY_RUMOURS, rentAmount, stopsFromLegacy, tick } from '../sim/tick';
+import type {
+  Action,
+  ActionLog,
+  Cart,
+  CarterOrder,
+  Difficulty,
+  GameState,
+  LegacyCarterOrder,
+  NodeId,
+} from '../sim/types';
 
 // v11: M5a adds difficulty, mercy (dutchmanBook, vouches), the shearer, the
 //      flock market, and the research bench to GameState (§6.14–6.16).
@@ -70,7 +82,15 @@ import type { Action, ActionLog, Difficulty, GameState, NodeId } from '../sim/ty
 // v22: M5½ playtest — cellars (§6.12, the Cellar Hide). Chain migrates.
 // v23: M5½b — Cart.vessel widens to 'sea' | 'dyke' (the tub-boat, §6.18);
 //      the lighter's old `true` reads as 'sea'. Chain migrates.
-const SAVE_KEY = 'fifth-continent-save-v23';
+// v24: M5½d — the heat cap (§6.18): ordinary play never summons soldiers, the
+//      Crown's muster is capped like the Company's, and the quiet season
+//      (lastContrabandTick/quietSeason) gives London a way to forget. Chain
+//      migrates, and walks a live save back down off the Dragoon rung.
+// v25: M5½d — the standing order becomes a list of stops (§6.19); carts carry
+//      a stop cursor. Chain migrates; legacy orders still replay.
+const SAVE_KEY = 'fifth-continent-save-v25';
+const SAVE_KEY_V24 = 'fifth-continent-save-v24';
+const SAVE_KEY_V23 = 'fifth-continent-save-v23';
 const SAVE_KEY_V22 = 'fifth-continent-save-v22';
 const SAVE_KEY_V21 = 'fifth-continent-save-v21';
 const SAVE_KEY_V20 = 'fifth-continent-save-v20';
@@ -129,7 +149,20 @@ function battleResultCard(b: BattlePlayback): EventCard {
     title = 'Overrun';
     body = `${b.targetName} is taken and the goods carried off. ${c.friendlyDead} of your men are lost, and the parish grieves.`;
   }
-  return { id: `result-${b.setup.attacker.strength}-${b.frame}`, kind: 'info', title, body };
+  // §6.13 (M5½d) — the fight writes down its own parameters. A lost raid is
+  // then self-diagnosing: faction, muster, men, works and ground, in the words
+  // the player would use to report it.
+  const s = b.setup;
+  const reading =
+    ` (${s.attacker.strength} of ${RAIDER_NAME[s.attacker.faction] ?? 'them'} against ${Math.round(
+      s.defender.strength,
+    )} of yours, ${s.frontage ? 'water at the foot' : 'open ground'}.)`;
+  return {
+    id: `result-${b.setup.attacker.strength}-${b.frame}`,
+    kind: 'info',
+    title,
+    body: body + reading,
+  };
 }
 
 /** Who is actually riding — the cards said "the Company" even when it was the
@@ -139,6 +172,29 @@ const RAIDER_NAME: Record<string, string> = {
   'water-guard': 'the Preventive Water Guard',
   dragoons: 'Dragoons',
 };
+
+/**
+ * §6.13 (M5½d) — men do not march themselves. The raid falls on the building
+ * holding the goods, which is very often NOT the building the player garrisoned
+ * (playtest 2026-08: ten men stood at the farm while the Company took the
+ * cutting house). The cards therefore say where the men actually are whenever
+ * more of them are standing somewhere else. Returns '' when the garrison is
+ * already in the right place — no noise on the fights that were fought right.
+ */
+function menElsewhere(next: GameState, target: NodeId): string {
+  const owned: NodeId[] = next.cuttingHouse ? ['farm', 'cutting-house'] : ['farm'];
+  const count = (n: NodeId): number => {
+    const g = next.garrisons[n];
+    return (g?.militia ?? 0) + (g?.crew ?? 0);
+  };
+  const here = count(target);
+  const away = owned.filter((n) => n !== target && count(n) > here);
+  if (away.length === 0) return '';
+  const list = away
+    .map((n) => `${count(n)} at ${nodeById(n, next.farm, next.cuttingHouse).name}`)
+    .join(', ');
+  return ` Your men are ${list} — and ${here === 0 ? 'none' : `only ${here}`} here. They do not march themselves.`;
+}
 
 /** The muster warning (spec §6.13): a force is riding for one of your buildings. */
 function musterCard(next: GameState): EventCard {
@@ -152,6 +208,7 @@ function musterCard(next: GameState): EventCard {
     title: 'A muster gathers',
     body:
       `${who[0].toUpperCase()}${who.slice(1)} is riding for ${name} — the blow falls in about ${days} day${days === 1 ? '' : 's'}. Post men and dig in, or lose the goods.` +
+      menElsewhere(next, r.target) +
       (r.faction === 'dragoons' ? ' They are soldiers. They do not rout, and coin does not move them.' : ''),
   };
 }
@@ -173,11 +230,23 @@ function raidCard(next: GameState): EventCard {
       ? ` The cut channel runs at its foot: they can come at you ${CROSSING_FRONTAGE} abreast, and no more — while ${CROSSING_FRONTAGE} of yours are standing.`
       : ` The cut channel runs at its foot, but it takes ${CROSSING_FRONTAGE} men to hold a crossing and you have ${men}.`
     : '';
+  // §6.13 (M5½d) — read the charge aloud, BEFORE it is paid. A fully walled
+  // garrison that loses by two men is the model working as specified; a
+  // player who could not have known that is the model failing. So the card
+  // states what these men hold and what is coming — and, on dry ground, what
+  // the same men would hold behind water: the verb they have not used (§21.1).
+  const hold = men > 0 ? defenceCeiling(next, r.target, r.faction) : 0;
+  const odds = men === 0 ? '' : ` Men and works like these turn back about ${hold}.`;
+  const behindWater = moated || men === 0 ? 0 : defenceCeiling(next, r.target, r.faction, 'moated');
+  const counterfactual =
+    behindWater > hold
+      ? ` Behind a cut channel the same ${men} would hold ${behindWater} — and there is no water at this foot.`
+      : '';
   return {
     id: `raid-${r.battleTick}`,
     kind: 'raid',
     title: r.faction === 'hawksmere' ? 'The Company is at the gate' : 'The Crown is at the gate',
-    body: `${r.size} of ${who} fall on ${name}, ${defence}.${ground}`,
+    body: `${r.size} of ${who} fall on ${name}, ${defence}.${menElsewhere(next, r.target)}${ground}${odds}${counterfactual}`,
   };
 }
 
@@ -781,6 +850,58 @@ function migrateV22(parsed: SaveFile): SaveFile {
   return parsed;
 }
 
+/**
+ * v23 → v24 (§6.18 M5½d): the quiet season's clock, and the heat cap applied
+ * retroactively. A live save sitting above the cap is the exact situation that
+ * forced this change — a player on the Dragoon rung with no way off — so the
+ * migration walks them back down rather than leaving them there.
+ */
+function migrateV23(parsed: SaveFile): SaveFile {
+  const s = parsed.state as GameState & {
+    lastContrabandTick?: unknown;
+    quietSeason?: unknown;
+  };
+  if (typeof s.lastContrabandTick !== 'number') s.lastContrabandTick = s.tick ?? 0;
+  if (typeof s.quietSeason !== 'boolean') s.quietSeason = false;
+  if (typeof s.nationalHeatFloor === 'number') {
+    s.nationalHeatFloor = Math.min(NATIONAL_FLOOR_CAP, s.nationalHeatFloor);
+  }
+  if (s.heat && typeof s.heat.national === 'number') {
+    s.heat.national = Math.min(s.heat.national, NATIONAL_HEAT_CAP);
+  }
+  // A muster already gathered under the old rules is re-read under the new
+  // ones: the blow that is riding should be the blow the game now promises.
+  if (s.raid && s.raid.faction === 'dragoons') {
+    s.raid.faction = 'water-guard';
+    s.raid.size = Math.min(s.raid.size, WATER_GUARD_MAX_MUSTER);
+  } else if (s.raid && s.raid.faction === 'water-guard') {
+    s.raid.size = Math.min(s.raid.size, WATER_GUARD_MAX_MUSTER);
+  }
+  return parsed;
+}
+
+/**
+ * v24 → v25 (§6.19 M5½d): the four-beat standing order becomes a list of
+ * stops. `stopsFromLegacy` is the same function the sim uses on every incoming
+ * order, so a save and a replayed action log migrate through identical code —
+ * there is no second, drifting copy of the mapping.
+ */
+function migrateV24(parsed: SaveFile): SaveFile {
+  for (const cart of parsed.state?.carts ?? []) {
+    const c = cart as Cart & { carter: (Partial<CarterOrder> & LegacyCarterOrder) | null };
+    if (c.carter && !Array.isArray(c.carter.stops)) {
+      (c as Cart).carter = stopsFromLegacy(c.carter);
+    }
+    // The cursor: take up the round where he stands, else at its first stop.
+    if (c.carter && typeof c.stop !== 'number') {
+      const here = c.location.kind === 'node' ? c.location.nodeId : null;
+      const idx = here === null ? -1 : c.carter.stops.findIndex((s) => s.at === here);
+      c.stop = idx >= 0 ? idx : 0;
+    }
+  }
+  return parsed;
+}
+
 function loadSave(): SaveFile | null {
   try {
     let raw = localStorage.getItem(SAVE_KEY);
@@ -789,6 +910,16 @@ function loadSave(): SaveFile | null {
     let fromV20 = false;
     let fromV21 = false;
     let fromV22 = false;
+    let fromV23 = false;
+    let fromV24 = false;
+    if (!raw) {
+      raw = localStorage.getItem(SAVE_KEY_V24);
+      fromV24 = raw !== null;
+    }
+    if (!raw) {
+      raw = localStorage.getItem(SAVE_KEY_V23);
+      fromV23 = raw !== null;
+    }
     if (!raw) {
       raw = localStorage.getItem(SAVE_KEY_V22);
       fromV22 = raw !== null;
@@ -816,6 +947,12 @@ function loadSave(): SaveFile | null {
     if (fromV18 || fromV19 || fromV20) parsed = migrateV20(parsed);
     if (fromV18 || fromV19 || fromV20 || fromV21) parsed = migrateV21(parsed);
     if (fromV18 || fromV19 || fromV20 || fromV21 || fromV22) parsed = migrateV22(parsed);
+    if (fromV18 || fromV19 || fromV20 || fromV21 || fromV22 || fromV23) {
+      parsed = migrateV23(parsed);
+    }
+    if (fromV18 || fromV19 || fromV20 || fromV21 || fromV22 || fromV23 || fromV24) {
+      parsed = migrateV24(parsed);
+    }
     if (parsed.version !== 1 || typeof parsed.state?.tick !== 'number') return null;
     if (typeof parsed.state.farm?.x !== 'number' || typeof parsed.state.fleeceReady !== 'number')
       return null;
@@ -1127,12 +1264,13 @@ export const useGameStore = create<GameStore>()((set, get) => {
         // The fattest holding names the order; the fence takes what the
         // appetite leaves. hireCarter re-orders a crewed cart in place (§6.11).
         const good = holdings.reduce((a, b) => ((cart.cargo[a] ?? 0) >= (cart.cargo[b] ?? 0) ? a : b));
+        // §6.19 — the round's home is its first stop that is not the market.
+        const home = cart.carter?.stops.find((s) => s.at !== 'ryne')?.at;
         const from =
-          cart.carter?.from && cart.carter.from !== 'ryne'
-            ? cart.carter.from
-            : cart.location.kind === 'node' && cart.location.nodeId !== 'ryne'
-              ? cart.location.nodeId
-              : 'farm';
+          home ??
+          (cart.location.kind === 'node' && cart.location.nodeId !== 'ryne'
+            ? cart.location.nodeId
+            : 'farm');
         enqueue({ type: 'hireCarter', cartId: cart.id, order: { from, to: 'ryne', good, fenceRest: true } });
       }
     },
