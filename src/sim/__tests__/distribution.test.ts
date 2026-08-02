@@ -91,10 +91,16 @@ describe(`${GAMES} seeded games, ${DAYS} days each`, () => {
     // widen this into a real distribution check, don't delete it.
     const distinct = new Set(coins);
     expect(distinct.size).toBe(1);
-    // The margin of a lawful life: solvent, but thin — a fortnight of honest
-    // wool, one starting clip and all, comes to about a single rent (spec §6.8).
-    expect(coins[0]).toBeGreaterThan(0);
-    expect(coins[0]).toBeLessThanOrEqual(RENT_AMOUNT);
+    // The margin of a lawful life (§6.15 Wealth Clock): the old identity met
+    // the rent to the coin and banked nothing — the poverty trap by
+    // construction. The lawful day now banks a small designed surplus
+    // (STARTING_FLOCK × the 2→3 price rise) and remains a floor: modest,
+    // bounded, and far under what crime earns over the same span.
+    const surplusCeiling =
+      RENT_AMOUNT +
+      STARTING_FLOCK * FLEECE_PER_HEAD_PER_DAY * (WOOL_PRICE_DOMESTIC - 2) * (DAYS + 1);
+    expect(coins[0]).toBeGreaterThan(RENT_AMOUNT / 2); // the surplus is real…
+    expect(coins[0]).toBeLessThanOrEqual(surplusCeiling); // …and stays modest
   });
 });
 
@@ -118,11 +124,12 @@ describe(`${GAMES} seeded games, 26 days each — the smuggler (spec §6.9)`, ()
       expect(s.dutchman.unlocked).toBe(true);
       expect(s.cuttingHouse).not.toBeNull(); // the bot climbed the whole ladder
 
-      // Twenty days of trade summon the officer and start the doom clock
-      // (spec §6.10) — and the trade survives him anyway.
+      // Twenty days of trade summon the officer (spec §6.10) — and the trade
+      // survives him anyway. (§6.15 Wealth Clock: the modest smuggler no
+      // longer boils the parish, so nothing promotes to London on this span —
+      // the doom clock now belongs to the hub's scale of trade, as designed.)
       expect(s.revenue.officer.arrived).toBe(true);
       expect(s.heat.regional).toBeGreaterThan(0);
-      expect(s.heat.national).toBeGreaterThan(0);
 
       expect(Number.isFinite(s.coin)).toBe(true);
       // A purely lawful life over the same span tops out at

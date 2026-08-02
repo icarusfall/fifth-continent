@@ -212,17 +212,35 @@ export function Hud({ state }: { state: GameState }) {
           className="hud-coin"
           style={{
             color:
-              state.coin < rent && state.rentDueTick - state.tick < 24 * TICKS_PER_HOUR
-                ? ROOF
+              state.coin < rent && state.rentDueTick - state.tick < 48 * TICKS_PER_HOUR
+                ? HEAT_RED
                 : undefined,
           }}
         >
           {rent}
         </span>
-        <span className="hud-note">
+        <span
+          className="hud-note"
+          style={{
+            color:
+              state.coin < rent && state.rentDueTick - state.tick < 48 * TICKS_PER_HOUR
+                ? HEAT_RED
+                : undefined,
+          }}
+        >
           due day {clockOf(state.rentDueTick).day}, dawn
           {state.coin < rent ? ` · short ${rent - state.coin}` : ' · covered'}
         </span>
+        {/* §20.1 (M5½ playtest) — the urgent warning: short, and nearly due. */}
+        {state.coin < rent && state.rentDueTick - state.tick < 48 * TICKS_PER_HOUR && (
+          <span
+            className="hud-note"
+            style={{ color: HEAT_RED }}
+            title="The purse cannot meet the rent and the due is under two days out. Sell, fence (the ledger has an alarm for it), or count on the Dutchman's book — distraint takes sheep."
+          >
+            the agent is nearly at the door
+          </span>
+        )}
         {state.dutchmanBook > 0 && (
           <span
             className="hud-note"

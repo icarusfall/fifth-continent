@@ -39,10 +39,15 @@ function runTicks(state: GameState, n: number, actions: (s: GameState) => Action
 }
 
 describe('the designed identity (spec §6.16 — check it in a test)', () => {
-  it('flock × price − carter − shearer = rent per day, to the coin', () => {
+  it('flock × price − carter − shearer = rent per day plus the Wealth Clock surplus', () => {
+    // §6.15 (the Great Rebalance): the lawful day used to meet the rent to
+    // the coin and bank nothing — the poverty trap by construction. It now
+    // banks a small designed surplus (STARTING_FLOCK × the 2→3 price rise),
+    // and stays a floor: crime out-earns it several times over.
+    const surplus = STARTING_FLOCK * FLEECE_PER_HEAD_PER_DAY * (WOOL_PRICE_DOMESTIC - 2);
     expect(
       STARTING_FLOCK * FLEECE_PER_HEAD_PER_DAY * WOOL_PRICE_DOMESTIC - CARTER_WAGE - SHEARER_WAGE,
-    ).toBe(RENT_AMOUNT / RENT_PERIOD_DAYS);
+    ).toBe(RENT_AMOUNT / RENT_PERIOD_DAYS + surplus);
   });
 
   it('the town buys just over the starting clip: surplus wool is owling, not income', () => {

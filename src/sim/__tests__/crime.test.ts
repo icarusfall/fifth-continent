@@ -309,11 +309,11 @@ describe('the Ryne market — fixed prices, daily appetite (spec §6.9)', () => 
   });
 
   it('a sated town buys no more until dawn', () => {
-    const first = tick(atRyne({ 'brandy-fair': 10 }), [
+    const first = tick(atRyne({ 'brandy-fair': 14 }), [
       { type: 'sell', cartId: 'cart-1', good: 'brandy-fair' },
     ]);
     expect(first.coin).toBe(DAILY_DEMAND['brandy-fair'] * RYNE_PRICE['brandy-fair']);
-    expect(first.carts[0].cargo['brandy-fair']).toBe(10 - DAILY_DEMAND['brandy-fair']);
+    expect(first.carts[0].cargo['brandy-fair']).toBe(14 - DAILY_DEMAND['brandy-fair']);
     expect(first.demandRemaining['brandy-fair']).toBe(0);
 
     const again = tick(first, [{ type: 'sell', cartId: 'cart-1', good: 'brandy-fair' }]);
@@ -379,7 +379,7 @@ describe('the Dutchman — the ladder (spec §6.9, M5 tutorial pass)', () => {
     });
   });
 
-  it('the first hold is a lesson in itself: 4 lace against a town that drinks 2 a day', () => {
+  it('the first hold is a lesson in itself: his lace outdrinks the town’s day', () => {
     expect(DUTCHMAN_HOLD.lace).toBeGreaterThan(DAILY_DEMAND.lace); // the fence's introduction
   });
 });

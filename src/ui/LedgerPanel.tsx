@@ -9,8 +9,10 @@ import {
   MILITIA_WAGE,
   REFINER_WAGE,
   SHEARER_WAGE,
+  TICKS_PER_DAY,
 } from '../sim/balance';
-import { auditGapNow } from '../sim/revenue';
+import { forecastDay } from '../sim/forecast';
+import { auditGapNow, CONTRABAND } from '../sim/revenue';
 import { carterWageOf, rentAmount, woolOnTheBooks } from '../sim/tick';
 import { clockOf } from '../sim/time';
 import type { GameState } from '../sim/types';
@@ -35,11 +37,19 @@ function wageBill(state: GameState): number {
 
 export function LedgerPanel({ state }: { state: GameState }) {
   const enqueue = useGameStore((s) => s.enqueue);
+  const soundTheAlarm = useGameStore((s) => s.soundTheAlarm);
   const [open, setOpen] = useState(false);
   const l = state.ledger;
   const rent = rentAmount(state);
   const wages = wageBill(state);
   const honest = l.declaredYield >= state.flockSize;
+  const forecast = forecastDay(state);
+  // §20.1 — urgent when the purse is short inside two days of the due.
+  const rentUrgent =
+    state.coin < rent && state.rentDueTick - state.tick < 2 * TICKS_PER_DAY;
+  const anyLadenCart = state.carts.some((c) =>
+    CONTRABAND.some((g) => (c.cargo[g] ?? 0) > 0),
+  );
 
   return (
     <div className={open ? 'ledger-panel open' : 'ledger-panel'}>
@@ -60,10 +70,35 @@ export function LedgerPanel({ state }: { state: GameState }) {
             <p>
               coin <strong>{state.coin}</strong> · wages {wages}/day
             </p>
-            <p>
+            <p style={rentUrgent ? { color: HEAT_RED, fontWeight: 'bold' } : undefined}>
               rent <strong>{rent}</strong>, due day {clockOf(state.rentDueTick).day} at dawn —{' '}
               {state.coin >= rent ? 'covered' : `short ${rent - state.coin}`}
+              {rentUrgent ? ' — and the agent is nearly at the door' : ''}
             </p>
+            {/* §20.1 (M5½ playtest) — the day ahead: the book's guess at what
+                the standing orders take in, against the wages. Never prices
+                the player's own hands, and says so. */}
+            <p
+              title="What the standing orders should take in over the next day — trips priced off each route, capped by the town's appetite and the lugger's. A guess: it prices the orders, never your own hands."
+              style={{
+                color: forecast.takings >= forecast.wages ? undefined : HEAT_RED,
+              }}
+            >
+              the day ahead (the book&rsquo;s guess): takings ~
+              <strong>{forecast.takings}</strong> · wages {forecast.wages} · net{' '}
+              {forecast.takings - forecast.wages >= 0 ? '+' : ''}
+              {forecast.takings - forecast.wages}
+            </p>
+            {(rentUrgent || anyLadenCart) && (
+              <div className="menu-buttons">
+                <button
+                  title="Every cart holding contraband turns for Ryne with the fence taking the remainder; carts already in town fence their load at once. Raise cash first; apologise to the routes later."
+                  onClick={soundTheAlarm}
+                >
+                  Sound the alarm — every laden cart to the fence
+                </button>
+              </div>
+            )}
             {state.dutchmanBook > 0 && (
               <p style={{ color: ROOF }}>
                 the Dutchman&rsquo;s book: <strong>{state.dutchmanBook}</strong> — half of every

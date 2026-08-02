@@ -51,21 +51,25 @@ export const MARSH_TRACK_EXPOSURE = 0.7; // recorded, not consumed until M3
 
 // ---- Prices ----
 // The domestic price is insulting on purpose (spec §10 rung 2).
-export const WOOL_PRICE_DOMESTIC = 2; // coin per fleece at Ryne
+// §6.15 Wealth Clock: 2 → 3 — owling pays 12/fleece at the same 4×, and
+// the lawful floor rises with it (the M3 invariant holds by ratio).
+export const WOOL_PRICE_DOMESTIC = 3; // coin per fleece at Ryne
 export const LEIDEN_PRICE_MULT = 4; // the Dutchman's offer
 
 // ---- The Dutchman (spec §6.9: night, falling tide, no credit) ----
-export const DUTCHMAN_FLEECE_DEMAND = 24; // fleece he'll take per visit
+export const DUTCHMAN_FLEECE_DEMAND = 36; // fleece he'll take per visit (Wealth Clock: was 24)
 // §6.9 (M5 tutorial pass) — the ladder: his hold opens one good at a time,
 // priced in the fleece he has taken over the gunwale. Lace from the first
 // meeting; the mirror of the quay's RUMOUR_TRUST, in owled wool.
 export const DUTCHMAN_TRUST_TEA = 16; // two cart-runs of wool
 export const DUTCHMAN_TRUST_JENEVER = 40; // and jenever arrives with the cutting house in reach
-/** His hold on arrival — restocked each visit. */
+/** His hold on arrival — restocked each visit. §6.15 Wealth Clock: the hold
+ *  grows with the town's thirst, and the first lesson stands — the lace he
+ *  lands still outdrinks Ryne's day, so the fence's introduction holds. */
 export const DUTCHMAN_HOLD: Partial<Record<Good, number>> = {
-  jenever: 12,
-  tea: 8,
-  lace: 4,
+  jenever: 16,
+  tea: 12,
+  lace: 6,
 };
 /** What he charges, coin per unit. */
 export const DUTCHMAN_PRICE: Partial<Record<Good, number>> = {
@@ -116,14 +120,16 @@ export const RYNE_PRICE: Record<Good, number> = {
 /** Units Ryne will buy per day, reset at dawn. Saturation as a wall. §6.16:
  *  fleece demand sits just over the starting clip — a grown flock's surplus
  *  wool moves only over the gunwale (owling), never through the ledger. */
+// §6.15 Wealth Clock: the town drinks more — tea 8→12, lace 2→4,
+// rough 10→12, fair 6→10. Gent holds at the §6.17 retune's floor.
 export const DAILY_DEMAND: Record<Good, number> = {
   fleece: 16,
   jenever: 0,
-  tea: 8,
-  'bulked-tea': 16, // §6.17: a fatter, cheaper channel than the fine leaf's 8
-  lace: 2,
-  'brandy-rough': 10,
-  'brandy-fair': 6,
+  tea: 12,
+  'bulked-tea': 16, // §6.17: a fatter, cheaper channel than the fine leaf's
+  lace: 4,
+  'brandy-rough': 12,
+  'brandy-fair': 10,
   'brandy-gent': 4, // M5c retune: the ladder's top must out-earn its foot
 };
 
@@ -135,7 +141,7 @@ export const PROMOTION_RATE = 0.1; // share of the excess that promotes
 export const SUSPICION_SHARE = 0.5; // every heat event stains its nearest node by this
 export const SUSPICION_DECAY = 0.99; // × at dawn — he keeps notes
 export const STORAGE_HEAT_COEFF = 0.01; // per illicit unit over cover, per tick (§18)
-export const MARKET_TATTLE = 0.5; // heat per contraband unit sold at Ryne
+export const MARKET_TATTLE = 0.3; // heat per unit sold at Ryne (Wealth Clock: volume doubled, the talk must not)
 export const DITCH_HEAT = 0.2; // heat per unit tipped into a dyke — tubs carry no name
 /** What a site can hide in plain sight (stock, not throughput — §6.1 leak is M4). */
 export const COVER_CAPACITY: Partial<Record<string, number>> = {
@@ -218,7 +224,7 @@ export const SHEEP_VALUE = 10; // the agent's valuation under distraint
 /** Cumulative contraband units sold at Ryne before the Company takes notice. */
 // M5c survival retune (§6.13): the designer never saw day 30 on fair — first
 // contact comes to an established trade, and the cadence leaves room to live.
-export const HAWKSMERE_PROVOKE = 120;
+export const HAWKSMERE_PROVOKE = 200; // §6.15 Wealth Clock: first contact ~d18-20 at the new volume
 /** Days from provocation to the first muster. */
 export const HAWKSMERE_FIRST_RAID_DELAY_DAYS = 6;
 /** Days between one raid resolving and the next mustering. */
@@ -275,8 +281,10 @@ export const CELLAR_COVER_PER_TIER = 4;
 // upkeep. Each rung hardens the building (+alpha in a raid, §14.2) and, the
 // trap, makes it louder to the Revenue — the silhouette is the tell.
 export const MAX_FORT_TIER = 4;
-/** Coin to climb *to* each tier (index = tier). Roughly doubles per rung. */
-export const FORT_COST: readonly number[] = [0, 40, 80, 160, 320];
+/** Coin to climb *to* each tier (index = tier). Roughly doubles per rung.
+ *  §6.15 Wealth Clock: the fortress lands at 450, both buildings at 900 —
+ *  day-20 money on the new curve, so the §21 fantasy is buildable. */
+export const FORT_COST: readonly number[] = [0, 30, 60, 120, 240];
 /**
  * Each tier's contribution to a building's visibility (§6.4). Climbs faster
  * than the +0.05/tier alpha: hardness and hiddenness pull apart on purpose.
@@ -497,7 +505,7 @@ export const SEA_TICKS_PER_TILE = 0.2;
 // rail-building. The prices are §21.2's axis made arithmetic: coin to the
 // diggers, Debt to the marsh, Standing to the parish, pasture to the flock.
 /** Coin per tile of channel — a 10-tile segment runs ~120. */
-export const DYKE_COST_PER_TILE = 12;
+export const DYKE_COST_PER_TILE = 8; // §6.15 Wealth Clock: was 12 — the survey ≈ 400 all told
 /** Crew-days per tile, rounded up per segment. One crew, one dig at a time. */
 export const DYKE_DAYS_PER_TILE = 0.5;
 /** §21.1's fourth thing: every dyke shrinks the marsh, permanently. */
@@ -510,10 +518,12 @@ export const DYKE_PASTURE_HEAD = 2;
 // ---- M5a: the research bench (spec §6.14) ----
 // Coin is nominal everywhere in research — the real price is always a meter
 // (Debt, the Heat floor, Standing). Trade costs only coin: safe, and weak.
+// §6.15 Wealth Clock: coin is nominal here (the meters are the price), so
+// the coin stops pretending — marsh and leiden roughly a third cheaper.
 export const RESEARCH_COST: Record<ResearchTree, readonly number[]> = {
   trade: [40],
-  marsh: [30, 70, 140, 260],
-  leiden: [50, 110, 220],
+  marsh: [20, 45, 90, 170],
+  leiden: [30, 70, 140],
 };
 export const RESEARCH_DAYS: Record<ResearchTree, readonly number[]> = {
   trade: [2],

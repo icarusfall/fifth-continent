@@ -94,13 +94,13 @@ describe('the fence — the way out of a sated market (spec §6.17)', () => {
     });
 
   it('takes the whole load at a haircut, uncapped by the day’s appetite', () => {
-    const s = atRyne({ 'brandy-fair': 8 });
-    // The town's appetite for fair brandy is only 6 — the fence ignores it.
-    expect(DAILY_DEMAND['brandy-fair']).toBeLessThan(8);
+    const s = atRyne({ 'brandy-fair': 14 });
+    // The load exceeds the town's daily appetite — the fence ignores it.
+    expect(DAILY_DEMAND['brandy-fair']).toBeLessThan(14);
     const next = tick(s, [{ type: 'sellToFence', cartId: 'cart-1', good: 'brandy-fair' }]);
     const price = Math.round(RYNE_PRICE['brandy-fair'] * FENCE_PRICE_MULT);
     expect(next.carts[0].cargo['brandy-fair'] ?? 0).toBe(0);
-    expect(next.coin).toBe(8 * price);
+    expect(next.coin).toBe(14 * price);
     // The fence is a back door, not the market stall: the day's demand is untouched.
     expect(next.demandRemaining['brandy-fair']).toBe(DAILY_DEMAND['brandy-fair']);
   });

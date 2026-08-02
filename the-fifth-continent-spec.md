@@ -333,13 +333,14 @@ deferred along with Standing itself).
 **Domestic prices — fixed, capped, dumb on purpose.** §17's moving prices
 wait for their milestone. An M2 market is a fixed price and a daily appetite:
 ```
-sellPrice[good]        fleece 2 · brandy round(BRANDY_BASE_PRICE × tierMult)
+sellPrice[good]        fleece 3 (§6.15 Wealth Clock — was 2) · brandy
+                       round(BRANDY_BASE_PRICE × tierMult)
                        · tea 7 · lace 24        (BRANDY_BASE_PRICE = 6)
 tierMult               Rough 0.6 / Fair 1.0 / Gentleman's 1.8   (§17.3)
 demandRemaining        resets at dawn to DAILY_DEMAND[ryne][good]:
-                       fleece 24 · brandy Rough 10 / Fair 6 / Gentleman's 4
-                       · tea 8 · lace 2      (Gentleman's 2 → 4, M5c retune —
-                       the top of the refining ladder must out-earn its foot)
+                       fleece 24 · brandy Rough 12 / Fair 10 / Gentleman's 4
+                       · tea 12 · lace 4     (the §6.15 Wealth Clock table —
+                       the top of the refining ladder still out-earns its foot)
 overproof jenever has no legal buyer — it cannot be sold at Ryne at all
 ```
 When the appetite is spent, the town is done buying until dawn. This is the
@@ -788,13 +789,13 @@ silhouette (the art is the tell, below).
 
 ```
 tier 0  Bare              the building as M1–M3 drew it
-tier 1  Dogs & hedge      FORT_COST[1]=40   +intelligence, not +alpha (see below)
-tier 2  Bolted doors &    FORT_COST[2]=80   the first rung that aids the fight
+tier 1  Dogs & hedge      FORT_COST[1]=30   +intelligence, not +alpha (see below)
+tier 2  Bolted doors &    FORT_COST[2]=60   the first rung that aids the fight
         firing steps                        — a wall for §6.13's men to shoot
                                             from, never men itself
-tier 3  Gunported barn    FORT_COST[3]=160
-tier 4  The Fortified     FORT_COST[4]=320  a blockhouse in a smock
-        Farm
+tier 3  Gunported barn    FORT_COST[3]=120
+tier 4  The Fortified     FORT_COST[4]=240  a blockhouse in a smock
+        Farm                                (§6.15 Wealth Clock — was 40/80/160/320)
 ```
 
 Cost roughly doubles per rung: the top of the ladder is a fortune, and — the
@@ -959,7 +960,8 @@ threats legible:
 
 ```
 HAWKSMERE (rival) — wants your market. Provoked by your FOOTPRINT:
-  contrabandSold (cumulative illicit units sold at Ryne) ≥ HAWKSMERE_PROVOKE 120
+  contrabandSold (cumulative illicit units sold at Ryne) ≥ HAWKSMERE_PROVOKE 200
+  (120 → 200 with §6.15's Wealth Clock: pace, not mercy)
   Once provoked, they raid on a cadence; each raid you survive grows the next.
 
 THE CROWN (state force) — wants you gone. Summoned by national HEAT (§6.3, the
@@ -1096,7 +1098,8 @@ trade    researched at the farm         — costs coin, only coin
 marsh    researched at the wight-stone  — needs ≥1 bound wight
 leiden   researched at the workshop     — needs Leiden housed
 
-RESEARCH_COST   trade [40]       marsh [30, 70, 140, 260]  leiden [50, 110, 220]
+RESEARCH_COST   trade [40]       marsh [20, 45, 90, 170]   leiden [30, 70, 140]
+                (§6.15 Wealth Clock — coin is nominal here and now priced so)
 RESEARCH_DAYS   trade [2]        marsh [2, 3, 4, 5]        leiden [3, 4, 5]
 ```
 
@@ -1345,6 +1348,42 @@ reprice it; they must not make the hum unreachable. When a playtest finds
 the player babysitting a stuck pipeline instead of building the next one
 (the sated-market glut, the shorted-page trap), that is a design defect in
 this section's sense, whatever the individual numbers say.
+
+**The Wealth Clock (M5½ playtest — the Great Rebalance).** The audit that
+forced it: the *perfect* scripted hub — no pauses, no misroutes — banked
+386 coin by day 15 and ~2,300 by day 30, against a "build everything" bill
+of ~2,800 capital plus 35–45/day running, with Hawksmere's first blow at
+~day 26 and national heat crossing the Dragoon line about the same dawn.
+The wealth clock ran at HALF the doom clock, so the §21 fantasy (fortify,
+dig, defend, hum) was arithmetically unreachable at any skill. Every prior
+softening had moved the threat side; nobody had ever audited the income
+side. The target curve, now held by a 200-seed test (the improver's
+timetable): **a competent smuggler banks ~500 by day 10, ~2,000 by day
+20, and can afford the double fortress by ~day 22**; the parish stays
+unpinned for a working smuggler with cellars dug; the Water Guard is not
+automatic before ~day 25. The pass, in one table (old → new):
+
+```
+WOOL_PRICE_DOMESTIC    2 → 3     owling pays 12/fleece at the same 4×;
+                                 the lawful floor rises with it and stays
+                                 a floor (the M3 invariant holds by ratio)
+DUTCHMAN_FLEECE_DEMAND 24 → 36   the lugger scales with dyke-grown flocks
+DAILY_DEMAND           tea 8→12 · lace 2→4 · rough 10→12 · fair 6→10
+                                 (gent stays 4 — the §6.17 retune's floor)
+FORT_COST              [40,80,160,320] → [30,60,120,240]  fortress 450;
+                                 both buildings 900 ≈ day-20 money now
+DYKE_COST_PER_TILE     12 → 8    the survey ≈ 400 all told
+RESEARCH_COST          marsh [30,70,140,260] → [20,45,90,170]
+                       leiden [50,110,220] → [30,70,140]
+                                 (§6.14: coin is nominal; the meters are
+                                 the price — so the coin stops pretending)
+MARKET_TATTLE          0.5 → 0.3 volume doubles; the talk must not
+HAWKSMERE_PROVOKE      120 → 200 first contact stays ~day 18–20 at the
+                                 new volume — pace, not mercy
+```
+
+All opening bids; the distribution suite is re-pinned to the new curve
+and the timetable test keeps any future pass honest.
 
 **The dial** scales what the world does to you — never what your own economy
 yields. Prices, yields, and capacities are identical at every difficulty, so
@@ -1659,7 +1698,8 @@ named segment is a decision; a spaghetti ditch is a mess nobody can read.
 segment      { id, name, path[] }      authored in map.ts, like the roads
 visibility   the survey appears once the cutting house stands (the
              improver's eye); a one-shot card names the old sewers (§10)
-DYKE_COST_PER_TILE   12 coin          a 10-tile segment ≈ 120 coin
+DYKE_COST_PER_TILE   8 coin (§6.15 Wealth Clock — was 12); a 10-tile
+                     segment ≈ 80 coin, the survey ≈ 400 all told
 DYKE_DAYS_PER_TILE   0.5 days        rounded up — slow, capital-intensive
 one dig at a time    state.digging = { id, doneTick } | null — the crew
              is one crew; the bench pattern (§6.14), its own slot (you
@@ -2250,6 +2290,20 @@ A management screen that is also a lie you are maintaining. **The Revenue keeps 
 their ± controls move out of the farm popover, joined by the purse, the
 rent, the Dutchman's book, the day's wage bill, and Standing. The popovers
 stay verbs; the panel is where the lying gets done.)*
+
+*(M5½ playtest — the day ahead, and the alarm.)* The panel gains a
+**cash-flow forecast**: what the standing orders should take in over the
+next 24 hours (per order: trips/day off the route's latency × the load,
+capped by the town's remaining appetite per good — fenced remainders at
+the haircut; the gunwale at the Dutchman's price and appetite), set
+against the wage bill and the coming rent. Explicitly **the book's
+guess** — it prices the orders, never the player's own hands, and says
+so. The HUD's rent line turns urgent (heat-red) when the purse is short
+inside two days of the due. And one button for the bad morning: **sound
+the alarm** — every cart holding contraband is re-ordered to Ryne with
+the fence taking the remainder (§6.17's flag), and carts already standing
+in town fence their load at once. Raise cash first; apologise to the
+routes later. All of it through the ordinary action log, so replays hold.
 
 ### 20.2 Supply flow visibility
 Goods on the map look like **carts, not belts**. Flows are an **overlay**, toggled.

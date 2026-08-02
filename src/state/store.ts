@@ -20,6 +20,7 @@ import {
   REFINER_WAGE,
   RESEARCH_COST,
   RUMOUR_TRUST,
+  RYNE_PRICE,
   SHEARER_UNLOCK_SHEARS,
   SHEARER_WAGE,
   SHEEP_PRICE_BUY,
@@ -676,6 +677,11 @@ export interface GameStore {
   waitAgain: () => void;
   /** Dismiss an informational card and let the world run on. */
   dismissCard: () => void;
+  /** §20.1 (M5½ playtest) — sound the alarm: every cart holding contraband
+   *  is re-ordered to Ryne with the fence taking the remainder, and carts
+   *  already standing in town fence their load at once. Raise cash first;
+   *  apologise to the routes later. Ordinary actions, so replays hold. */
+  soundTheAlarm: () => void;
   save: () => void;
 }
 
@@ -1046,6 +1052,30 @@ export const useGameStore = create<GameStore>()((set, get) => {
     },
 
     dismissCard: () => set({ activeCard: null }),
+
+    soundTheAlarm: () => {
+      const { state, enqueue } = get();
+      for (const cart of state.carts) {
+        const holdings = CONTRABAND.filter((g) => (cart.cargo[g] ?? 0) > 0 && RYNE_PRICE[g] > 0);
+        const atRyne = cart.location.kind === 'node' && cart.location.nodeId === 'ryne';
+        if (atRyne && holdings.length > 0) {
+          // Already in town: straight round the back, every good aboard.
+          for (const g of holdings) enqueue({ type: 'sellToFence', cartId: cart.id, good: g });
+          continue;
+        }
+        if (holdings.length === 0) continue;
+        // The fattest holding names the order; the fence takes what the
+        // appetite leaves. hireCarter re-orders a crewed cart in place (§6.11).
+        const good = holdings.reduce((a, b) => ((cart.cargo[a] ?? 0) >= (cart.cargo[b] ?? 0) ? a : b));
+        const from =
+          cart.carter?.from && cart.carter.from !== 'ryne'
+            ? cart.carter.from
+            : cart.location.kind === 'node' && cart.location.nodeId !== 'ryne'
+              ? cart.location.nodeId
+              : 'farm';
+        enqueue({ type: 'hireCarter', cartId: cart.id, order: { from, to: 'ryne', good, fenceRest: true } });
+      }
+    },
 
     save: () => {
       const { state, actionLog } = get();

@@ -6,10 +6,12 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  CREW_MUSTER,
   FACTION_ALPHA,
   FACTION_BREAKPOINT,
   DRAGOON_HEAT,
   FIRST_RAID_SEIZE_FRAC,
+  FORT_COST,
   HAWKSMERE_FIRST_RAID,
   HAWKSMERE_FIRST_RAID_DELAY_DAYS,
   HAWKSMERE_PROVOKE,
@@ -17,11 +19,10 @@ import {
   RAID_MUSTER_LEAD_DAYS,
   RENT_AMOUNT,
   STANDING_START,
-  STARTING_FLOCK,
   TICKS_PER_DAY,
   WATER_GUARD_HEAT,
 } from '../balance';
-import { runPolicyGame, smugglerPolicy } from '../policy';
+import { hubPolicy, runPolicyGame } from '../policy';
 import { garrisonForce, raidTick, resolveRaid } from '../raid';
 import { initialState } from '../tick';
 import type { Action, GameState } from '../types';
@@ -175,12 +176,13 @@ describe('resolution and consequences (§6.13 / §14.6)', () => {
   });
 });
 
-// ---- House rule §13: 200 seeded games with a defending smuggler ----
+// ---- House rule §13: 200 seeded games with a defending hub ----
 
-// The smuggler of §6.9 who posts a few crew and digs in the cutting house once
-// crime pays — and so has something to answer the Company with when it comes.
+// §6.15 Wealth Clock: provocation sits at 200 sold now — the scale of trade
+// that draws the Company is the HUB's, not the modest smuggler's. The
+// defender is the hub life that digs in and posts crew once crime pays.
 function defendingSmuggler(state: GameState): Action[] {
-  const actions = smugglerPolicy(state);
+  const actions = hubPolicy(state);
   const cart = state.carts[0];
   const atCut = cart?.location.kind === 'node' && cart.location.nodeId === 'cutting-house';
   if (state.cuttingHouse && atCut) {
@@ -198,13 +200,10 @@ function defendingSmuggler(state: GameState): Action[] {
 }
 
 const GAMES = 200;
-// M5c survival retune: provocation moved 60 → 120 sold and the cadence 6 → 9
-// days, so the scenario runs longer to keep its teeth — the Company must
-// still come, and the smuggler must still answer.
-const DAYS = 45;
+const DAYS = 35;
 
-describe(`${GAMES} seeded games, ${DAYS} days — the defending smuggler (spec §13)`, () => {
-  it('the Company comes, the smuggler answers, and the tenancy survives', { timeout: 240_000 }, () => {
+describe(`${GAMES} seeded games, ${DAYS} days — the defending hub (spec §13)`, () => {
+  it('the Company comes, the hub answers, and the tenancy survives', { timeout: 240_000 }, () => {
     const coins: number[] = [];
     let raidedGames = 0;
 
@@ -212,9 +211,9 @@ describe(`${GAMES} seeded games, ${DAYS} days — the defending smuggler (spec �
       const s = runPolicyGame(seed, TICKS_PER_DAY * DAYS, defendingSmuggler);
 
       expect(s.lost).toBe(false); // a raid never ends the tenancy
-      expect(s.flockSize).toBe(STARTING_FLOCK); // they take goods, not sheep
+      expect(s.flockSize).toBeGreaterThan(0); // the hub grows it; nobody empties it
       expect(s.standing).toBeGreaterThan(0); // bloodied, perhaps, but not given up
-      expect(s.hawksmere.provoked).toBe(true); // 30 days of trade draws them
+      expect(s.hawksmere.provoked).toBe(true); // the hub's trade draws them
       if (s.hawksmere.raidsSurvived > 0) raidedGames++;
       coins.push(s.coin);
     }
@@ -222,5 +221,20 @@ describe(`${GAMES} seeded games, ${DAYS} days — the defending smuggler (spec �
     // Deterministic economy and deterministic raids: 200 games, one outcome.
     expect(new Set(coins).size).toBe(1);
     expect(raidedGames).toBe(GAMES); // every one of them was raided at least once
+  });
+
+  // §6.15 — the improver's timetable, held forever: by day 22 the working hub
+  // can afford the double fortress with a garrison behind it and a rent
+  // standing. If a future pass breaks this, the Wealth Clock has slipped.
+  it('the double fortress is day-22 money (spec §6.15, the Wealth Clock)', { timeout: 120_000 }, () => {
+    const bill =
+      2 * (FORT_COST[1] + FORT_COST[2] + FORT_COST[3] + FORT_COST[4]) +
+      4 * CREW_MUSTER +
+      RENT_AMOUNT;
+    for (let seed = 1; seed <= GAMES; seed++) {
+      const s = runPolicyGame(seed, TICKS_PER_DAY * 22, hubPolicy);
+      expect(s.lost).toBe(false);
+      expect(s.coin).toBeGreaterThanOrEqual(bill);
+    }
   });
 });

@@ -150,7 +150,10 @@ describe('the sated market — the carter waits, exposed (spec §6.11 / §6.17)'
     let s = initialState(1);
     s.tick = 60; // mid-morning: the day's appetite is spent long before dawn refreshes it
     s.coin = 100;
-    // Ryne drinks only DAILY_DEMAND['brandy-fair'] = 6 a day; the cart holds 8.
+    // The town is already half-drunk today (§6.15 raised the appetites past a
+    // cartload): only 4 remain of the day's fair-brandy thirst, so the 8 he
+    // hauls must outlast it and the wait-exposed behaviour still shows itself.
+    s.demandRemaining['brandy-fair'] = 4;
     s.stores.farm = { 'brandy-fair': CART_CAPACITY };
     s = tick(s, [
       {
