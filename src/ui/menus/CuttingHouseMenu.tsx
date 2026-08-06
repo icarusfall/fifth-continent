@@ -6,7 +6,7 @@ import { GOOD_LABEL, storeSummary } from '../format';
 import { CUTS, CUTTING_HOUSE_STORE_CAPACITY, CUT_SUGAR_COST, REFINER_UNLOCK, REFINER_WAGE, RYNE_PRICE, SMOUCH_COST, SMOUCH_YIELD } from '../../sim/balance';
 import type { CutDepth, GameState } from '../../sim/types';
 import { CartsAtNode } from './CartRows';
-import { StoreFill, cargoCount, useEnqueue } from './shared';
+import { Group, StoreFill, cargoCount, useEnqueue } from './shared';
 import { CellarRow, FortifyRow, GarrisonRow, WorkshopRow } from './works';
 export function CuttingHouseMenu({ state }: { state: GameState }) {
   const enqueue = useEnqueue();
@@ -69,12 +69,16 @@ export function CuttingHouseMenu({ state }: { state: GameState }) {
 
       <RefinerRow state={state} />
 
-      <FortifyRow state={state} nodeId="cutting-house" />
-      <CellarRow state={state} nodeId="cutting-house" />
-      <GarrisonRow state={state} nodeId="cutting-house" />
-      <WorkshopRow state={state} nodeId="cutting-house" />
+      <Group id="house-works" title={<>works &amp; men</>}>
+        <FortifyRow state={state} nodeId="cutting-house" />
+        <CellarRow state={state} nodeId="cutting-house" />
+        <GarrisonRow state={state} nodeId="cutting-house" />
+        <WorkshopRow state={state} nodeId="cutting-house" />
+      </Group>
 
-      <CartsAtNode state={state} nodeId="cutting-house" />
+      <Group id="house-yard" title="the yard">
+        <CartsAtNode state={state} nodeId="cutting-house" />
+      </Group>
     </>
   );
 }

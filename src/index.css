@@ -915,6 +915,91 @@ button.danger {
   margin-right: 4px;
 }
 
+/* The sheet (stage 3): a menu in the thumb's reach. Same content as the
+   popover; only the container differs. */
+.sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--bar-h) + env(safe-area-inset-bottom, 0px) + 4px);
+  z-index: 10;
+  max-height: 58dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel-solid);
+  border-top: 1px solid var(--clay);
+  border-radius: 10px 10px 0 0;
+  box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.45);
+}
+
+.sheet-handle {
+  background: none;
+  border: none;
+  padding: 6px 0 2px;
+  min-height: 24px;
+  cursor: pointer;
+}
+
+.sheet-handle span {
+  display: block;
+  width: 44px;
+  height: 4px;
+  margin: 0 auto;
+  border-radius: 2px;
+  background: var(--clay);
+  opacity: 0.7;
+}
+
+.sheet-body {
+  overflow-y: auto;
+  padding: 0 var(--sp-3) var(--sp-3);
+  overscroll-behavior: contain;
+}
+
+/* Inside a sheet the popover's close pip is redundant; the handle closes. */
+.sheet .popover-close {
+  display: none;
+}
+
+/* §20 (stage 3) — collapsible menu groups: the heading is the toggle. */
+.menu-group {
+  margin: 2px 0;
+}
+
+.group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: none;
+  border: none;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  color: var(--limewash);
+  padding: 6px 2px 2px;
+}
+
+.group-head h5 {
+  margin: 0;
+  font-size: 11px;
+  font-variant: small-caps;
+  letter-spacing: 0.06em;
+  opacity: 0.7;
+}
+
+.group-head:hover {
+  background: none;
+}
+
+.group-head:hover h5 {
+  opacity: 1;
+}
+
+.group-fold {
+  opacity: 0.55;
+  font-size: 11px;
+}
+
 /* The 800px split (clean-sheet pass, phone-led): below it the chrome
    becomes sheet-and-bar; above it the dock and the ledger's spine tab
    return, and the bar sheds the buttons those replace. */

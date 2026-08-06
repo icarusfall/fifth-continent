@@ -8,7 +8,7 @@ import { dykeWaterways, flockCapOf } from '../../sim/dykes';
 import { illicitAnywhere } from '../../sim/revenue';
 import type { GameState } from '../../sim/types';
 import { CartsAtNode } from './CartRows';
-import { StoreFill, cargoCount, useEnqueue } from './shared';
+import { Group, StoreFill, cargoCount, useEnqueue } from './shared';
 import { CellarRow, FortifyRow, GarrisonRow, WorkshopRow } from './works';
 /**
  * Spec §6.16 — the shearing lad: offered once the chore is felt (six hand
@@ -173,7 +173,7 @@ export function FarmMenu({
 
       <div className="popover-cols">
         <div>
-          <h5>the yard</h5>
+          <Group id="farm-yard" title="the yard">
           <div className="menu-buttons">
             <button
               disabled={state.fleeceReady <= 0}
@@ -219,10 +219,11 @@ export function FarmMenu({
                 </button>
               )}
           </div>
+          </Group>
         </div>
 
         <div>
-          <h5>works &amp; men</h5>
+          <Group id="farm-works" title={<>works &amp; men</>}>
           {/* Fortification appears once you have something worth guarding (§10). */}
           {state.dutchman.unlocked && <FortifyRow state={state} nodeId="farm" />}
           {/* §6.12 — the quiet twin, same gate as the works (§10). */}
@@ -236,14 +237,20 @@ export function FarmMenu({
           <ShearerRow state={state} />
           {state.dutchman.unlocked && <FlockMarketRow state={state} />}
           {state.dutchman.unlocked && <BenchRow state={state} />}
+          </Group>
         </div>
       </div>
 
       {/* The stable roster: every cart answers to the yard, wherever its wheels
           are — and a cart standing here is loaded, sent, and hired from its own
           row, so no cart is left undirected behind the first (§20). */}
-      {state.carts.length > 0 && <h5>the stable</h5>}
-      <CartsAtNode state={state} nodeId="farm" stable />
+      {state.carts.length > 0 ? (
+        <Group id="farm-stable" title="the stable">
+          <CartsAtNode state={state} nodeId="farm" stable />
+        </Group>
+      ) : (
+        <CartsAtNode state={state} nodeId="farm" stable />
+      )}
     </>
   );
 }

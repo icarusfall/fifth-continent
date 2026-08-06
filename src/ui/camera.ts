@@ -47,11 +47,14 @@ export class CameraController {
    * already is. Used by the location dock (spec §20): click the name, and the
    * map glides to the place. It moves only the target; ease() does the gliding.
    */
-  focusOn(wx: number, wy: number): void {
+  /** `atY` (stage 3): where the point comes to rest vertically, as a fraction
+   *  of the viewport — 0.5 is centre; ~0.3 leaves the lower half clear for a
+   *  phone's bottom sheet, so the place stays in view above its own menu. */
+  focusOn(wx: number, wy: number, atY = 0.5): void {
     const z = Math.min(ZOOM_MAX, Math.max(this.tzoom, this.fitZoom * 1.7));
     this.tzoom = z;
     this.tx = wx - this.vw / (2 * z);
-    this.ty = wy - this.vh / (2 * z);
+    this.ty = wy - (this.vh * atY) / z;
   }
 
   /** Advance the easing one frame. */

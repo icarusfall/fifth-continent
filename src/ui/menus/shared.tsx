@@ -13,6 +13,7 @@ import { CONTRABAND } from '../../sim/revenue';
 import { dayPhaseOf } from '../../sim/time';
 import type { Cart, CarterOrder, EdgeId, GameState, Good, NodeId } from '../../sim/types';
 import { useGameStore } from '../../state/store';
+import { useUiStore } from '../../state/ui';
 import { createContext, useContext, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 export function cargoCount(cargo: Partial<Record<Good, number>>): number {
@@ -164,6 +165,25 @@ export function heldAnywhere(state: GameState, good: Good): number {
   return n;
 }
 
+
+/**
+ * §20 (stage 3) — a collapsible run of a long menu. The heading is the
+ * toggle; what you fold away stays folded for the session (UI store, never
+ * the save). Default open: a menu must never HIDE a verb, only shelve it.
+ */
+export function Group({ id, title, children }: { id: string; title: ReactNode; children: ReactNode }) {
+  const open = useUiStore((s) => s.groupOpen[id] ?? true);
+  const toggle = useUiStore((s) => s.toggleGroup);
+  return (
+    <section className="menu-group">
+      <button className="group-head" onClick={() => toggle(id)}>
+        <h5>{title}</h5>
+        <span className="group-fold">{open ? '▾' : '▸'}</span>
+      </button>
+      {open && children}
+    </section>
+  );
+}
 
 export function Popover({
   onClose,

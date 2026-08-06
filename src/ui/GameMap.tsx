@@ -34,6 +34,7 @@ import { CONTRABAND, coverOf, fortVisibility, illicitCount } from '../sim/revenu
 import type { Cart, EdgeId, GameState, Good, NodeId } from '../sim/types';
 import { useGameStore } from '../state/store';
 import { useUiStore } from '../state/ui';
+import { Sheet, useIsPhone } from './Sheet';
 import { CameraController } from './camera';
 import { pathPoints, pointAlong, TILE, tileCenter } from './geometry';
 import { getTerrainCanvas } from './paint';
@@ -230,6 +231,7 @@ export function GameMap({ state }: { state: GameState }) {
 
   const stateRef = useRef(state);
   stateRef.current = state;
+  const isPhone = useIsPhone();
 
   const [selected, setSelected] = useState<Selection>(null);
   const selectedRef = useRef<Selection>(null);
@@ -736,7 +738,9 @@ export function GameMap({ state }: { state: GameState }) {
   function selectPlace(sel: Selection) {
     if (sel === 'farm') farmVisitedRef.current = true;
     const w = anchorWorld(sel, stateRef.current);
-    if (w) camRef.current!.focusOn(w.x, w.y);
+    // Phone (stage 3): the menu is a bottom sheet, so the place eases into
+    // the upper third and stays visible above its own card.
+    if (w) camRef.current!.focusOn(w.x, w.y, isPhone ? 0.3 : 0.5);
     setSelected(sel);
   }
   const places: Array<{ sel: Selection; label: string }> = [
@@ -863,41 +867,48 @@ export function GameMap({ state }: { state: GameState }) {
         </nav>
       )}
 
-      {selected && !placing && (
-        <div ref={popRef} className="popover-anchor">
-          <Popover wide={selected === 'farm'} onClose={() => setSelected(null)}>
+      {selected &&
+        !placing &&
+        (() => {
+          const content = (
             <CloseCtx.Provider value={() => setSelected(null)}>
-            {selected === 'farm' && (
-              <FarmMenu state={state} onPlace={() => setPlacing(true)} />
-            )}
-            {selected === 'ryne' && <RyneMenu state={state} />}
-            {selected === 'customs' && (
-              <>
-                <h4>The Customs House</h4>
-                <p className="flavour">
-                  {state.revenue.officer.arrived
-                    ? 'A Riding Officer lodges upstairs now. He keeps early hours and long lists.'
-                    : 'Quiet today. It counts things. It is counting now.'}
-                </p>
-              </>
-            )}
-            {selected === 'shingle' && (
-              <ShingleMenu state={state} onPlace={() => setPlacing(true)} />
-            )}
-            {selected === 'cutting-house' && <CuttingHouseMenu state={state} />}
-            {selected === 'wight-sign' && <SignMenu state={state} />}
-            {selected === 'wight-stone' && <StoneMenu state={state} />}
-            {selected === 'officer' && <OfficerMenu state={state} />}
-            {selected?.startsWith('dyke:') && (
-              <DykeMenu state={state} dykeId={selected.slice(5)} />
-            )}
-            {selected?.startsWith('cart:') && (
-              <CartMenu state={state} flooded={flooded} cartId={selected.slice(5)} />
-            )}
+              {selected === 'farm' && <FarmMenu state={state} onPlace={() => setPlacing(true)} />}
+              {selected === 'ryne' && <RyneMenu state={state} />}
+              {selected === 'customs' && (
+                <>
+                  <h4>The Customs House</h4>
+                  <p className="flavour">
+                    {state.revenue.officer.arrived
+                      ? 'A Riding Officer lodges upstairs now. He keeps early hours and long lists.'
+                      : 'Quiet today. It counts things. It is counting now.'}
+                  </p>
+                </>
+              )}
+              {selected === 'shingle' && (
+                <ShingleMenu state={state} onPlace={() => setPlacing(true)} />
+              )}
+              {selected === 'cutting-house' && <CuttingHouseMenu state={state} />}
+              {selected === 'wight-sign' && <SignMenu state={state} />}
+              {selected === 'wight-stone' && <StoneMenu state={state} />}
+              {selected === 'officer' && <OfficerMenu state={state} />}
+              {selected?.startsWith('dyke:') && <DykeMenu state={state} dykeId={selected.slice(5)} />}
+              {selected?.startsWith('cart:') && (
+                <CartMenu state={state} flooded={flooded} cartId={selected.slice(5)} />
+              )}
             </CloseCtx.Provider>
-          </Popover>
-        </div>
-      )}
+          );
+          // Stage 3 — one content, two presentations: the thumb's sheet on a
+          // phone, the world-anchored popover on a desktop (§20).
+          return isPhone ? (
+            <Sheet onClose={() => setSelected(null)}>{content}</Sheet>
+          ) : (
+            <div ref={popRef} className="popover-anchor">
+              <Popover wide={selected === 'farm'} onClose={() => setSelected(null)}>
+                {content}
+              </Popover>
+            </div>
+          );
+        })()}
     </div>
   );
 }

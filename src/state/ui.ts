@@ -35,6 +35,10 @@ interface UiStore {
   /** The full log, phone presentation (the ticker opens it). */
   logOpen: boolean;
   setLogOpen: (open: boolean) => void;
+  /** §20 (stage 3) — which menu groups stand open. Session-only preference:
+   *  a long menu folds to its headings and remembers what you kept out. */
+  groupOpen: Record<string, boolean>;
+  toggleGroup: (id: string) => void;
 }
 
 export const useUiStore = create<UiStore>((set) => ({
@@ -57,4 +61,6 @@ export const useUiStore = create<UiStore>((set) => ({
   setLedgerOpen: (open) => set({ ledgerOpen: open }),
   logOpen: false,
   setLogOpen: (open) => set({ logOpen: open }),
+  groupOpen: {},
+  toggleGroup: (id) => set((s) => ({ groupOpen: { ...s.groupOpen, [id]: !(s.groupOpen[id] ?? true) } })),
 }));
