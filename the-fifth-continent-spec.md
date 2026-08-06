@@ -2509,7 +2509,7 @@ disclosure: routes appear only once there is something to move.
 **M3 — The Revenue.** `RevenueModel`, suspicion inference, the fogged player-facing intel map, cover & leak, first Riding Officer (§6.10). Bought carts and the hired carter on standing orders (§6.11) — automation arrives with the man who stops carts.
 **M4 — Force.** Hawksmere, raid resolution, fortification tiers, the visibility trade-off.
 **M5 — The Trees.** Ichor and Phlogiston, Debt, Publication, the two unlock events (§6.14). Difficulty dial & mercy (§6.15) and the shearer + flock market (§6.16) land first, in M5a. Sub-stops M5a/M5b/M5c.
-**M5½ — The Dykes.** §21.1's dig verb: channel logistics, chokepoints, drainage cover, dyke Debt. Designed 2026-07 (§6.18): three stops — M5½a the survey & the spade, M5½b the tub-boat, M5½c the water fights back.
+**M5½ — The Dykes.** §21.1's dig verb: channel logistics, chokepoints, drainage cover, dyke Debt. Designed 2026-07 (§6.18): four stops — M5½a the survey & the spade, M5½b the tub-boat, M5½c the water fights back, M5½d the round and the meters that speak (the raid readouts, the heat cap, §6.19's multi-stop order).
 **M6 — Alliances & Endings.**
 
 ---
