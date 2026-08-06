@@ -57,6 +57,12 @@ export class CameraController {
     this.ty = wy - (this.vh * atY) / z;
   }
 
+  /** The fitted zoom (whole world in view) — the LOD bands are read off
+   *  zoom relative to this (§15.2, stage 5). */
+  get fit(): number {
+    return this.fitZoom;
+  }
+
   /** Advance the easing one frame. */
   ease(): void {
     this.x += (this.tx - this.x) * EASE_PAN;

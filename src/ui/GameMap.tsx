@@ -65,6 +65,7 @@ import {
   drawWightSign,
   drawWightStone,
   drawWoolMote,
+  drawPlaceMark,
   drawWorkshopBadge } from './sprites';
 
 type Selection =
@@ -171,6 +172,23 @@ function moteLife(m: Mote): number {
   return m.kind === 'wool' ? WOOL_MOTE_MS : COIN_MOTE_MS;
 }
 
+/**
+ * §15.2 (stage 5) — the three semantic-zoom bands, with hysteresis so the
+ * boundary never flickers under an easing camera. County is the strategic
+ * view (the route graph, flow as thickness, places as marks — the same map
+ * the Revenue keeps); Parish is the working view; Yard is close detail,
+ * where the labels yield to the art.
+ */
+type Lod = 'county' | 'parish' | 'yard';
+
+function lodBand(ratio: number, prev: Lod): Lod {
+  if (prev === 'county') return ratio > 1.42 ? (ratio > 3.55 ? 'yard' : 'parish') : 'county';
+  if (prev === 'yard') return ratio < 3.25 ? (ratio < 1.28 ? 'county' : 'parish') : 'yard';
+  if (ratio < 1.28) return 'county';
+  if (ratio > 3.55) return 'yard';
+  return 'parish';
+}
+
 function routesVisible(state: GameState): boolean {
   const cart = state.carts[0];
   return (
@@ -257,6 +275,8 @@ export function GameMap({ state }: { state: GameState }) {
   const showGoodsRef = useRef(true);
   showGoodsRef.current = showGoods;
   const hoverTileRef = useRef<{ x: number; y: number } | null>(null);
+  // §15.2 (stage 5) — the zoom band, held across frames for hysteresis.
+  const lodRef = useRef<Lod>('parish');
   // Feedback motes (§20): spawned by state deltas below, drawn by the loop.
   const motesRef = useRef<Mote[]>([]);
   const prevFxRef = useRef<GameState | null>(null);
@@ -312,6 +332,10 @@ export function GameMap({ state }: { state: GameState }) {
       );
 
       // Layer 1: roads, flock, buildings, cart.
+      // §15.2 — which band this frame draws in.
+      const lod = (lodRef.current = lodBand(cam.zoom / cam.fit, lodRef.current));
+      const county = lod === 'county';
+      const yard = lod === 'yard';
       const floodedNow = isFlooded(s.tick);
       for (const edge of edgesFor(s.farm, s.cuttingHouse)) {
         // Progressive disclosure: the roads once there is something to move;
@@ -339,16 +363,21 @@ export function GameMap({ state }: { state: GameState }) {
       if (showGoodsRef.current) {
         const served = carterRouteEdges(s);
         for (const edge of edgesFor(s.farm, s.cuttingHouse)) {
-          if (served.has(edge.id)) drawCarterRoute(ctx, pathPoints(edge, false));
+          // County (§15.2): traffic is thickness — the flow-volume line.
+          if (served.has(edge.id)) drawCarterRoute(ctx, pathPoints(edge, false), county ? 2.4 : 1);
         }
       }
-      drawSheep(ctx, s.farm, s.flockSize);
-      drawFarm(ctx, s.farm);
-      if ((s.fortifications.farm ?? 0) > 0) {
-        drawFortifications(ctx, s.farm, s.fortifications.farm ?? 0, fortVisibility(s, 'farm'));
-      }
       const fc = tileCenter(s.farm);
-      drawLabel(ctx, 'Walland Farm', fc.x, fc.y - 16);
+      if (county) {
+        drawPlaceMark(ctx, fc.x, fc.y);
+      } else {
+        drawSheep(ctx, s.farm, s.flockSize);
+        drawFarm(ctx, s.farm);
+        if ((s.fortifications.farm ?? 0) > 0) {
+          drawFortifications(ctx, s.farm, s.fortifications.farm ?? 0, fortVisibility(s, 'farm'));
+        }
+      }
+      if (!yard) drawLabel(ctx, 'Walland Farm', fc.x, fc.y - 16);
       if (isFreshGame(s) && !farmVisitedRef.current) {
         drawFarmGlow(ctx, s.farm, (performance.now() / 1800) % 1);
       }
@@ -362,53 +391,69 @@ export function GameMap({ state }: { state: GameState }) {
               ? 'digging'
               : 'survey';
           drawDyke(ctx, seg.path, status);
-          if (status !== 'dug') {
+          if (status !== 'dug' && !county) {
             drawSurveyPost(ctx, pointAlong(seg.path.map(tileCenter), 0.5));
           }
         }
       }
 
-      drawRyne(ctx);
-      drawLabel(ctx, 'Ryne', 28.5 * TILE, 19.6 * TILE);
-      drawCustoms(ctx);
-      drawLabel(ctx, 'Customs House', 26.5 * TILE, 17.9 * TILE);
+      if (county) {
+        drawPlaceMark(ctx, 28.5 * TILE, 20.6 * TILE);
+        drawPlaceMark(ctx, 26.5 * TILE, 18.9 * TILE);
+      } else {
+        drawRyne(ctx);
+        drawCustoms(ctx);
+      }
+      if (!yard) {
+        drawLabel(ctx, 'Ryne', 28.5 * TILE, 19.6 * TILE);
+        drawLabel(ctx, 'Customs House', 26.5 * TILE, 17.9 * TILE);
+      }
 
       if (s.dutchman.unlocked) {
-        drawShingle(ctx, SHINGLE);
         const sc = tileCenter(SHINGLE);
-        drawLabel(ctx, 'The Shingle', sc.x - 4, sc.y - 12);
+        if (county) {
+          drawPlaceMark(ctx, sc.x, sc.y);
+        } else {
+          drawShingle(ctx, SHINGLE);
+        }
+        if (!yard) drawLabel(ctx, 'The Shingle', sc.x - 4, sc.y - 12);
+        // The lugger is an event, not scenery: it shows in every band.
         if (s.dutchman.present) drawLugger(ctx, SHINGLE);
       }
       if (s.cuttingHouse) {
-        drawCuttingHouse(ctx, s.cuttingHouse);
-        if ((s.fortifications['cutting-house'] ?? 0) > 0) {
-          drawFortifications(
-            ctx,
-            s.cuttingHouse,
-            s.fortifications['cutting-house'] ?? 0,
-            fortVisibility(s, 'cutting-house'),
-          );
-        }
         const cc = tileCenter(s.cuttingHouse);
-        drawLabel(ctx, 'Cutting House', cc.x, cc.y - 12);
+        if (county) {
+          drawPlaceMark(ctx, cc.x, cc.y);
+        } else {
+          drawCuttingHouse(ctx, s.cuttingHouse);
+          if ((s.fortifications['cutting-house'] ?? 0) > 0) {
+            drawFortifications(
+              ctx,
+              s.cuttingHouse,
+              s.fortifications['cutting-house'] ?? 0,
+              fortVisibility(s, 'cutting-house'),
+            );
+          }
+        }
+        if (!yard) drawLabel(ctx, 'Cutting House', cc.x, cc.y - 12);
       }
 
       // §6.14 — the marsh's own marks: the sign, and the stone once bound.
       const wightPhase = (performance.now() / 2600) % 1;
-      if (s.wights.sign) drawWightSign(ctx, s.wights.sign, wightPhase);
+      if (!county && s.wights.sign) drawWightSign(ctx, s.wights.sign, wightPhase);
       if (s.wights.stone) {
-        drawWightStone(ctx, s.wights.stone, wightPhase);
+        if (!county) drawWightStone(ctx, s.wights.stone, wightPhase);
         const wc = tileCenter(s.wights.stone);
-        drawLabel(ctx, 'The Wight-Stone', wc.x, wc.y - 16);
+        if (!yard) drawLabel(ctx, 'The Wight-Stone', wc.x, wc.y - 16);
       }
 
       // §6.14 (M5c) — the workshop's mark on its host, in the owner's orange.
       if (s.leiden.state === 'housed' && s.leiden.node) {
         const host = s.leiden.node === 'farm' ? s.farm : s.cuttingHouse;
-        if (host) {
+        if (host && !county) {
           drawWorkshopBadge(ctx, host, wightPhase);
           const hc = tileCenter(host);
-          drawLabel(ctx, 'The Workshop', hc.x, hc.y + 22);
+          if (!yard) drawLabel(ctx, 'The Workshop', hc.x, hc.y + 22);
         }
       }
 
@@ -444,7 +489,8 @@ export function GameMap({ state }: { state: GameState }) {
         }
       }
 
-      for (const cart of s.carts) {
+      // County shows flow, not vehicles: the ribbons carry the story.
+      for (const cart of county ? [] : s.carts) {
         const cp = cartWorldPosOf(s, cart);
         if (!cp) continue;
         if (cart.vessel === 'sea') {
@@ -475,7 +521,7 @@ export function GameMap({ state }: { state: GameState }) {
 
       // The goods overlay (§20.2): a stock chip at every place that holds
       // anything, and the town's remaining appetite — bottlenecks read red.
-      if (showGoodsRef.current) {
+      if (showGoodsRef.current && !county) {
         const farmStore = s.stores.farm ?? {};
         const farmCount = cargoCount(farmStore);
         const farmRows = stockRows(farmStore);

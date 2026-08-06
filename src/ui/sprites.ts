@@ -394,6 +394,7 @@ export function drawWorkshopBadge(
 export function drawCarterRoute(
   ctx: CanvasRenderingContext2D,
   pts: Array<{ x: number; y: number }>,
+  width = 1,
 ): void {
   const trace = () => {
     ctx.beginPath();
@@ -404,13 +405,31 @@ export function drawCarterRoute(
   ctx.lineCap = 'round';
   ctx.setLineDash([]);
 
-  // The glow: a wide, faint halo, then a thin bright core.
+  // The glow: a wide, faint halo, then a thin bright core. `width` (§15.2,
+  // stage 5): the County band draws traffic as thickness — this is the
+  // strategic view's flow-volume line.
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
-  ctx.lineWidth = 8;
+  ctx.lineWidth = 8 * width;
   trace();
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 2 * width;
   trace();
+}
+
+/**
+ * §15.2 (stage 5) — the County band's place mark: at the strategic zoom the
+ * buildings collapse to a ringed dot and their names. This is deliberately
+ * the same graphic language as the Revenue's map — the player should feel
+ * the uncomfortable symmetry.
+ */
+export function drawPlaceMark(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+  ctx.beginPath();
+  ctx.arc(x, y, 5, 0, Math.PI * 2);
+  ctx.fillStyle = LIMEWASH;
+  ctx.fill();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = INK;
+  ctx.stroke();
 }
 
 /**
