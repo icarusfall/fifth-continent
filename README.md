@@ -6,11 +6,29 @@ A single-player, browser-based god/builder game about smuggling, logistics, and
 the two kinds of magic you can use to hide a crime. Design spec and build brief:
 [the-fifth-continent-spec.md](./the-fifth-continent-spec.md).
 
-**406 tests green · save v25 · M5½ complete, awaiting review.**
+**406 tests green · save v25 · M5½ complete · the clean-sheet UI pass shipped.**
 
 ---
 
-## Status: M5½d — the round, and the meters learn to speak ✅
+## Status: the clean-sheet UI pass ✅ (then M6)
+
+Phone-led, on the dark ink look tidied, in six commits (spec §20, §15.2).
+The header is gone: the map fills the screen and the chrome floats — a thin
+instrument strip up top (meters appear only when the world gives them
+something to say), a bottom bar in the thumb zone. Below 800px every menu
+rises as a bottom sheet with the camera easing the place into view above
+its own card; a desktop keeps the dock, the spine tab, and the anchored
+popovers — same components either side of the line. The overlays became the
+promised one-keystroke reading: off → yours (limewash) → theirs (the gossip
+stains in Revenue blue) → both, the gap legible as colour disagreement; Tab
+cycles it. And §15.2's semantic zoom landed: County (marks, names, traffic
+as ribbon thickness — the Revenue's own graphic language), Parish, Yard,
+with hysteresis. Long menus fold under their headings; every staged flow
+offers a way out on every step; the phone's log is a one-line ticker that
+opens into a sheet. GameMap.tsx was split from 3,000 lines into the canvas
+shell plus eight menu files. Nothing touches GameState — no save bump.
+
+Earlier: **M5½d — the round, and the meters learn to speak ✅**
 
 Three playtest reports, one pass (spec §6.18, §6.19).
 
@@ -124,7 +142,6 @@ watchable battle with its three Calls.
   The heat cap makes one of these load-bearing — soldiers now require *a named
   act*, and violence against an officer is the act §7 has always meant.
 - **The moving-price market (§17).** Prices are fixed with daily demand caps.
-- A clean-sheet UI pass, before M6.
 
 ## Run it
 

@@ -1049,17 +1049,45 @@ button.danger {
     width: 72px;
   }
 
-  /* The log must never bury the map: newest lines only, fading out below. */
+  /* The log folds to a one-line ticker (stage 6): the map is never under a
+     text box on a phone. The ticker opens the full history as a sheet. */
   .log-float {
-    max-width: 60vw;
+    left: 8px;
+    right: 8px;
+    width: auto;
+    max-width: none;
   }
 
-  .event-log {
-    max-height: 20vh;
-    overflow: hidden;
+  .log-ticker {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: var(--panel-thin);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    color: var(--limewash);
     font-size: 11px;
-    -webkit-mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
-    mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
+    font-style: italic;
+    padding: 7px 10px;
+    pointer-events: auto;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* The log sheet escapes its float: fixed to the viewport like any sheet. */
+  .log-float .sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    pointer-events: auto;
+  }
+
+  .event-log.in-sheet {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: var(--fs-s);
   }
 
   /* Rare verbs retreat into the strip's fold; the bar keeps the thumb's. */

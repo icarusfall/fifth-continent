@@ -3010,6 +3010,50 @@ is Overlay A's first standing form.)*
 
 The gap between A and B is the game. Make looking at it effortless.
 
+*(Built, the clean-sheet UI pass, 2026-08 — phone-led by the designer's call,
+desktop the stretched version, on the dark ink look kept and tidied.)*
+
+```
+the shell        no header: the map fills the viewport and every piece of
+                 chrome floats. A thin INSTRUMENT STRIP on top (clock, tide,
+                 purse, rent; the heat and debt gauges appear only once the
+                 world gives them something to say — §10) with the rest of
+                 the reckoning behind a fold. A BOTTOM BAR in the thumb zone:
+                 places, the overlay control, the speeds, the ledger. The
+                 800px line splits the presentations: below it the dock hides
+                 behind Places and menus rise as BOTTOM SHEETS (the camera
+                 easing the place into the upper third, above its own card);
+                 a desktop keeps the dock, the spine tab, and the anchored
+                 popovers. Same content components either side of the line.
+the overlay      one control, cycling off → A (yours: goods chips, carter
+                 ribbons, in limewash) → B (theirs: the gossip stains, worn
+                 in Revenue blue — the stain is the Revenue's belief, and
+                 the palette reserves that colour for exactly them) → C
+                 (both: the gap reads as colour disagreement). Tab on a
+                 desktop, the bar's button on a phone. Before the parish
+                 has anything to say the ring is off ↔ A only (§10).
+the bands        §15.2's semantic zoom, with hysteresis so an easing camera
+                 never flickers the boundary. County: buildings collapse to
+                 ringed marks and names, carts stand down, a round's ribbon
+                 thickens with traffic — the strategic view, deliberately
+                 the Revenue's own graphic language. Parish: the working
+                 view. Yard: labels yield to the art. The lugger, an event
+                 and not scenery, shows in every band.
+the menus        long menus fold under their small-caps headings (the yard /
+                 works & men / the stable), the heading the toggle, folded
+                 state kept for the session and never in the save. Default
+                 open: a menu may shelve a verb, never hide it. Staged flows
+                 offer a way out on every step (playtest: a mis-clicked
+                 hire had to be clicked through to the end).
+the log          a floating recent-history card on a desktop; a one-line
+                 ticker on a phone, opening the full history as a sheet —
+                 the map is never under a text box.
+```
+
+None of this touches GameState: overlay mode, folded groups, open panels
+are UI store only (house rules 1–2), and losing them costs a preference,
+never a tenancy.
+
 ---
 
 ## 21. TRANSPORT — AND THE DYKES
