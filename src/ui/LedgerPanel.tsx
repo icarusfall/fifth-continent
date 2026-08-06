@@ -3,7 +3,6 @@
 // here (out of the farm popover, M5a-3), alongside the purse, the rent, the
 // Dutchman's book, the day's wage bill, and the parish's regard.
 
-import { useState } from 'react';
 import {
   CREW_WAGE,
   MILITIA_WAGE,
@@ -17,6 +16,7 @@ import { carterWageOf, rentAmount, woolOnTheBooks } from '../sim/tick';
 import { clockOf } from '../sim/time';
 import type { GameState } from '../sim/types';
 import { useGameStore } from '../state/store';
+import { useUiStore } from '../state/ui';
 import { HEAT_RED, ROOF } from './palette';
 
 /** The day's standing wages: carters (danger money and all), the shearing
@@ -38,7 +38,10 @@ function wageBill(state: GameState): number {
 export function LedgerPanel({ state }: { state: GameState }) {
   const enqueue = useGameStore((s) => s.enqueue);
   const soundTheAlarm = useGameStore((s) => s.soundTheAlarm);
-  const [open, setOpen] = useState(false);
+  // Open state lives in the UI store: the spine tab (desktop) and the bottom
+  // bar's ledger button (phone) drive the same panel.
+  const open = useUiStore((s) => s.ledgerOpen);
+  const setOpen = useUiStore((s) => s.setLedgerOpen);
   const l = state.ledger;
   const rent = rentAmount(state);
   const wages = wageBill(state);
@@ -56,7 +59,7 @@ export function LedgerPanel({ state }: { state: GameState }) {
       <button
         className="ledger-tab"
         title="The book the officer reads — and the one you keep."
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => setOpen(!open)}
       >
         {open ? 'close ›' : '‹ the ledger'}
       </button>

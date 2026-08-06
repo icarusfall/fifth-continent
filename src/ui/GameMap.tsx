@@ -101,6 +101,7 @@ import type {
   NodeId,
 } from '../sim/types';
 import { useGameStore } from '../state/store';
+import { useUiStore } from '../state/ui';
 import { CameraController } from './camera';
 import { pathPoints, pointAlong, TILE, tileCenter } from './geometry';
 import { getTerrainCanvas } from './paint';
@@ -443,12 +444,17 @@ export function GameMap({ state }: { state: GameState }) {
   const placingRef = useRef(false);
   placingRef.current = placing;
   // The gossip overlay (spec §6.10): yesterday's Revenue mind, one toggle.
-  const [showGossip, setShowGossip] = useState(false);
+  // §20.2 — the overlay mode lives in the UI store now (the bottom bar's
+  // cycle button and Tab both drive it); the loop still reads refs.
+  const overlay = useUiStore((s) => s.overlay);
+  const dockOpen = useUiStore((s) => s.dockOpen);
+  const setDockOpen = useUiStore((s) => s.setDockOpen);
+  const showGossip = overlay === 'b' || overlay === 'c';
   const showGossipRef = useRef(false);
   showGossipRef.current = showGossip;
   // The goods overlay (spec §20.2): stock chips at every place, on by default
   // — once the hub splits the stores, "what is where" must be read at a glance.
-  const [showGoods, setShowGoods] = useState(true);
+  const showGoods = overlay === 'a' || overlay === 'c';
   const showGoodsRef = useRef(true);
   showGoodsRef.current = showGoods;
   const hoverTileRef = useRef<{ x: number; y: number } | null>(null);
@@ -1037,46 +1043,14 @@ export function GameMap({ state }: { state: GameState }) {
 
       {state.lost && <ForfeitOverlay />}
 
-      {(state.heat.regional >= 0.5 || state.revenue.officer.arrived) && (
-        <button
-          className={showGossip ? 'gossip-toggle on' : 'gossip-toggle'}
-          title={
-            state.research.completed.leiden >= 3
-              ? 'The Aetheric Telegraph: the Revenue’s mind, live, and where he calls next (§6.14).'
-              : "What the parish says the Revenue thinks. Yesterday's news, like all gossip."
-          }
-          onClick={(e) => {
-            e.stopPropagation();
-            setShowGossip((v) => !v);
-          }}
-        >
-          {state.research.completed.leiden >= 3
-            ? showGossip
-              ? 'telegraph · on'
-              : 'telegraph'
-            : showGossip
-              ? 'gossip · on'
-              : 'gossip'}
-        </button>
-      )}
-
-      <button
-        className={showGoods ? 'gossip-toggle goods on-goods' : 'gossip-toggle goods'}
-        title="What sits where, what the town still buys, and where the walls press — overlay A: what you are actually doing (§20.2)."
-        onClick={(e) => {
-          e.stopPropagation();
-          setShowGoods((v) => !v);
-        }}
-      >
-        {showGoods ? 'goods · on' : 'goods'}
-      </button>
-
       {!placing && !state.lost && (
         // Stop pointer events reaching the shell: otherwise its pointerdown
         // captures the pointer and steals the button's click (and would start
         // a camera pan). onClick stop keeps the map's hit-test from firing too.
+        // Phone: the dock hides behind the bar's Places button and closes on
+        // a pick; desktop shows it always (the .open class is a no-op there).
         <nav
-          className="location-dock"
+          className={dockOpen ? 'location-dock open' : 'location-dock'}
           aria-label="Places"
           onPointerDown={(e) => e.stopPropagation()}
         >
@@ -1087,6 +1061,7 @@ export function GameMap({ state }: { state: GameState }) {
               onClick={(e) => {
                 e.stopPropagation();
                 selectPlace(pl.sel);
+                setDockOpen(false);
               }}
             >
               {pl.label}
