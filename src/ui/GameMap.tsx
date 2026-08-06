@@ -334,9 +334,13 @@ export function GameMap({ state }: { state: GameState }) {
       }
       // §20 — the carter's rounds, named in light: a soft white ribbon over
       // every edge a standing order rides (playtest: "which roads are his?").
-      const served = carterRouteEdges(s);
-      for (const edge of edgesFor(s.farm, s.cuttingHouse)) {
-        if (served.has(edge.id)) drawCarterRoute(ctx, pathPoints(edge, false));
+      // Stage 4: the ribbons belong to overlay A — YOUR map. Under B alone
+      // they stand down, so "theirs" is purely the Revenue's reading.
+      if (showGoodsRef.current) {
+        const served = carterRouteEdges(s);
+        for (const edge of edgesFor(s.farm, s.cuttingHouse)) {
+          if (served.has(edge.id)) drawCarterRoute(ctx, pathPoints(edge, false));
+        }
       }
       drawSheep(ctx, s.farm, s.flockSize);
       drawFarm(ctx, s.farm);

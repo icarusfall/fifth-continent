@@ -222,10 +222,13 @@ export function drawGossipStain(
   y: number,
   strength: number,
 ): void {
+  // §20.2 (stage 4) — overlay B is THEIR map: the Revenue's belief wears the
+  // Revenue's blue, so superimposed on overlay A (limewash) the gap between
+  // the two maps reads as colour disagreement. Heat red stays for heat.
   const r = 10 + Math.sqrt(strength) * 6;
   const g = ctx.createRadialGradient(x, y, 2, x, y, r);
-  g.addColorStop(0, `${HEAT_RED}66`);
-  g.addColorStop(1, `${HEAT_RED}00`);
+  g.addColorStop(0, `${REVENUE_BLUE}88`);
+  g.addColorStop(1, `${REVENUE_BLUE}00`);
   ctx.fillStyle = g;
   ctx.beginPath();
   ctx.arc(x, y, r, 0, Math.PI * 2);

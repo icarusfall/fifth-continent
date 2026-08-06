@@ -3,6 +3,7 @@
 // killer feature, and it must be one keystroke"); the speeds ride along; the
 // ledger opens from here where the spine tab is too small to hit.
 
+import { useEffect } from 'react';
 import type { GameState } from '../sim/types';
 import { gossipAvailable, useUiStore } from '../state/ui';
 import { SpeedControls, SystemControls } from './SpeedControls';
@@ -24,6 +25,21 @@ function overlayLabel(mode: 'off' | 'a' | 'b' | 'c', telegraph: boolean): string
 export function BottomBar({ state }: { state: GameState }) {
   const overlay = useUiStore((s) => s.overlay);
   const cycleOverlay = useUiStore((s) => s.cycleOverlay);
+  // §20.2 — "the killer feature, and it must be one keystroke": Tab cycles
+  // the overlay on a desktop; the bar's button is the phone's thumb version.
+  const hasGossipNow = gossipAvailable(state);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+      const el = document.activeElement;
+      // Leave Tab alone while something focusable is actually being used.
+      if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return;
+      e.preventDefault();
+      cycleOverlay(hasGossipNow);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [cycleOverlay, hasGossipNow]);
   const dockOpen = useUiStore((s) => s.dockOpen);
   const setDockOpen = useUiStore((s) => s.setDockOpen);
   const ledgerOpen = useUiStore((s) => s.ledgerOpen);
