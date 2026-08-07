@@ -22,9 +22,6 @@ interface UiStore {
   overlay: OverlayMode;
   cycleOverlay: (hasGossip: boolean) => void;
   setOverlay: (mode: OverlayMode) => void;
-  /** The location dock, phone presentation: shown behind a Places button. */
-  dockOpen: boolean;
-  setDockOpen: (open: boolean) => void;
   /** The instrument strip's detail fold. */
   hudOpen: boolean;
   setHudOpen: (open: boolean) => void;
@@ -61,8 +58,6 @@ export const useUiStore = create<UiStore>((set) => ({
       return { overlay: ring[(at + 1) % ring.length] ?? 'a' };
     }),
   setOverlay: (mode) => set({ overlay: mode }),
-  dockOpen: false,
-  setDockOpen: (open) => set({ dockOpen: open }),
   hudOpen: false,
   setHudOpen: (open) => set({ hudOpen: open }),
   ledgerOpen: false,

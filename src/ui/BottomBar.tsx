@@ -6,7 +6,6 @@
 import { useEffect } from 'react';
 import type { GameState } from '../sim/types';
 import { gossipAvailable, useUiStore } from '../state/ui';
-import { firstMorningHint } from './firstMorning';
 import { SpeedControls, SystemControls } from './SpeedControls';
 
 /** What the overlay button says: the mode it is IN, briefly. */
@@ -41,8 +40,6 @@ export function BottomBar({ state }: { state: GameState }) {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [cycleOverlay, hasGossipNow]);
-  const dockOpen = useUiStore((s) => s.dockOpen);
-  const setDockOpen = useUiStore((s) => s.setDockOpen);
   const ledgerOpen = useUiStore((s) => s.ledgerOpen);
   const setLedgerOpen = useUiStore((s) => s.setLedgerOpen);
   const hasGossip = gossipAvailable(state);
@@ -50,16 +47,6 @@ export function BottomBar({ state }: { state: GameState }) {
 
   return (
     <div className="bottom-bar" onPointerDown={(e) => e.stopPropagation()}>
-      <button
-        // §10 (the first morning) — while the thread runs, the door to the
-        // places breathes: the quietest possible "this one".
-        className={`bar-places${dockOpen ? ' on' : ''}${firstMorningHint(state) ? ' breathe' : ''}`}
-        title="The places. One tap each; the map eases over."
-        onClick={() => setDockOpen(!dockOpen)}
-      >
-        places
-      </button>
-
       <button
         className={overlay === 'off' ? 'bar-overlay' : 'bar-overlay on'}
         title={

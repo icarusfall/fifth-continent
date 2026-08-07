@@ -395,7 +395,7 @@ body {
   position: absolute;
   left: 12px;
   top: 56px; /* below the instrument strip */
-  z-index: 9;
+  z-index: 7; /* the strip's fold covers the dock, not the reverse */
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -1057,31 +1057,41 @@ button.danger {
   }
 }
 
-/* …and while the thread runs, the way to the places breathes too — as does
-   the dock's entry for the very place the sentence names. */
-.bar-places.breathe,
+/* …and while the thread runs, the dock's entry for the very place the
+   sentence names GLOWS — a halo, not a whisper (playtest: the border-pulse
+   read as nothing at arm's length). */
 .location-dock button.breathe {
-  animation: breathe 2.6s ease-in-out infinite;
-  border-color: var(--limewash);
   color: var(--limewash);
+  animation: button-glow 1.9s ease-in-out infinite;
+}
+
+@keyframes button-glow {
+  0%,
+  100% {
+    border-color: rgba(232, 225, 210, 0.55);
+    box-shadow: 0 0 3px 0 rgba(232, 225, 210, 0.25);
+  }
+  50% {
+    border-color: var(--limewash);
+    box-shadow: 0 0 14px 3px rgba(232, 225, 210, 0.5);
+  }
 }
 
 /* The 800px split (clean-sheet pass, phone-led): below it the chrome
    becomes sheet-and-bar; above it the dock and the ledger's spine tab
    return, and the bar sheds the buttons those replace. */
 @media (max-width: 799px) {
-  /* The dock hides behind the bar's Places button. */
+  /* The dock stays on, compact: the places are the interface's fixed
+     points, and the sell step was unfindable with the door shut. */
   .location-dock {
-    display: none;
+    top: 44px;
+    gap: 4px;
   }
 
-  .location-dock.open {
-    display: flex;
-    /* Above the hint line's slot: the sentence points, the door sits over
-       it, and neither covers the other. */
-    bottom: calc(var(--bar-h) + env(safe-area-inset-bottom, 0px) + 76px);
-    top: auto;
-    z-index: 11;
+  .location-dock button {
+    font-size: 12px;
+    padding: 6px 10px;
+    min-height: 34px;
   }
 
   /* The spine tab is a desktop affordance; the bar's button opens the book. */
@@ -1168,12 +1178,6 @@ button.danger {
     bottom: calc(64px + env(safe-area-inset-bottom, 0px));
   }
 
-  /* The open dock stacks ABOVE the hint line's slot — the sentence points,
-     the door sits over it, and neither covers the other. */
-  .location-dock.open {
-    bottom: calc(136px + env(safe-area-inset-bottom, 0px));
-  }
-
   .bottom-bar {
     justify-content: space-between;
     gap: var(--sp-1);
@@ -1181,8 +1185,7 @@ button.danger {
 }
 
 @media (min-width: 800px) {
-  /* The dock and the spine tab do these jobs on a desktop. */
-  .bar-places,
+  /* The spine tab does this job on a desktop. */
   .bar-ledger {
     display: none;
   }

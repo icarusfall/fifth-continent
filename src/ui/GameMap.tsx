@@ -253,8 +253,6 @@ export function GameMap({ state }: { state: GameState }) {
   // §20.2 — the overlay mode lives in the UI store now (the bottom bar's
   // cycle button and Tab both drive it); the loop still reads refs.
   const overlay = useUiStore((s) => s.overlay);
-  const dockOpen = useUiStore((s) => s.dockOpen);
-  const setDockOpen = useUiStore((s) => s.setDockOpen);
   const showGossip = overlay === 'b' || overlay === 'c';
   const showGossipRef = useRef(false);
   showGossipRef.current = showGossip;
@@ -796,9 +794,6 @@ export function GameMap({ state }: { state: GameState }) {
       requestAnimationFrame(() => {
         const w = tileCenter(stateRef.current.farm);
         camRef.current!.focusOn(w.x, w.y, isPhone ? 0.3 : 0.5);
-        // First-morning playtest: the Places door stands OPEN on a phone —
-        // the place names are the first tappable things on the screen.
-        if (isPhone) setDockOpen(true);
       }),
     );
     return () => cancelAnimationFrame(id);
@@ -814,7 +809,6 @@ export function GameMap({ state }: { state: GameState }) {
     if (!restarted || !isFreshGame(state)) return;
     const w = tileCenter(state.farm);
     camRef.current!.focusOn(w.x, w.y, isPhone ? 0.3 : 0.5);
-    if (isPhone) setDockOpen(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.tick]);
 
@@ -826,10 +820,12 @@ export function GameMap({ state }: { state: GameState }) {
     if (w) camRef.current!.focusOn(w.x, w.y, isPhone ? 0.3 : 0.5);
     setSelected(sel);
   }
+  // Playtest: only places you can ACT at earn a dock seat. The Customs
+  // House stays on the map with its popover — the day bribes arrive, it
+  // earns its seat back — but a button that does nothing teaches nothing.
   const places: Array<{ sel: Selection; label: string }> = [
     { sel: 'farm', label: 'Walland Farm' },
     { sel: 'ryne', label: 'Ryne' },
-    { sel: 'customs', label: 'Customs House' },
   ];
   if (state.dutchman.unlocked) places.push({ sel: 'shingle', label: 'The Shingle' });
   if (state.cuttingHouse) places.push({ sel: 'cutting-house', label: 'Cutting House' });
@@ -927,10 +923,11 @@ export function GameMap({ state }: { state: GameState }) {
         // Stop pointer events reaching the shell: otherwise its pointerdown
         // captures the pointer and steals the button's click (and would start
         // a camera pan). onClick stop keeps the map's hit-test from firing too.
-        // Phone: the dock hides behind the bar's Places button and closes on
-        // a pick; desktop shows it always (the .open class is a no-op there).
+        // Playtest: the dock shows ALWAYS, on every width — the places are
+        // the interface's fixed points, and the sell step was unfindable
+        // with the door shut. Only places with verbs are listed.
         <nav
-          className={dockOpen ? 'location-dock open' : 'location-dock'}
+          className="location-dock"
           aria-label="Places"
           onPointerDown={(e) => e.stopPropagation()}
         >
@@ -947,7 +944,6 @@ export function GameMap({ state }: { state: GameState }) {
               onClick={(e) => {
                 e.stopPropagation();
                 selectPlace(pl.sel);
-                setDockOpen(false);
               }}
             >
               {pl.label}
