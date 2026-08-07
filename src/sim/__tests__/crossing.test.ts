@@ -6,6 +6,7 @@
 // are the promise §6.18 makes, and CI keeps it.
 
 import { describe, expect, it } from 'vitest';
+import { breathe } from './breathe';
 import {
   CROSSING_FRONTAGE,
   CUT_CROSSING_STANDING,
@@ -393,12 +394,13 @@ const GAMES = 200;
 const DAYS = 30;
 
 describe(`${GAMES} seeded games, ${DAYS} days — the hub behind the water (spec §13/§6.18)`, () => {
-  it('digs its moat, mans it deeper than the crossing, and keeps the tenancy', { timeout: 240_000 }, () => {
+  it('digs its moat, mans it deeper than the crossing, and keeps the tenancy', { timeout: 240_000 }, async () => {
     let moatedGames = 0;
     let raidedGames = 0;
     const coins: number[] = [];
 
     for (let seed = 1; seed <= GAMES; seed++) {
+      await breathe(seed);
       const s = runPolicyGame(seed, TICKS_PER_DAY * DAYS, moatedHub);
 
       expect(s.lost).toBe(false);

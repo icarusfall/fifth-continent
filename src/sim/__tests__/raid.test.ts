@@ -5,6 +5,7 @@
 // consequences it lands on the world.
 
 import { describe, expect, it } from 'vitest';
+import { breathe } from './breathe';
 import {
   CREW_MUSTER,
   FACTION_ALPHA,
@@ -203,11 +204,12 @@ const GAMES = 200;
 const DAYS = 35;
 
 describe(`${GAMES} seeded games, ${DAYS} days — the defending hub (spec §13)`, () => {
-  it('the Company comes, the hub answers, and the tenancy survives', { timeout: 240_000 }, () => {
+  it('the Company comes, the hub answers, and the tenancy survives', { timeout: 240_000 }, async () => {
     const coins: number[] = [];
     let raidedGames = 0;
 
     for (let seed = 1; seed <= GAMES; seed++) {
+      await breathe(seed);
       const s = runPolicyGame(seed, TICKS_PER_DAY * DAYS, defendingSmuggler);
 
       expect(s.lost).toBe(false); // a raid never ends the tenancy
@@ -226,12 +228,13 @@ describe(`${GAMES} seeded games, ${DAYS} days — the defending hub (spec §13)`
   // §6.15 — the improver's timetable, held forever: by day 22 the working hub
   // can afford the double fortress with a garrison behind it and a rent
   // standing. If a future pass breaks this, the Wealth Clock has slipped.
-  it('the double fortress is day-22 money (spec §6.15, the Wealth Clock)', { timeout: 120_000 }, () => {
+  it('the double fortress is day-22 money (spec §6.15, the Wealth Clock)', { timeout: 120_000 }, async () => {
     const bill =
       2 * (FORT_COST[1] + FORT_COST[2] + FORT_COST[3] + FORT_COST[4]) +
       4 * CREW_MUSTER +
       RENT_AMOUNT;
     for (let seed = 1; seed <= GAMES; seed++) {
+      await breathe(seed);
       const s = runPolicyGame(seed, TICKS_PER_DAY * 22, hubPolicy);
       expect(s.lost).toBe(false);
       expect(s.coin).toBeGreaterThanOrEqual(bill);

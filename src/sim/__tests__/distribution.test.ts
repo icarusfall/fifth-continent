@@ -9,6 +9,7 @@
 // life out-earns the first; the tests hold the game to it.
 
 import { describe, expect, it } from 'vitest';
+import { breathe } from './breathe';
 import {
   BINDING_CAPACITY,
   CARTER_WAGE,
@@ -39,10 +40,11 @@ const DAYS = 14; // two rent dues fall inside this window
 
 describe(`${GAMES} seeded games, ${DAYS} days each`, () => {
   // 200 × 14 days ≈ 400k ticks: give the harness room to breathe.
-  it('every game ends upright: rent paid, flock intact, books balanced', { timeout: 60_000 }, () => {
+  it('every game ends upright: rent paid, flock intact, books balanced', { timeout: 60_000 }, async () => {
     const coins: number[] = [];
 
     for (let seed = 1; seed <= GAMES; seed++) {
+      await breathe(seed);
       const s = runPolicyGame(seed, TICKS_PER_DAY * DAYS);
 
       // The bot survives the squeeze on lawful wool alone.
@@ -112,10 +114,11 @@ describe(`${GAMES} seeded games, 26 days each — the smuggler (spec §6.9)`, ()
   const SMUGGLER_DAYS = 26;
   const SMUGGLER_RENTS = 4;
 
-  it('crime pays: rents met, flock intact, and the lawful ceiling left far below', { timeout: 120_000 }, () => {
+  it('crime pays: rents met, flock intact, and the lawful ceiling left far below', { timeout: 120_000 }, async () => {
     const coins: number[] = [];
 
     for (let seed = 1; seed <= GAMES; seed++) {
+      await breathe(seed);
       const s = runPolicyGame(seed, TICKS_PER_DAY * SMUGGLER_DAYS, smugglerPolicy);
 
       expect(s.lost).toBe(false);
@@ -148,10 +151,11 @@ describe(`${GAMES} seeded games, 26 days each — the smuggler (spec §6.9)`, ()
 });
 
 describe(`${GAMES} seeded games, ${DAYS} days each — the delegator (spec §6.11)`, () => {
-  it('a hired carter sustains the lawful life with no hand on the reins', { timeout: 60_000 }, () => {
+  it('a hired carter sustains the lawful life with no hand on the reins', { timeout: 60_000 }, async () => {
     const coins: number[] = [];
 
     for (let seed = 1; seed <= GAMES; seed++) {
+      await breathe(seed);
       const s = runPolicyGame(seed, TICKS_PER_DAY * DAYS, delegatorPolicy);
 
       expect(s.lost).toBe(false);
@@ -196,11 +200,12 @@ describe(`${GAMES} seeded games, 30 days — the hub (spec §6.17, Beat 3)`, () 
     );
   }
 
-  it('dispersal and smouching are priced, and the lawful leg is load-bearing', { timeout: 300_000 }, () => {
+  it('dispersal and smouching are priced, and the lawful leg is load-bearing', { timeout: 300_000 }, async () => {
     const hubCoins: number[] = [];
     const bareCoins: number[] = [];
 
     for (let seed = 1; seed <= GAMES; seed++) {
+      await breathe(seed);
       const hub = runPolicyGame(seed, TICKS_PER_DAY * HUB_DAYS, hubPolicy);
       const bare = runPolicyGame(seed, TICKS_PER_DAY * HUB_DAYS, hubNoAlibiPolicy);
 
@@ -268,10 +273,11 @@ describe(`${GAMES} seeded games, 30 days — the hub (spec §6.17, Beat 3)`, () 
 describe(`${GAMES} seeded games, 20 days — the relay (spec §6.11, M5a-4)`, () => {
   const RELAY_DAYS = 20; // three rents, and time for the backhaul to compound
 
-  it('the backhaul funds the wheels and the relay meets at the barn', { timeout: 120_000 }, () => {
+  it('the backhaul funds the wheels and the relay meets at the barn', { timeout: 120_000 }, async () => {
     const coins: number[] = [];
 
     for (let seed = 1; seed <= GAMES; seed++) {
+      await breathe(seed);
       const s = runPolicyGame(seed, TICKS_PER_DAY * RELAY_DAYS, relayPolicy);
 
       expect(s.lost).toBe(false);
@@ -305,11 +311,12 @@ describe(`${GAMES} seeded games, 40 days — the wight (spec §6.14, M5b)`, () =
   const WIGHT_DAYS = 40;
   const WIGHT_RENTS = 6; // days 6, 12, 18, 24, 30, 36
 
-  it('discipline pays tribute and is never collected; greed loses a person', { timeout: 400_000 }, () => {
+  it('discipline pays tribute and is never collected; greed loses a person', { timeout: 400_000 }, async () => {
     const marshCoins: number[] = [];
     const doomCoins: number[] = [];
 
     for (let seed = 1; seed <= GAMES; seed++) {
+      await breathe(seed);
       const marsh = runPolicyGame(seed, TICKS_PER_DAY * WIGHT_DAYS, marshPolicy);
       const doom = runPolicyGame(seed, TICKS_PER_DAY * WIGHT_DAYS, marshDoomPolicy);
 

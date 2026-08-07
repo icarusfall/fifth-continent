@@ -3,6 +3,7 @@
 // tolerance for dice, only arithmetic.
 
 import { describe, expect, it } from 'vitest';
+import { breathe } from './breathe';
 import {
   CART_CAPACITY,
   CART_COST,
@@ -498,8 +499,9 @@ describe('bought carts and the hired carter (spec §6.11)', () => {
 
   // House rule 5: the glut valve across 200 seeded games — the sated-market
   // pile-up the M5c playtest reported must drain under the standing order.
-  it('200 seeds: the fence order drains a 40-cask glut and never waits laden', { timeout: 120_000 }, () => {
+  it('200 seeds: the fence order drains a 40-cask glut and never waits laden', { timeout: 120_000 }, async () => {
     for (let seed = 1; seed <= 200; seed++) {
+      await breathe(seed);
       const s0 = initialState(seed);
       s0.coin = 0;
       s0.cuttingHouse = { x: 24, y: 12 };

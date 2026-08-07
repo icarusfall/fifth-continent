@@ -8,6 +8,7 @@
 // block is house rule 5's.
 
 import { describe, expect, it } from 'vitest';
+import { breathe } from './breathe';
 import {
   DIFFICULTY,
   FORT_VISIBILITY_HEAT,
@@ -191,8 +192,9 @@ const GAMES = 200;
 const STEW_DAYS = 30;
 
 describe(`${GAMES} seeded games, ${STEW_DAYS} days — the veiled fortress (spec §13)`, () => {
-  it('across every seed: hidden works cool under the notch, bare works never do, and the rent is exact', { timeout: 120_000 }, () => {
+  it('across every seed: hidden works cool under the notch, bare works never do, and the rent is exact', { timeout: 120_000 }, async () => {
     for (let seed = 1; seed <= GAMES; seed++) {
+      await breathe(seed);
       let s = initialState(seed);
       s.tick = 60;
       s.lastCrisisTick = -(20 * TICKS_PER_DAY);
