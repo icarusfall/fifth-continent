@@ -512,9 +512,12 @@ export function GameMap({ state }: { state: GameState }) {
         const farmStore = s.stores.farm ?? {};
         const farmCount = cargoCount(farmStore);
         const farmRows = stockRows(farmStore);
-        if (s.fleeceReady > 0 && (farmCount >= FARM_STORE_CAPACITY || farmRows.length > 0)) {
+        // Playtest: the wool on the flock's backs shows WHENEVER it exists —
+        // it is the first goods-fact the game has, and without it overlay A
+        // draws nothing early on and its button reads as dead.
+        if (s.fleeceReady > 0) {
           farmRows.push({
-            text: `+${s.fleeceReady} stuck on the sheep`,
+            text: `${s.fleeceReady} wool on the sheep`,
             color: farmCount >= FARM_STORE_CAPACITY ? '#E0837A' : undefined });
         }
         // §18 made visible (M5 tutorial pass): what the clutter hides, and
