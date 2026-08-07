@@ -512,12 +512,19 @@ export function CartsAtNode({
                 : ' · no carter — yours to drive'}
             </p>
             <div className="menu-buttons">
-              {/* Playtest (first morning): the top button is the DEFAULT.
-                  An empty cart's next verb is loading; a laden cart's next
-                  verb is the road — never "unload it all back again". */}
-              {drivable && laden && roadButtons(nodeId, state, cart, send, flooded)}
+              {/* Playtest (first morning): the top button is the DEFAULT —
+                  the FORWARD verb. At a store (the farm, the house) a laden
+                  cart's next act is the road, never "unload it all back
+                  again"; at the market or the gunwale it is the sale, never
+                  "home to the farm". An empty cart loads first anywhere. */}
+              {drivable &&
+                laden &&
+                (nodeId === 'farm' || nodeId === 'cutting-house') &&
+                roadButtons(nodeId, state, cart, send, flooded)}
               {drivable && cargoButtons(nodeId, state, cart, enqueue)}
-              {drivable && !laden && roadButtons(nodeId, state, cart, send, flooded)}
+              {drivable &&
+                !(laden && (nodeId === 'farm' || nodeId === 'cutting-house')) &&
+                roadButtons(nodeId, state, cart, send, flooded)}
               {hiring?.cartId === cart.id ? (
                 hiring.capFor !== undefined ? (
                   // §6.11 (M5b playtest) — the load cap: how much of the shared
