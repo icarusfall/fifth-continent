@@ -87,7 +87,7 @@ import {
   officerTick,
 } from './revenue';
 import { raidTick, resolveRaid } from './raid';
-import { applyDigDyke, digProgress, dykeWaterways, flockCapOf } from './dykes';
+import { applyDigDyke, digProgress, dykeWaterways, flockCapOf, waterwayTouches } from './dykes';
 import {
   accrueNightMarsh,
   addDebt,
@@ -967,8 +967,15 @@ function applyAction(state: GameState, action: Action): void {
 
     case 'buyTubBoat': {
       // §6.18 (M5½b) — quiet bulk on the water you dug: a hull, not a stall.
-      if (dykeWaterways(state).length === 0) {
-        logEvent(state, 'No waterway runs yet. The boatwright builds for water, not for hope.');
+      // M5½e: the water must touch the FARM — the boat launches from the farm
+      // bank, and "any waterway, anywhere" sold hulls that could never move.
+      if (!waterwayTouches(state, 'farm')) {
+        logEvent(
+          state,
+          dykeWaterways(state).length === 0
+            ? 'No waterway runs yet. The boatwright builds for water, not for hope.'
+            : 'Your water runs, but none of it reaches the farm bank — the boatwright launches from here. A channel must end within reach of the farm.',
+        );
         return;
       }
       const tubs = state.carts.filter((c) => c.vessel === 'dyke').length;

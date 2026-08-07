@@ -214,7 +214,20 @@ export function roadButtons(
   }
   // §6.18 (M5½b) — the tub-boat answers the waterways from this landing.
   if (cart.vessel === 'dyke') {
-    for (const w of dykeWaterways(state)) {
+    const waterways = dykeWaterways(state);
+    // M5½e — a tub at a landing no water reaches must SAY so: a row that
+    // shows nothing reads as broken, and the fix (the survey) goes unnamed.
+    if (!waterways.some((w) => w.a === nodeId || w.b === nodeId)) {
+      btns.push(
+        <p key="no-water" className="flavour">
+          No water of yours reaches this landing — the tub sits on mud. A channel must end
+          within reach of it before the boat can pole out; the survey&rsquo;s breathing posts
+          mark the cuts that would open water.
+        </p>,
+      );
+      return btns;
+    }
+    for (const w of waterways) {
       if (w.a !== nodeId && w.b !== nodeId) continue;
       const farEnd = w.a === nodeId ? w.b : w.a;
       const lowWater = tideLevel(state.tick) < TUB_TIDE_MIN;

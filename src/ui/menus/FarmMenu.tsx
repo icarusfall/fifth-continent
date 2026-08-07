@@ -4,7 +4,7 @@
 
 import { storeSummary } from '../format';
 import { CART_COST, CUTTING_HOUSE_COST, FARM_STORE_CAPACITY, MAX_CARTS, MAX_TUB_BOATS, RESEARCH_COST, RESEARCH_DAYS, SHEARER_UNLOCK_SHEARS, SHEARER_WAGE, SHEEP_PRICE_BUY, SHEEP_PRICE_SELL, TICKS_PER_DAY, TUB_BOAT_COST } from '../../sim/balance';
-import { dykeWaterways, flockCapOf } from '../../sim/dykes';
+import { flockCapOf, waterwayTouches } from '../../sim/dykes';
 import { illicitAnywhere } from '../../sim/revenue';
 import type { GameState } from '../../sim/types';
 import { CartsAtNode } from './CartRows';
@@ -195,8 +195,9 @@ export function FarmMenu({
                   Buy a cart · {CART_COST} coin
                 </button>
               )}
-            {/* §6.18 (M5½b) — a hull, not a stall: offered once water runs. */}
-            {dykeWaterways(state).length > 0 &&
+            {/* §6.18 (M5½b) — a hull, not a stall: offered once water runs.
+                M5½e: water that TOUCHES THE FARM — the boat launches here. */}
+            {waterwayTouches(state, 'farm') &&
               state.carts.filter((c) => c.vessel === 'dyke').length < MAX_TUB_BOATS && (
                 <button
                   disabled={state.coin < TUB_BOAT_COST}

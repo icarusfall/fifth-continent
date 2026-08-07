@@ -290,6 +290,13 @@ export function dykePreview(
   return { opens, nextStep: null };
 }
 
+/** §6.18 (M5½e) — does any standing waterway touch this landing? The tub is
+ *  bought and launched at the farm, so the farm must be the landing asked
+ *  about — "any waterway, anywhere" sold boats that could never move. */
+export function waterwayTouches(state: GameState, node: NodeId): boolean {
+  return dykeWaterways(state).some((w) => w.a === node || w.b === node);
+}
+
 /**
  * §6.18 (M5½e) — the building this cut would moat that is not moated today,
  * or null. The same hypothetical-dug-set probe as the route preview: pure,

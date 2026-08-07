@@ -21,7 +21,7 @@ import {
   TRIBUTE_RELIEF,
   WIGHT_TRAP_IRON,
 } from './balance';
-import { edgesFor, isPlaceable, nodeById } from './map';
+import { DYKE_SEGMENTS, edgesFor, isPlaceable, nodeById } from './map';
 import { collectLeiden } from './leiden';
 import { fortVisibilityRaw, playerBuildings } from './revenue';
 import { dayPhaseOf } from './time';
@@ -79,6 +79,16 @@ function signSiteTaken(state: GameState, x: number, y: number): boolean {
   return standing.some((s) => s !== null && s.x === x && s.y === y);
 }
 
+/** §6.18/M5½e — the old people knew better than to raise stones on the sewer
+ *  lines: a stone staked here refuses any dig within a tile (stoneRefuses),
+ *  and a ring beside a landing's only entries could sever it from the water
+ *  for the rest of the game. Two tiles clears the refusal reach with margin. */
+function nearSurveyLine(x: number, y: number): boolean {
+  return DYKE_SEGMENTS.some((seg) =>
+    seg.path.some((p) => Math.abs(p.x - x) <= 2 && Math.abs(p.y - y) <= 2),
+  );
+}
+
 /** The deep-marsh tile the sign stands on: just off the midpoint of the
  *  most-used night crossing, snapped to open marsh where possible. */
 function signSite(state: GameState): { x: number; y: number } {
@@ -94,18 +104,32 @@ function signSite(state: GameState): { x: number; y: number } {
   const path = edge?.path ?? [{ x: 20, y: 12 }];
   const mid = path[Math.floor(path.length / 2)];
   // Step off the track into the deep marsh; take the first footing that holds.
-  for (const [dx, dy] of [
+  // Two passes (M5½e): first insisting on ground clear of the survey lines,
+  // then — only if every clear site is taken — the old search, so a sign
+  // always rises somewhere.
+  const steps = [
     [1, 1],
     [-1, 1],
     [1, -1],
     [-1, -1],
     [2, 0],
     [0, 2],
+    [-2, 0],
+    [0, -2],
+    [2, 2],
+    [-2, 2],
+    [2, -2],
+    [-2, -2],
     [0, 0],
-  ]) {
-    const x = mid.x + dx;
-    const y = mid.y + dy;
-    if (isPlaceable(x, y) && !signSiteTaken(state, x, y)) return { x, y };
+  ];
+  for (const clearOfSurvey of [true, false]) {
+    for (const [dx, dy] of steps) {
+      const x = mid.x + dx;
+      const y = mid.y + dy;
+      if (!isPlaceable(x, y) || signSiteTaken(state, x, y)) continue;
+      if (clearOfSurvey && nearSurveyLine(x, y)) continue;
+      return { x, y };
+    }
   }
   return { x: mid.x, y: mid.y };
 }

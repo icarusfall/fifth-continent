@@ -2265,6 +2265,26 @@ the survey        it is easy to dig a dyke to nowhere: eight identical
                   on the map, the first-morning pattern; dead-end cuts stand
                   plain. And the post's menu names the moat it would make,
                   as it already names the route it would open (§6.18 M5½b)
+the tub's landing the boat is bought and launched at the farm, but the gate
+                  (sim and menu alike) asked only that ANY waterway run — a
+                  player whose channels landed elsewhere was sold a hull
+                  that could never move, the deadest verb yet shipped. Both
+                  gates now require a waterway touching the FARM
+                  (waterwayTouches, dykes.ts), and a tub standing at a
+                  landing no water reaches says so in its row — with the
+                  survey named as the fix — instead of showing nothing
+the sign's ground a ring raised within stone-refusal reach of a surveyed
+                  line could, once staked, refuse a landing's only entries
+                  for the rest of the game (the farm's two are the Walland
+                  Cut and the Five Waterings, and the most-used night
+                  crossing runs right past both). signSite now rejects
+                  footings within 2 tiles of any surveyed waypoint — the
+                  old people knew better than to raise stones on the sewer
+                  lines — falling back to the old footing search only if
+                  every clear site is taken. Existing saves keep their
+                  stone where it stands: if a report shows one already
+                  astride a landing's entries, the priced answer (dig past
+                  the stone for Debt) is a design decision to take then
 ```
 
 No save bump: `GARRISON_PER_TIER` is capacity, not state, and the bench
