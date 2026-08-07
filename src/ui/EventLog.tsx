@@ -21,8 +21,9 @@ function HintLine({ state }: { state: GameState }) {
   const hint = firstMorningHint(state);
   if (!hint) return null;
   return (
+    // The manicule: the period's own pointing hand, doing its period job.
     <button className="hint-line" onClick={() => requestFocus(hint.sel)}>
-      {hint.text}
+      <span className="hint-hand">☞</span> {hint.text}
     </button>
   );
 }

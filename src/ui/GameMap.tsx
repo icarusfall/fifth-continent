@@ -35,7 +35,7 @@ import type { Cart, EdgeId, GameState, Good, NodeId } from '../sim/types';
 import { useGameStore } from '../state/store';
 import { useUiStore } from '../state/ui';
 import { Sheet, useIsPhone } from './Sheet';
-import { isFreshGame } from './firstMorning';
+import { firstMorningHint, isFreshGame } from './firstMorning';
 import { CameraController } from './camera';
 import { pathPoints, pointAlong, TILE, tileCenter } from './geometry';
 import { getTerrainCanvas } from './paint';
@@ -366,7 +366,7 @@ export function GameMap({ state }: { state: GameState }) {
           drawFortifications(ctx, s.farm, s.fortifications.farm ?? 0, fortVisibility(s, 'farm'));
         }
       }
-      if (!yard) drawLabel(ctx, 'Walland Farm', fc.x, fc.y - 16);
+      if (!yard) drawLabel(ctx, 'Walland Farm', fc.x, fc.y - 16, cam.zoom);
       if (isFreshGame(s) && !farmVisitedRef.current) {
         drawFarmGlow(ctx, s.farm, (performance.now() / 1800) % 1, cam.zoom);
       }
@@ -394,8 +394,8 @@ export function GameMap({ state }: { state: GameState }) {
         drawCustoms(ctx);
       }
       if (!yard) {
-        drawLabel(ctx, 'Ryne', 28.5 * TILE, 19.6 * TILE);
-        drawLabel(ctx, 'Customs House', 26.5 * TILE, 17.9 * TILE);
+        drawLabel(ctx, 'Ryne', 28.5 * TILE, 19.6 * TILE, cam.zoom);
+        drawLabel(ctx, 'Customs House', 26.5 * TILE, 17.9 * TILE, cam.zoom);
       }
 
       if (s.dutchman.unlocked) {
@@ -405,7 +405,7 @@ export function GameMap({ state }: { state: GameState }) {
         } else {
           drawShingle(ctx, SHINGLE);
         }
-        if (!yard) drawLabel(ctx, 'The Shingle', sc.x - 4, sc.y - 12);
+        if (!yard) drawLabel(ctx, 'The Shingle', sc.x - 4, sc.y - 12, cam.zoom);
         // The lugger is an event, not scenery: it shows in every band.
         if (s.dutchman.present) drawLugger(ctx, SHINGLE);
       }
@@ -424,7 +424,7 @@ export function GameMap({ state }: { state: GameState }) {
             );
           }
         }
-        if (!yard) drawLabel(ctx, 'Cutting House', cc.x, cc.y - 12);
+        if (!yard) drawLabel(ctx, 'Cutting House', cc.x, cc.y - 12, cam.zoom);
       }
 
       // §6.14 — the marsh's own marks: the sign, and the stone once bound.
@@ -433,7 +433,7 @@ export function GameMap({ state }: { state: GameState }) {
       if (s.wights.stone) {
         if (!county) drawWightStone(ctx, s.wights.stone, wightPhase);
         const wc = tileCenter(s.wights.stone);
-        if (!yard) drawLabel(ctx, 'The Wight-Stone', wc.x, wc.y - 16);
+        if (!yard) drawLabel(ctx, 'The Wight-Stone', wc.x, wc.y - 16, cam.zoom);
       }
 
       // §6.14 (M5c) — the workshop's mark on its host, in the owner's orange.
@@ -442,7 +442,7 @@ export function GameMap({ state }: { state: GameState }) {
         if (host && !county) {
           drawWorkshopBadge(ctx, host, wightPhase);
           const hc = tileCenter(host);
-          if (!yard) drawLabel(ctx, 'The Workshop', hc.x, hc.y + 22);
+          if (!yard) drawLabel(ctx, 'The Workshop', hc.x, hc.y + 22, cam.zoom);
         }
       }
 
@@ -471,7 +471,7 @@ export function GameMap({ state }: { state: GameState }) {
             ctx.setLineDash([4, 4]);
             ctx.strokeRect(t.x - 12, t.y - 12, 24, 24);
             ctx.setLineDash([]);
-            drawLabel(ctx, 'his next call', t.x, t.y - 18);
+            drawLabel(ctx, 'his next call', t.x, t.y - 18, cam.zoom);
           } catch {
             /* a target that no longer exists is no target */
           }
@@ -796,11 +796,27 @@ export function GameMap({ state }: { state: GameState }) {
       requestAnimationFrame(() => {
         const w = tileCenter(stateRef.current.farm);
         camRef.current!.focusOn(w.x, w.y, isPhone ? 0.3 : 0.5);
+        // First-morning playtest: the Places door stands OPEN on a phone —
+        // the place names are the first tappable things on the screen.
+        if (isPhone) setDockOpen(true);
       }),
     );
     return () => cancelAnimationFrame(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Starting over runs the clock backwards: re-aim at the new farm and open
+  // the door again, exactly as a first mount would.
+  const prevTickRef = useRef(state.tick);
+  useEffect(() => {
+    const restarted = state.tick < prevTickRef.current;
+    prevTickRef.current = state.tick;
+    if (!restarted || !isFreshGame(state)) return;
+    const w = tileCenter(state.farm);
+    camRef.current!.focusOn(w.x, w.y, isPhone ? 0.3 : 0.5);
+    if (isPhone) setDockOpen(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.tick]);
 
   function selectPlace(sel: Selection) {
     if (sel === 'farm') farmVisitedRef.current = true;
@@ -921,7 +937,13 @@ export function GameMap({ state }: { state: GameState }) {
           {places.map((pl) => (
             <button
               key={pl.sel as string}
-              className={selected === pl.sel ? 'on' : undefined}
+              className={
+                selected === pl.sel
+                  ? 'on'
+                  : firstMorningHint(state)?.sel === pl.sel
+                    ? 'breathe'
+                    : undefined
+              }
               onClick={(e) => {
                 e.stopPropagation();
                 selectPlace(pl.sel);

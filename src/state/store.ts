@@ -1030,7 +1030,11 @@ export const useGameStore = create<GameStore>()((set, get) => {
     actionLog: saved?.actionLog ?? {},
     pending: [],
     paused: false,
-    ticksPerSecond: 3,
+    // The amble (§10, first-morning playtest: "I got to day 3 just looking
+    // around the screen"). A fresh tenancy opens at the slowest walk — the
+    // marsh rewards being read, and the reader must be given time to read.
+    // A returning save keeps the ordinary walk: that player knows the room.
+    ticksPerSecond: saved ? 3 : 1,
     activeCard: null,
     autoPayRent: loadAutoPay(),
     shownCards: saved ? loadShown() : {},
@@ -1185,6 +1189,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
         actionLog: {},
         pending: [],
         paused: false,
+        ticksPerSecond: 1, // the amble: a new tenancy is read before it is run
         activeCard: null,
         shownCards: {},
         lastPacedTick: 0,

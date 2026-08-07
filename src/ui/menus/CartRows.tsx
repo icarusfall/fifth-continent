@@ -240,7 +240,18 @@ export function roadButtons(
   switch (nodeId) {
     case 'farm': {
       if (held > 0) {
+        // Playtest (first morning): the default sits on top, and it names
+        // where it goes. The high road is slow but never drowns — the send
+        // least likely to strand a beginner; the tide's gamble sits second.
         btns.push(
+          <button
+            key="high"
+            title="Slow, dry, and past the Customs House. The tide never has it."
+            onClick={() => send(cart.id, 'high-road')}
+          >
+            Send {name} to Ryne · the high road, slow and sure
+            {coatNote(state, 'high-road', 'farm')}
+          </button>,
           <button
             key="low"
             disabled={flooded}
@@ -251,15 +262,8 @@ export function roadButtons(
             }
             onClick={() => send(cart.id, 'low-road')}
           >
-            Send {name} by the low road{' '}
-            {flooded ? `· clears in ${tideSpan}` : `· floods in ${tideSpan}`}
-          </button>,
-          <button
-            key="high"
-            title="Slow, dry, and past the Customs House."
-            onClick={() => send(cart.id, 'high-road')}
-          >
-            Send {name} by the high road · slow{coatNote(state, 'high-road', 'farm')}
+            Send {name} to Ryne · the low road,{' '}
+            {flooded ? `drowned — clears in ${tideSpan}` : `fast — floods in ${tideSpan}`}
           </button>,
         );
       }
@@ -287,16 +291,17 @@ export function roadButtons(
     }
     case 'ryne': {
       btns.push(
+        <button key="high" onClick={() => send(cart.id, 'high-road')}>
+          Home to the farm · the high road, slow and sure
+          {coatNote(state, 'high-road', 'ryne')}
+        </button>,
         <button
           key="low"
           disabled={flooded}
           title={flooded ? 'Under the tide. It will fall.' : undefined}
           onClick={() => send(cart.id, 'low-road')}
         >
-          Home by the low road {flooded ? '· drowned' : '· fast'}
-        </button>,
-        <button key="high" onClick={() => send(cart.id, 'high-road')}>
-          Home by the high road · slow{coatNote(state, 'high-road', 'ryne')}
+          Home to the farm · the low road, {flooded ? 'drowned' : 'fast'}
         </button>,
       );
       if (state.cuttingHouse) {
@@ -507,8 +512,12 @@ export function CartsAtNode({
                 : ' · no carter — yours to drive'}
             </p>
             <div className="menu-buttons">
+              {/* Playtest (first morning): the top button is the DEFAULT.
+                  An empty cart's next verb is loading; a laden cart's next
+                  verb is the road — never "unload it all back again". */}
+              {drivable && laden && roadButtons(nodeId, state, cart, send, flooded)}
               {drivable && cargoButtons(nodeId, state, cart, enqueue)}
-              {drivable && roadButtons(nodeId, state, cart, send, flooded)}
+              {drivable && !laden && roadButtons(nodeId, state, cart, send, flooded)}
               {hiring?.cartId === cart.id ? (
                 hiring.capFor !== undefined ? (
                   // §6.11 (M5b playtest) — the load cap: how much of the shared

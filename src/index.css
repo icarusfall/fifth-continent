@@ -1006,16 +1006,38 @@ button.danger {
   display: block;
   width: 100%;
   text-align: left;
-  background: var(--panel);
+  background: var(--panel-solid);
   border: 1px solid var(--limewash);
   border-radius: 4px;
   color: var(--limewash);
-  font-size: var(--fs-s);
+  font-size: var(--fs-m);
   font-style: italic;
-  padding: 8px 12px;
+  line-height: 1.4;
+  padding: 10px 14px;
   margin-bottom: 6px;
   pointer-events: auto;
-  animation: breathe 2.6s ease-in-out infinite;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5);
+  /* Enter with a settle, then breathe: the eye follows what moves once. */
+  animation:
+    hint-enter 0.5s ease-out,
+    breathe 2.6s ease-in-out 0.5s infinite;
+}
+
+.hint-hand {
+  font-style: normal;
+  font-size: 1.25em;
+  margin-right: 2px;
+}
+
+@keyframes hint-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .hint-line:hover {
@@ -1035,8 +1057,10 @@ button.danger {
   }
 }
 
-/* …and while the thread runs, the way to the places breathes too. */
-.bar-places.breathe {
+/* …and while the thread runs, the way to the places breathes too — as does
+   the dock's entry for the very place the sentence names. */
+.bar-places.breathe,
+.location-dock button.breathe {
   animation: breathe 2.6s ease-in-out infinite;
   border-color: var(--limewash);
   color: var(--limewash);
@@ -1053,7 +1077,9 @@ button.danger {
 
   .location-dock.open {
     display: flex;
-    bottom: calc(var(--bar-h) + env(safe-area-inset-bottom, 0px) + 8px);
+    /* Above the hint line's slot: the sentence points, the door sits over
+       it, and neither covers the other. */
+    bottom: calc(var(--bar-h) + env(safe-area-inset-bottom, 0px) + 76px);
     top: auto;
     z-index: 11;
   }
@@ -1138,9 +1164,14 @@ button.danger {
   }
 
   /* The bar grew taller than --bar-h with 40px targets: keep floats clear. */
-  .log-float,
-  .location-dock.open {
+  .log-float {
     bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* The open dock stacks ABOVE the hint line's slot — the sentence points,
+     the door sits over it, and neither covers the other. */
+  .location-dock.open {
+    bottom: calc(136px + env(safe-area-inset-bottom, 0px));
   }
 
   .bottom-bar {
