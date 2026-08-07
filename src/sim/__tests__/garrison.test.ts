@@ -6,6 +6,7 @@
 // informer that closes the marsh's free hides.
 
 import { describe, expect, it } from 'vitest';
+import { breathe } from './breathe';
 import {
   COVER_CAPACITY,
   CREW_MUSTER,
@@ -184,9 +185,10 @@ const GAMES = 200;
 const DAYS = 20;
 
 describe(`${GAMES} seeded games, ${DAYS} days — the garrisoning smuggler (spec §13)`, () => {
-  it('posts men, pays their wage, and ends upright with the parish still with him', { timeout: 120_000 }, () => {
+  it('posts men, pays their wage, and ends upright with the parish still with him', { timeout: 120_000 }, async () => {
     const coins: number[] = [];
     for (let seed = 1; seed <= GAMES; seed++) {
+      await breathe(seed);
       const s = runPolicyGame(seed, TICKS_PER_DAY * DAYS, garrisoningSmuggler);
 
       expect(s.lost).toBe(false);

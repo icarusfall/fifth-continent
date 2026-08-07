@@ -5,6 +5,7 @@
 // are the state's own, so every expectation is exact.
 
 import { describe, expect, it } from 'vitest';
+import { breathe } from './breathe';
 import {
   DIFFICULTY,
   BINDING_CAPACITY,
@@ -335,10 +336,11 @@ describe('the tiers (spec §6.14): fence, lighter, and their prices', () => {
 });
 
 describe('200 seeded games, 40 days — the philosopher (spec §6.14, M5c)', () => {
-  it('the sea sends him when it pleases; each letter prices the floor exactly; the clock keeps it', () => {
+  it('the sea sends him when it pleases; each letter prices the floor exactly; the clock keeps it', async () => {
     let housed = 0;
     let published = 0;
     for (let seed = 1; seed <= 200; seed++) {
+      await breathe(seed);
       const s = runPolicyGame(seed, 40 * TICKS_PER_DAY, leidenPolicy);
       if (s.leiden.state === 'housed') housed++;
       const tiers = s.research.completed.leiden;

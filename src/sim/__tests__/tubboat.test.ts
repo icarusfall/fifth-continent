@@ -3,6 +3,7 @@
 // and §21's promise that the channel is the quiet road. All deterministic.
 
 import { describe, expect, it } from 'vitest';
+import { breathe } from './breathe';
 import {
   DYKE_EXPOSURE,
   MAX_TUB_BOATS,
@@ -135,8 +136,9 @@ describe('the tub-boat (§6.18): a hull, not a stall', () => {
 const GAMES = 200;
 
 describe(`${GAMES} seeded games — the waterman (spec §13/§6.18)`, () => {
-  it('across every seed: the chain links, the tub hauls, the parish barely hears it', { timeout: 120_000 }, () => {
+  it('across every seed: the chain links, the tub hauls, the parish barely hears it', { timeout: 120_000 }, async () => {
     for (let seed = 1; seed <= GAMES; seed++) {
+      await breathe(seed);
       let s = initialState(seed);
       s.tick = 60;
       s.lastCrisisTick = -(20 * TICKS_PER_DAY);

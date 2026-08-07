@@ -5,6 +5,7 @@
 // rise: the officer rides for sore stains, not every whisper.
 
 import { describe, expect, it } from 'vitest';
+import { breathe } from './breathe';
 import {
   CELLAR_COST,
   CELLAR_COVER_PER_TIER,
@@ -101,8 +102,9 @@ const GAMES = 200;
 const DAYS = 5;
 
 describe(`${GAMES} seeded games, ${DAYS} days — the cellared barn (spec §13)`, () => {
-  it('across every seed: a lugger-load rests silent and unseized under dug hides', { timeout: 120_000 }, () => {
+  it('across every seed: a lugger-load rests silent and unseized under dug hides', { timeout: 120_000 }, async () => {
     for (let seed = 1; seed <= GAMES; seed++) {
+      await breathe(seed);
       let s = initialState(seed);
       s.coin = 400;
       s.cellars.farm = 2;

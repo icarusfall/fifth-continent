@@ -4,6 +4,7 @@
 // the marsh, Standing to the parish, pasture to the flock, water for ever.
 
 import { describe, expect, it } from 'vitest';
+import { breathe } from './breathe';
 import {
   DIFFICULTY,
   DYKE_COST_PER_TILE,
@@ -170,8 +171,9 @@ describe('the survey preview (§6.18): what a cut would open, before its price',
 const GAMES = 200;
 
 describe(`${GAMES} seeded games — the improver (spec §13/§6.18)`, () => {
-  it('digs the whole survey: every price lands exactly, and the tenancy stands', { timeout: 120_000 }, () => {
+  it('digs the whole survey: every price lands exactly, and the tenancy stands', { timeout: 120_000 }, async () => {
     for (let seed = 1; seed <= GAMES; seed++) {
+      await breathe(seed);
       let s = initialState(seed);
       s.tick = 60;
       s.lastCrisisTick = -(40 * TICKS_PER_DAY);

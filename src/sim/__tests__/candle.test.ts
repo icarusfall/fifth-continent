@@ -6,6 +6,7 @@
 // the audit does, and returnPen hands the book back to the agent.
 
 import { describe, expect, it } from 'vitest';
+import { breathe } from './breathe';
 import {
   FLEECE_PER_HEAD_PER_DAY,
   PAUPER_FLOOR,
@@ -149,8 +150,9 @@ const GAMES = 200;
 const POOR_DAYS = 5;
 
 describe(`${GAMES} seeded games, ${POOR_DAYS} days — the pauper's grace (spec §6.15)`, () => {
-  it('across every seed: found, counted, and never seized while under the floor', { timeout: 120_000 }, () => {
+  it('across every seed: found, counted, and never seized while under the floor', { timeout: 120_000 }, async () => {
     for (let seed = 1; seed <= GAMES; seed++) {
+      await breathe(seed);
       let s = initialState(seed);
       s.coin = 20;
       s.stores.farm = { 'brandy-fair': 20 }; // 120 worth + 20 coin: under the floor
