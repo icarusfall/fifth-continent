@@ -5,6 +5,9 @@ import type { MapEdge } from '../sim/types';
 export const TILE = 20; // world px per tile
 export const WORLD_W = 40 * TILE;
 export const WORLD_H = 30 * TILE;
+// §15.2 — the painted margin past the world's edge, in tiles: the apron the
+// camera clamp guarantees the viewport never leaves.
+export const APRON_TILES = 48;
 
 export function tileCenter(p: { x: number; y: number }): { x: number; y: number } {
   return { x: (p.x + 0.5) * TILE, y: (p.y + 0.5) * TILE };

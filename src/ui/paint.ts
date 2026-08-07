@@ -6,14 +6,29 @@
 // the lattice. The ink coastline is then traced from the warped class map
 // rather than from tile edges. All noise is seeded from coordinates:
 // repaint is pixel-identical.
+//
+// Two canvases share the one method (spec §15.2 — the world has no visible
+// edge): the world at full resolution, and a coarse APRON around it, terrain
+// classes clamped to the nearest world tile so the marsh runs on inland and
+// the sea runs on east. Blob and detail sites hash their ABSOLUTE tile
+// coordinates, so where the two paintings overlap they paint the same
+// features and the seam is only a change of resolution.
 
 import { MAP_HEIGHT, MAP_WIDTH, terrainAt } from '../sim/map';
-import { hash2 } from './geometry';
+import { APRON_TILES, hash2 } from './geometry';
 import { CLAY, DYKE, INK, LIMEWASH, MARSH, MARSH_DARK, SEA } from './palette';
 
-export const PAINT_RES = 40; // painted px per tile
-const W = MAP_WIDTH * PAINT_RES;
-const H = MAP_HEIGHT * PAINT_RES;
+export const PAINT_RES = 40; // painted px per tile (the world canvas)
+const APRON_RES = 8; // painted px per tile (the apron is only ever seen small)
+
+/** A painted rectangle in tile coordinates — may extend past the world. */
+interface Rect {
+  x0: number;
+  y0: number;
+  w: number;
+  h: number;
+  res: number;
+}
 
 // How far (in tiles) the class boundaries wander off the lattice.
 const WARP_AMP = 1.4;
@@ -61,10 +76,19 @@ function vnoise(x: number, y: number, salt: number): number {
   return a + (b - a) * xf + (c - a) * yf + (a - b - c + d) * xf * yf;
 }
 
+/** Terrain class clamped to the nearest world tile: past the map's edge the
+ *  marsh runs on inland, the coast runs on north and south, the sea east. */
+function classAt(x: number, y: number): string {
+  return terrainAt(
+    Math.max(0, Math.min(MAP_WIDTH - 1, x)),
+    Math.max(0, Math.min(MAP_HEIGHT - 1, y)),
+  );
+}
+
 /** Terrain class at a warped position (tile units). */
 function warpedClass(tx: number, ty: number, wxGrid: WarpGrid): string {
   const { wx, wy } = wxGrid.at(tx, ty);
-  return terrainAt(Math.floor(tx + wx), Math.floor(ty + wy));
+  return classAt(Math.floor(tx + wx), Math.floor(ty + wy));
 }
 
 // Warp offsets are sampled on a coarse grid and bilinearly interpolated —
@@ -75,15 +99,17 @@ class WarpGrid {
   private wxs: Float32Array;
   private wys: Float32Array;
 
-  constructor() {
+  constructor(private rect: Rect) {
+    const W = rect.w * rect.res;
+    const H = rect.h * rect.res;
     this.cols = Math.ceil(W / this.step) + 2;
     const rows = Math.ceil(H / this.step) + 2;
     this.wxs = new Float32Array(this.cols * rows);
     this.wys = new Float32Array(this.cols * rows);
     for (let gy = 0; gy < rows; gy++) {
       for (let gx = 0; gx < this.cols; gx++) {
-        const tx = (gx * this.step) / PAINT_RES;
-        const ty = (gy * this.step) / PAINT_RES;
+        const tx = rect.x0 + (gx * this.step) / rect.res;
+        const ty = rect.y0 + (gy * this.step) / rect.res;
         this.wxs[gy * this.cols + gx] = (vnoise(tx / WARP_SCALE, ty / WARP_SCALE, 71) - 0.5) * WARP_AMP;
         this.wys[gy * this.cols + gx] = (vnoise(tx / WARP_SCALE, ty / WARP_SCALE, 72) - 0.5) * WARP_AMP;
       }
@@ -92,8 +118,8 @@ class WarpGrid {
 
   /** tx, ty in tile units. */
   at(tx: number, ty: number): { wx: number; wy: number } {
-    const px = (tx * PAINT_RES) / this.step;
-    const py = (ty * PAINT_RES) / this.step;
+    const px = ((tx - this.rect.x0) * this.rect.res) / this.step;
+    const py = ((ty - this.rect.y0) * this.rect.res) / this.step;
     const xi = Math.max(0, Math.min(this.cols - 2, Math.floor(px)));
     const yi = Math.max(0, Math.floor(py));
     const xf = px - xi;
@@ -129,24 +155,48 @@ const BASE_RGB: [number, number, number][] = [
   BASE_RGB[3] = [m[0], m[1], m[2]];
 }
 
-let cached: HTMLCanvasElement | null = null;
+let worldCache: HTMLCanvasElement | null = null;
+let apronCache: HTMLCanvasElement | null = null;
 
 export function getTerrainCanvas(): HTMLCanvasElement {
-  if (cached) return cached;
+  if (!worldCache) {
+    worldCache = paint({ x0: 0, y0: 0, w: MAP_WIDTH, h: MAP_HEIGHT, res: PAINT_RES });
+  }
+  return worldCache;
+}
+
+/** The coarse painting under and around the world (§15.2): the camera clamp
+ *  guarantees the viewport never leaves it. */
+export function getApronCanvas(): HTMLCanvasElement {
+  if (!apronCache) {
+    apronCache = paint({
+      x0: -APRON_TILES,
+      y0: -APRON_TILES,
+      w: MAP_WIDTH + 2 * APRON_TILES,
+      h: MAP_HEIGHT + 2 * APRON_TILES,
+      res: APRON_RES });
+  }
+  return apronCache;
+}
+
+function paint(rect: Rect): HTMLCanvasElement {
+  const { x0, y0, res } = rect;
+  const W = rect.w * res;
+  const H = rect.h * res;
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
   const ctx = canvas.getContext('2d')!;
-  const warp = new WarpGrid();
+  const warp = new WarpGrid(rect);
 
   // ---- Pass 1: per-pixel warped classification ----
   const img = ctx.createImageData(W, H);
   const data = img.data;
   const cls = new Uint8Array(W * H);
   for (let py = 0; py < H; py++) {
-    const ty = py / PAINT_RES;
+    const ty = y0 + py / res;
     for (let px = 0; px < W; px++) {
-      const tx = px / PAINT_RES;
+      const tx = x0 + px / res;
       const ch = warpedClass(tx, ty, warp);
       const id = CLASS_ID[ch] ?? 1;
       cls[py * W + px] = id;
@@ -163,11 +213,11 @@ export function getTerrainCanvas(): HTMLCanvasElement {
   // ---- Pass 2: painterly mottling, off-lattice ----
   // Blob sites sit on their own jittered half-tile lattice, coloured by the
   // same warped classification, so patches straddle boundaries organically.
-  const SITE = PAINT_RES / 2;
-  for (let sy = 0; sy < H / SITE; sy++) {
-    for (let sx = 0; sx < W / SITE; sx++) {
-      const jx = (sx + hash2(sx, sy, 11)) * SITE;
-      const jy = (sy + hash2(sx, sy, 12)) * SITE;
+  // Sites are indexed by ABSOLUTE half-tile coords: apron and world agree.
+  for (let sy = y0 * 2; sy < (y0 + rect.h) * 2; sy++) {
+    for (let sx = x0 * 2; sx < (x0 + rect.w) * 2; sx++) {
+      const jx = ((sx + hash2(sx, sy, 11)) / 2 - x0) * res;
+      const jy = ((sy + hash2(sx, sy, 12)) / 2 - y0) * res;
       const id = cls[Math.min(H - 1, Math.round(jy)) * W + Math.min(W - 1, Math.round(jx))];
       const pick = hash2(sx, sy, 13);
       let color: string | null = null;
@@ -181,21 +231,20 @@ export function getTerrainCanvas(): HTMLCanvasElement {
         color = pick < 0.25 ? LIMEWASH : null;
       }
       if (!color) continue;
-      const r = (0.35 + hash2(sx, sy, 14) * 0.5) * PAINT_RES;
+      const r = (0.35 + hash2(sx, sy, 14) * 0.5) * res;
       blob(ctx, jx, jy, r, color, sx, sy, 15);
     }
   }
 
   // ---- Pass 3: shallows — lighten sea pixels near the coast ----
-  shallows(ctx, cls);
+  shallows(ctx, cls, W, H, res);
 
   // ---- Pass 4: details, placed off-lattice, typed by warped class ----
-  details(ctx, cls);
+  details(ctx, cls, rect);
 
   // ---- Pass 5: ink — trace the warped coast and dyke banks ----
-  inkBoundaries(ctx, cls);
+  inkBoundaries(ctx, cls, W, H, res);
 
-  cached = canvas;
   return canvas;
 }
 
@@ -226,8 +275,14 @@ function blob(
 }
 
 /** Lighten sea within a few painted px of land — a soft standing shallow. */
-function shallows(ctx: CanvasRenderingContext2D, cls: Uint8Array): void {
-  const REACH = Math.round(PAINT_RES * 0.35);
+function shallows(
+  ctx: CanvasRenderingContext2D,
+  cls: Uint8Array,
+  W: number,
+  H: number,
+  res: number,
+): void {
+  const REACH = Math.max(1, Math.round(res * 0.35));
   const STEP = 3;
   ctx.fillStyle = SEA_SHALLOW;
   ctx.globalAlpha = 0.55;
@@ -258,41 +313,45 @@ function shallows(ctx: CanvasRenderingContext2D, cls: Uint8Array): void {
   ctx.globalAlpha = 1;
 }
 
-/** Sedge, waves, pebbles — sites jittered off-lattice, typed by class. */
-function details(ctx: CanvasRenderingContext2D, cls: Uint8Array): void {
-  for (let sy = 0; sy < MAP_HEIGHT; sy++) {
-    for (let sx = 0; sx < MAP_WIDTH; sx++) {
-      const jx = (sx + hash2(sx, sy, 50)) * PAINT_RES;
-      const jy = (sy + hash2(sx, sy, 51)) * PAINT_RES;
+/** Sedge, waves, pebbles — sites jittered off-lattice, typed by class.
+ *  Site indices are absolute tile coords: apron and world paint alike. */
+function details(ctx: CanvasRenderingContext2D, cls: Uint8Array, rect: Rect): void {
+  const { x0, y0, res } = rect;
+  const W = rect.w * res;
+  const H = rect.h * res;
+  for (let sy = y0; sy < y0 + rect.h; sy++) {
+    for (let sx = x0; sx < x0 + rect.w; sx++) {
+      const jx = (sx + hash2(sx, sy, 50) - x0) * res;
+      const jy = (sy + hash2(sx, sy, 51) - y0) * res;
       const id = cls[Math.min(H - 1, Math.round(jy)) * W + Math.min(W - 1, Math.round(jx))];
       const r = hash2(sx, sy, 52);
 
       if (id === 1 && r < 0.34) {
         // Sedge tufts.
         ctx.strokeStyle = MARSH_DARK;
-        ctx.lineWidth = PAINT_RES * 0.06;
+        ctx.lineWidth = res * 0.06;
         ctx.lineCap = 'round';
         const n = r < 0.11 ? 3 : 2;
         for (let i = 0; i < n; i++) {
-          const bx = jx + (hash2(sx, sy, 60 + i) - 0.5) * PAINT_RES * 0.8;
-          const by = jy + (hash2(sx, sy, 70 + i) - 0.5) * PAINT_RES * 0.6;
-          const lean = (hash2(sx, sy, 80 + i) - 0.5) * PAINT_RES * 0.24;
+          const bx = jx + (hash2(sx, sy, 60 + i) - 0.5) * res * 0.8;
+          const by = jy + (hash2(sx, sy, 70 + i) - 0.5) * res * 0.6;
+          const lean = (hash2(sx, sy, 80 + i) - 0.5) * res * 0.24;
           ctx.beginPath();
-          ctx.moveTo(bx - PAINT_RES * 0.08, by + PAINT_RES * 0.12);
-          ctx.quadraticCurveTo(bx + lean, by - PAINT_RES * 0.05, bx + lean * 1.5, by - PAINT_RES * 0.2);
-          ctx.moveTo(bx + PAINT_RES * 0.06, by + PAINT_RES * 0.12);
-          ctx.quadraticCurveTo(bx + lean * 0.6, by, bx + lean, by - PAINT_RES * 0.15);
+          ctx.moveTo(bx - res * 0.08, by + res * 0.12);
+          ctx.quadraticCurveTo(bx + lean, by - res * 0.05, bx + lean * 1.5, by - res * 0.2);
+          ctx.moveTo(bx + res * 0.06, by + res * 0.12);
+          ctx.quadraticCurveTo(bx + lean * 0.6, by, bx + lean, by - res * 0.15);
           ctx.stroke();
         }
       } else if (id === SEA_ID && r < 0.26) {
         // Wave strokes.
         ctx.strokeStyle = 'rgba(232,225,210,0.16)';
-        ctx.lineWidth = PAINT_RES * 0.05;
+        ctx.lineWidth = res * 0.05;
         ctx.lineCap = 'round';
         ctx.beginPath();
         ctx.moveTo(jx, jy);
-        ctx.quadraticCurveTo(jx + PAINT_RES * 0.15, jy - PAINT_RES * 0.1, jx + PAINT_RES * 0.3, jy);
-        ctx.quadraticCurveTo(jx + PAINT_RES * 0.45, jy + PAINT_RES * 0.1, jx + PAINT_RES * 0.6, jy);
+        ctx.quadraticCurveTo(jx + res * 0.15, jy - res * 0.1, jx + res * 0.3, jy);
+        ctx.quadraticCurveTo(jx + res * 0.45, jy + res * 0.1, jx + res * 0.6, jy);
         ctx.stroke();
       } else if (id === 3) {
         // Pebbles.
@@ -302,9 +361,9 @@ function details(ctx: CanvasRenderingContext2D, cls: Uint8Array): void {
           ctx.globalAlpha = 0.5;
           ctx.beginPath();
           ctx.arc(
-            jx + (hash2(sx, sy, 58 + i) - 0.5) * PAINT_RES,
-            jy + (hash2(sx, sy, 64 + i) - 0.5) * PAINT_RES,
-            (0.03 + hash2(sx, sy, 71 + i) * 0.045) * PAINT_RES,
+            jx + (hash2(sx, sy, 58 + i) - 0.5) * res,
+            jy + (hash2(sx, sy, 64 + i) - 0.5) * res,
+            (0.03 + hash2(sx, sy, 71 + i) * 0.045) * res,
             0,
             Math.PI * 2,
           );
@@ -314,10 +373,10 @@ function details(ctx: CanvasRenderingContext2D, cls: Uint8Array): void {
       } else if (id === DYKE_ID && r < 0.5) {
         // A still ripple on the dyke.
         ctx.strokeStyle = 'rgba(232,225,210,0.2)';
-        ctx.lineWidth = PAINT_RES * 0.04;
+        ctx.lineWidth = res * 0.04;
         ctx.beginPath();
-        ctx.moveTo(jx - PAINT_RES * 0.22, jy);
-        ctx.lineTo(jx + PAINT_RES * 0.22, jy);
+        ctx.moveTo(jx - res * 0.22, jy);
+        ctx.lineTo(jx + res * 0.22, jy);
         ctx.stroke();
       }
     }
@@ -327,12 +386,20 @@ function details(ctx: CanvasRenderingContext2D, cls: Uint8Array): void {
 /**
  * Trace ink along the warped class boundaries: dots stamped where land
  * meets sea (bold) or dyke (fine). Because the class map itself wanders,
- * the line is naturally wobbly — no straight tile edge survives.
+ * the line is naturally wobbly — no straight tile edge survives. Neighbours
+ * past the canvas edge clamp to it (compare with self, no boundary): the
+ * painting must not ink its own rim, the world continues beneath as apron.
  */
-function inkBoundaries(ctx: CanvasRenderingContext2D, cls: Uint8Array): void {
+function inkBoundaries(
+  ctx: CanvasRenderingContext2D,
+  cls: Uint8Array,
+  W: number,
+  H: number,
+  res: number,
+): void {
   const STEP = 2;
-  const coastR = PAINT_RES * 0.05;
-  const dykeR = PAINT_RES * 0.028;
+  const coastR = res * 0.05;
+  const dykeR = res * 0.028;
   for (let py = 0; py < H; py += STEP) {
     for (let px = 0; px < W; px += STEP) {
       const id = cls[py * W + px];
@@ -345,9 +412,9 @@ function inkBoundaries(ctx: CanvasRenderingContext2D, cls: Uint8Array): void {
         [0, -STEP],
         [0, STEP],
       ]) {
-        const qx = px + dx;
-        const qy = py + dy;
-        const q = qx < 0 || qy < 0 || qx >= W || qy >= H ? SEA_ID : cls[qy * W + qx];
+        const qx = Math.max(0, Math.min(W - 1, px + dx));
+        const qy = Math.max(0, Math.min(H - 1, py + dy));
+        const q = cls[qy * W + qx];
         if (q === SEA_ID && id !== DYKE_ID) coast = true;
         else if (q === DYKE_ID && id !== DYKE_ID) bank = true;
       }

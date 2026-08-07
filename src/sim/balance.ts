@@ -307,7 +307,14 @@ export const CREW_MUSTER = 40; // coin to raise one smuggler
 export const CREW_WAGE = 3; // coin/day
 /** A building holds this many, plus more per fort tier (fort = capacity too). */
 export const GARRISON_BASE = 4;
-export const GARRISON_PER_TIER = 2; // bare holds 4, a fortress 12
+/**
+ * §6.13 (M5½e) — a bare building quarters 4, a fortress 20. Raised from 2/tier
+ * (cap 12): no dry ground could be made impregnable at 12, and the phone
+ * playtest asked for a "maxed out" that means it. Twenty crew behind tier-4
+ * stone hold 22 on dry ground — the Water Guard's capped worst is 20 — at a
+ * payroll (60/day) that keeps the moat the economical road.
+ */
+export const GARRISON_PER_TIER = 4;
 
 // Standing — the parish's regard (spec §6.13 / §11). Falls when your people
 // die (STANDING_LOSS_PER_FRIENDLY_DEAD, in the combat block above), drifts back

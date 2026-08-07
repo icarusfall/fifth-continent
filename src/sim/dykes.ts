@@ -115,7 +115,7 @@ export function digProgress(state: GameState): void {
   loseStanding(state, DYKE_PARISH_STANDING); // enclosure enrages the commoners
   logEvent(
     state,
-    `${segment.name} runs with water. The gentry approve; the parish mutters; the marsh is smaller than it was, and it knows. Grazing for ${DYKE_PASTURE_HEAD} more head has drained dry.`,
+    `${segment.name} runs with water. The gentry approve; the parish mutters; the marsh is smaller than it was, and it knows. Grazing for ${DYKE_PASTURE_HEAD} more head has drained dry — the pasture now holds ${flockCapOf(state)}.`,
   );
 }
 
@@ -288,6 +288,31 @@ export function dykePreview(
     }
   }
   return { opens, nextStep: null };
+}
+
+/**
+ * §6.18 (M5½e) — the building this cut would moat that is not moated today,
+ * or null. The same hypothetical-dug-set probe as the route preview: pure,
+ * no dice, no mutation. The survey uses it to tell a cut that DOES something
+ * from a dyke to nowhere.
+ */
+export function cutWouldMoat(state: GameState, id: string): NodeId | null {
+  if (state.dykesDug.includes(id)) return null;
+  const probe: GameState = { ...state, dykesDug: [...state.dykesDug, id] };
+  const owned: NodeId[] = state.cuttingHouse ? ['cutting-house', 'farm'] : ['farm'];
+  for (const node of owned) {
+    if (!moatedAt(state, node) && moatedAt(probe, node)) return node;
+  }
+  return null;
+}
+
+/**
+ * §6.18 (M5½e) — should this post breathe on the map? True when digging this
+ * one segment, today, opens a waterway or moats a building you own.
+ */
+export function cutInvites(state: GameState, id: string): boolean {
+  if (state.dykesDug.includes(id)) return false;
+  return dykePreview(state, id).opens.length > 0 || cutWouldMoat(state, id) !== null;
 }
 
 // ---- M5½c: the water fights back (spec §6.18 / §14.1) ----

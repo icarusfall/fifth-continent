@@ -874,6 +874,21 @@ button.danger {
   font-size: 12px;
 }
 
+/* §14.4 (M5½e) — a dead Call stays visible and answers when tapped. */
+.battle-calls button.dead {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.battle-calls .call-hint {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  font-style: italic;
+  opacity: 0.85;
+  text-align: center;
+  margin: 2px 0 0;
+}
+
 /* Speed controls, riding in the bottom bar. */
 .speed-controls {
   display: flex;

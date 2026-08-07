@@ -3,13 +3,17 @@
 // drag-to-pan, trackpad pinch (ctrl+wheel) for free, and true two-finger
 // touch pinch via pinch(). Pure UI state, no React.
 
-import { WORLD_H, WORLD_W } from './geometry';
+import { APRON_TILES, TILE, WORLD_H, WORLD_W } from './geometry';
 
 const ZOOM_MAX = 8;
 const ZOOM_SPEED = 0.0015; // spec §15.2
 const EASE_ZOOM = 0.14;
 const EASE_PAN = 0.35; // pans track the hand closely; zoom glides
 const DRAG_THRESHOLD_PX = 5;
+// §15.2 — the world has no visible edge: this much of min(view, world) must
+// stay on screen, and the viewport never leaves the painted apron.
+const OVERLAP = 0.55;
+const APRON_PX = APRON_TILES * TILE;
 
 export class CameraController {
   // current (rendered) camera
@@ -63,8 +67,21 @@ export class CameraController {
     return this.fitZoom;
   }
 
+  /** §15.2 — one axis of the world's-edge clamp: keep over half of
+   *  min(view, world) on screen, never leave the painted apron; an inverted
+   *  range (a viewport wider than apron + world + apron) centres the world.
+   *  Applied to the *target*, so the ease turns a hard wall into a glide. */
+  private clampAxis(t: number, span: number, world: number): number {
+    const keep = OVERLAP * Math.min(span, world);
+    const lo = Math.max(keep - span, -APRON_PX);
+    const hi = Math.min(world - keep, world + APRON_PX - span);
+    return lo > hi ? (lo + hi) / 2 : Math.min(hi, Math.max(lo, t));
+  }
+
   /** Advance the easing one frame. */
   ease(): void {
+    this.tx = this.clampAxis(this.tx, this.vw / this.tzoom, WORLD_W);
+    this.ty = this.clampAxis(this.ty, this.vh / this.tzoom, WORLD_H);
     this.x += (this.tx - this.x) * EASE_PAN;
     this.y += (this.ty - this.y) * EASE_PAN;
     this.zoom += (this.tzoom - this.zoom) * EASE_ZOOM;

@@ -33,6 +33,7 @@ import { useUiStore } from '../state/ui';
 import { DYKE, HEAT_RED, ICHOR_GREEN, LIMEWASH, REVENUE_BLUE, ROOF, SEA } from './palette';
 
 import { spanOf } from './format';
+import { benchReport } from './menus/shared';
 import { SystemControls } from './SpeedControls';
 
 const PHASE_GLYPH = { day: '☀', dusk: '🌗', night: '☾' } as const;
@@ -153,6 +154,23 @@ function HeatGauges({ state, day }: { state: GameState; day: number }) {
           />
         </div>
       </div>
+    </div>
+  );
+}
+
+/** §6.14 (M5½e) — the bench's read-out: what is being learned, and how long
+ *  is left. The chip exists only while a project runs — a mouth, not chrome. */
+function BenchChip({ state }: { state: GameState }) {
+  const bench = benchReport(state);
+  if (!bench) return null;
+  return (
+    <div
+      className="chip"
+      title={`On the bench: ${bench.name} — done in ${bench.left}. One project at a time.`}
+    >
+      <span className="chip-label">bench</span>
+      <span className="chip-value">{bench.name.toLowerCase()}</span>
+      <span className="chip-note">{bench.left}</span>
     </div>
   );
 }
@@ -281,6 +299,8 @@ export function Hud({ state }: { state: GameState }) {
         )}
 
         {(state.boundWights > 0 || state.debt > 0) && <DebtChip state={state} />}
+
+        {state.research.active !== null && <BenchChip state={state} />}
 
         <button
           className="strip-fold"

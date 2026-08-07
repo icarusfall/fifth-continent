@@ -155,6 +155,18 @@ export function raidBattleSetup(state: GameState, calls?: ScheduledCall[]): Batt
 }
 
 /**
+ * §6.13 (M5½e) — who would come today, and how many: the mustered raid if one
+ * stands, else the raider the meters have earned at the size they would bring.
+ * For the works menu's standing charge-reading — legible while there is still
+ * time to act, not only at the wall.
+ */
+export function expectedRaid(state: GameState): { faction: Faction; size: number } {
+  if (state.raid) return { faction: state.raid.faction, size: state.raid.size };
+  const faction = raidFaction(state);
+  return { faction, size: raidSize(state, faction) };
+}
+
+/**
  * §6.13 (M5½d) — read the charge aloud. The largest force of `faction` this
  * building's men and works turn back, asked of `simulateBattle` itself rather
  * than of a formula beside it: the card can then never drift from the fight it

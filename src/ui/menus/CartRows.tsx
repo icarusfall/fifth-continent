@@ -509,7 +509,7 @@ export function CartsAtNode({
                   (cart.carter.stops.some((s) => s.at === 'shingle')
                     ? 'He deals over the gunwale when the lugger stands off, and waits when it does not.'
                     : 'He minds the tide and nothing else.')
-                : ' · no carter — yours to drive'}
+                : ` · no ${handOf(cart)} — yours to drive`}
             </p>
             <div className="menu-buttons">
               {/* Playtest (first morning): the top button is the DEFAULT —
@@ -585,7 +585,7 @@ export function CartsAtNode({
                     </button>
                     {hiring.where === 'ryne' && (
                       <button
-                        title="The whole remainder, round the back, at the haircut — the carter looks away, then goes on."
+                        title={`The whole remainder, round the back, at the haircut — the ${handOf(cart)} looks away, then goes on.`}
                         onClick={() => addStop('ryne', undefined, true)}
                       >
                         …sell at Ryne, and the fence takes the remainder
@@ -643,7 +643,7 @@ export function CartsAtNode({
                       return (
                         <button
                           key={`fence-${g}`}
-                          title="The whole remainder, round the back, at once — the carter looks away, then turns for home."
+                          title={`The whole remainder, round the back, at once — the ${handOf(cart)} looks away, then turns for home.`}
                           onClick={() => enqueue({ type: 'sellToFence', cartId: cart.id, good: g })}
                         >
                           Fence the remaining {n} {GOOD_LABEL[g]} · {n * fencePrice} coin
@@ -664,7 +664,7 @@ export function CartsAtNode({
                     }
                     onClick={() => enqueue({ type: 'dismissCarter', cartId: cart.id })}
                   >
-                    Dismiss the carter
+                    Dismiss the {handOf(cart)}
                   </button>
                 </>
               ) : !present ? null : carterAvailable ? (
@@ -677,7 +677,7 @@ export function CartsAtNode({
                     title="Where he calls, and what he picks up at each — any loop among the known places, up to four calls."
                     onClick={() => setHiring({ cartId: cart.id, stops: [] })}
                   >
-                    Hire a carter, and write him a round · {CARTER_WAGE} coin a day
+                    Hire a {handOf(cart)}, and write him a round · {CARTER_WAGE} coin a day
                     {shingleRoutesOpen(state) || state.dutchman.unlocked
                       ? `, ${CARTER_DANGER_WAGE} if it touches the coast`
                       : ''}
@@ -707,6 +707,13 @@ export function CartsAtNode({
   );
 }
 
+
+/** §6.19 (M5½e playtest) — the hand on the reins, named for the hull: a
+ *  carter on the road, a dyke-pilot on the dug water, a lighterman at sea.
+ *  One hire flow, three trades — "hire a carter" on a tub-boat reads wrong. */
+function handOf(cart: Cart): string {
+  return cart.vessel === 'dyke' ? 'dyke-pilot' : cart.vessel === 'sea' ? 'lighterman' : 'carter';
+}
 
 export function CartMenu({
   state,
@@ -753,13 +760,13 @@ export function CartMenu({
       {cart.carter && (
         <>
           <p className="flavour">
-            A carter holds the reins: {orderLabel(state, cart.carter)}, and round again —{' '}
+            A {handOf(cart)} holds the reins: {orderLabel(state, cart.carter)}, and round again —{' '}
             {carterWageOf(cart.carter)} coin a day. He minds the tide and nothing else — not even
             the blue coat.
           </p>
           <div className="menu-buttons">
             <button onClick={() => enqueue({ type: 'dismissCarter', cartId: cart.id })}>
-              Dismiss the carter
+              Dismiss the {handOf(cart)}
             </button>
           </div>
         </>

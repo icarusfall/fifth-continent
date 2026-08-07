@@ -918,8 +918,10 @@ smuggler crew   α 0.18, breakpoint 30   CREW_MUSTER   40 coin, CREW_WAGE   3/da
 raise           a verb at the building; men appear in its garrison next tick
 wages           at dawn, with the carter's (§6.11); a building that cannot pay
                 its garrison loses men to desertion (cheapest first)
-cap             GARRISON_BASE 4 + fortTier × GARRISON_PER_TIER 2  → a bare
-                building holds 4, a fortress 12. Fortification now does *three*
+cap             GARRISON_BASE 4 + fortTier × GARRISON_PER_TIER 4  → a bare
+                building holds 4, a fortress 20 (M5½e: was 2/tier for a cap
+                of 12, which no dry ground could make impregnable — the
+                fortress earns its name). Fortification now does *three*
                 things: alpha, capacity, and visibility (§6.12).
 ```
 
@@ -1967,7 +1969,8 @@ for you; the house's is not.
 | dogs & hedge, 6 men, tier 1 | 4 | 4 |
 | bolted doors, 8 men, tier 2 | 7 | 11 |
 | tier 3, 10 men | 11 | 25 |
-| **full: tier 4, 12 crew** | **15** | **46** |
+| tier 4, 12 crew | 15 | 46 |
+| **full (M5½e): tier 4, 20 crew** | **25** | **beyond any muster** |
 
 Depth is the story the table tells: at tier 4 behind water, 4 crew turn back
 5, six turn back 11, eight turn back 20, ten turn back 32, twelve turn back
@@ -2121,7 +2124,9 @@ WATER_GUARD_         = 20. With the cap making the Water Guard the permanent
                      Measured against §14: 20 is held by ten men behind water
                      (ceiling 23) and NOT by twelve behind dry stone (13), so
                      the answer stays *dig* — §6.18's whole argument, now
-                     actually reachable
+                     actually reachable. (M5½e adds a second answer at a
+                     steeper price: a full fortress of twenty crew holds 22
+                     on dry ground — payroll instead of spadework)
 ```
 
 The Company was capped in M5½c for the same reason and the same fiction: a
@@ -2177,6 +2182,93 @@ Dragoons already riding is re-read as the Water Guard at the new cap. The save
 that forced this change is a player standing on a rung that no longer exists;
 leaving them there because the data loaded cleanly would be a rules-lawyer's
 answer to a design bug.
+
+#### M5½e phone playtest — the fortress earns its name, and the mouths the phone needs
+
+**The report (2026-08-07, phone):** *"I still can't win a fight with a fully
+gunported cutting house defended by smugglers at the quartering cap. If you've
+maxed out defences for a building, it should be pretty much impregnable. At no
+point in the battle did other defensive options appear."* A second run, with
+wight-fog learned, held the wall — *"but I shouldn't need the fog if fully
+fortified and manned."*
+
+Measured: the old cap quartered 12, and 12 crew behind tier-4 stone on dry
+ground hold 13 against the Water Guard's capped 20. So the state a player
+reasonably calls *finished* loses by seven, every time — and both roads that
+close the gap (the water, the fog) are exactly the kind of deduce-it-yourself
+mechanic the designer's call above rules out as a required step. M5½d
+reserved the numbers argument for a playtest that brought evidence; this one
+did. The lever is the smallest available, and it is not a combat number:
+
+```
+GARRISON_PER_TIER  2 → 4: a bare building quarters 4, a fortress 20. The §14
+                   maths is untouched — every pinned ceiling above still holds
+                   for its headcount. What changes is which headcounts a
+                   building can QUARTER. Measured, tier 4, crew, dry ground:
+                   16 hold 17 · 18 hold 20 · 20 hold 22 — a full fortress
+                   turns back the Water Guard's capped worst with margin,
+                   no fog, no moat.
+three roads now    impregnability against ordinary play's top rung, priced in
+                   different meters, none required to be deduced (the works
+                   menu reads all three aloud, below):
+                   · payroll — 20 crew at CREW_WAGE 3 = 60/day, 800 to muster
+                   · water   — 10 crew moated hold 23, half the payroll: the
+                               spade's road (§6.18), still the economical one
+                   · fog     — the emergency lever, 8 Debt the battle (§6.14)
+                   Dragoons still crush all of it (20 crew, dry: ceiling 8).
+                   §7's named act keeps its meaning; the doom tier is intact.
+```
+
+**And the mouths.** The phone found a class of failure the desktop never
+shows: every explanation in the defence UI lived in a `title` tooltip, and a
+thumb never sees one. The M5½d rule — read the charge aloud — extends to the
+surfaces themselves:
+
+```
+the works menu    GarrisonRow reads the charge where the men are posted: who
+                  would come today and how many (a new raid.ts export
+                  `expectedRaid` — state.raid if mustered, else
+                  raidFaction/raidSize), what these men and works turn back
+                  (defenceCeiling), and, on dry ground, what the same men
+                  would hold behind a cut channel. Standing, not crisis-only:
+                  the reading is there while there is still time to act on it
+the muster card   gains the same reading, days before the blow — the raid
+                  card alone said it at the wall, when digging was already
+                  too late
+the battle calls  every dead Call explains itself ON TAP: the reason renders
+                  in a visible hint line under the buttons, never only a
+                  tooltip — what would earn the fog, why this bank cannot be
+                  cut, why coin does not move the Crown, where a reserve or
+                  an engine would come from
+the bench         §6.14's research had no progress read-out anywhere: a HUD
+                  chip and a line in each research menu now name the active
+                  project and its days remaining (research.active.doneTick —
+                  the state was always there; it had no mouth)
+the pasture       the flock cap grew with every dyke and nothing the player
+                  watches said so (the farm headline read "barn 0/24", and
+                  base pasture = barn capacity = 24 made two caps read as
+                  one). The headline now says "N sheep of a pasture for M"
+                  beside the barn's numbers, and the dig's completion log
+                  states the new cap outright
+the hand          one hire flow serves three hulls, and "hire a carter" on a
+                  tub-boat reads wrong: the verb now names the trade — a
+                  carter on the road, a dyke-pilot on the dug water, a
+                  lighterman at sea. Naming only; the sim's carter record is
+                  unchanged
+the survey        it is easy to dig a dyke to nowhere: eight identical
+                  pin-lines, and the one that joins the farm to the coast
+                  looks exactly like the one that is only pasture. The posts
+                  now tell them apart — a segment whose cut would open a
+                  waterway TODAY (dykePreview.opens ≠ ∅), or lay a moat at
+                  the foot of a building you own (cutWouldMoat, new in
+                  dykes.ts — the same hypothetical-dug-set probe), breathes
+                  on the map, the first-morning pattern; dead-end cuts stand
+                  plain. And the post's menu names the moat it would make,
+                  as it already names the route it would open (§6.18 M5½b)
+```
+
+No save bump: `GARRISON_PER_TIER` is capacity, not state, and the bench
+read-out is presentation over fields that already exist.
 
 ---
 
@@ -2761,6 +2853,28 @@ Also: drag-to-pan (middle mouse or space+drag), edge-scroll, and trackpad pinch 
 **The camera is eased.** Pan and zoom set a *target*; the camera lerps toward it
 (~20%/frame) and never snaps. Terrain is painted to the static layer as soft
 overlapping blobs of palette colour — the tile grid must never be visible.
+
+**The world has no visible edge.** The map must never read as a floating
+rectangle in void (a phone zoomed out sees far more ground than the 40×30
+world holds). Beyond the playable map the same painterly terrain continues as
+a coarse **apron**: terrain classes clamped to the nearest world tile — the
+marsh runs on inland, the coastline runs on north and south, the open sea runs
+on east — painted once at low resolution for `APRON_TILES = 48` tiles on every
+side and drawn *under* the crisp world canvas. And the camera target is
+clamped, per axis, every frame before easing:
+
+```
+span = viewport / zoom                        // world px visible on this axis
+keep = 0.55 * min(span, world)                // this much world must stay visible
+lo   = max(keep - span, -APRON)               // APRON = APRON_TILES * TILE
+hi   = min(world - keep, world + APRON - span)
+t    = lo > hi ? (lo + hi) / 2 : clamp(t, lo, hi)   // inverted range ⇒ centre
+```
+
+Two guarantees fall out: the playable map always fills over half of the
+viewport (or shows over half of itself, when the view is wider than the
+world) — you cannot get lost in the apron — and the viewport never leaves
+painted ground, at any zoom the `MIN_ZOOM` clamp permits.
 
 **Semantic zoom / LOD — three bands, and they are a design feature, not an optimisation:**
 - **Far ("the County"):** no buildings, just the route graph — flow volumes as line thickness, Heat as colour. This is the *strategic* view and it is what the Revenue's map looks like too. The player should feel the uncomfortable symmetry.

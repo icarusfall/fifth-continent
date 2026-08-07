@@ -6,12 +6,16 @@
 
 
 
-import { GOOD_LABEL } from '../format';
-import { DUTCHMAN_TRUST_JENEVER, DUTCHMAN_TRUST_TEA } from '../../sim/balance';
+import { GOOD_LABEL, spanOf } from '../format';
+import {
+  DUTCHMAN_TRUST_JENEVER,
+  DUTCHMAN_TRUST_TEA,
+  MARSH_VEIL_DEBT,
+  TICKS_PER_DAY } from '../../sim/balance';
 import { edgeById, edgesFor, nodeById } from '../../sim/map';
 import { CONTRABAND } from '../../sim/revenue';
 import { dayPhaseOf } from '../../sim/time';
-import type { Cart, CarterOrder, EdgeId, GameState, Good, NodeId } from '../../sim/types';
+import type { Cart, CarterOrder, EdgeId, GameState, Good, NodeId, ResearchTree } from '../../sim/types';
 import { useGameStore } from '../../state/store';
 import { useUiStore } from '../../state/ui';
 import { createContext, useContext, useEffect, useRef } from 'react';
@@ -115,6 +119,76 @@ export function coatOn(state: GameState, edgeId: EdgeId, from: NodeId): boolean 
   return officer.location.nodeId === far;
 }
 
+
+// §6.14 (M5c) — the leiden ladder, for the workshop's menu. Coin is nominal;
+// the price column is the letter each tier wants sent. (M5½e: moved here from
+// FarmMenu so the bench read-out can name any tree's project without cycles.)
+export const LEIDEN_TIERS: ReadonlyArray<{ name: string; effect: string; price: string }> = [
+  {
+    name: 'Galvanic fence',
+    effect: 'the workshop’s men kill the better',
+    price: 'the wired wall reads for miles' },
+  {
+    name: 'Steam-lighter',
+    effect: 'a hull, sixteen tubs, no bedtime — the sea lane opens',
+    price: 'the engine is loud over water' },
+  {
+    name: 'Aetheric Telegraph',
+    effect: 'the overlay defogs — the Revenue’s mind, live',
+    price: 'the largest letter of all' },
+];
+
+/** §6.14 — marsh research, named for the stone's menu. */
+export const MARSH_TIERS: ReadonlyArray<{ name: string; effect: string; price: string }> = [
+  {
+    name: 'Marsh-lantern haulers',
+    effect: 'night moves read a tenth as loud',
+    price: '+1 Debt each laden night run' },
+  {
+    name: 'Wight-fog',
+    effect: 'a Call in battle: the raiders fight half-blind',
+    price: '+8 Debt each fog' },
+  {
+    name: 'The Hollow Way',
+    effect: 'one marsh track leaves the world’s knowing',
+    price: '+1 Debt each crossing, laden or empty' },
+  {
+    name: 'The Reed-Veil',
+    effect: 'the reeds swallow three parts in four of every work’s showing',
+    price: `+${MARSH_VEIL_DEBT} Debt per hidden building, each dawn it stands` },
+];
+
+/** Every project the one bench can hold, named — index = tier (§6.14). */
+const RESEARCH_NAME: Record<ResearchTree, readonly string[]> = {
+  trade: ['False bottoms'],
+  marsh: MARSH_TIERS.map((t) => t.name),
+  leiden: LEIDEN_TIERS.map((t) => t.name) };
+
+/**
+ * §6.14 (M5½e) — the bench's read-out: the active project, named, with its
+ * time left to run. Null when the bench is idle. The state was always in
+ * `research.active`; this gives it a mouth (the HUD chip, the menus' line).
+ */
+export function benchReport(state: GameState): { name: string; left: string } | null {
+  const a = state.research.active;
+  if (!a) return null;
+  const name = RESEARCH_NAME[a.tree][state.research.completed[a.tree]] ?? 'the work';
+  const ticks = Math.max(0, a.doneTick - state.tick);
+  const days = ticks / TICKS_PER_DAY;
+  const left = days >= 1 ? `about ${Math.ceil(days)} day${Math.ceil(days) === 1 ? '' : 's'}` : spanOf(ticks);
+  return { name, left };
+}
+
+/** The bench's line for any menu that offers research: what it holds now. */
+export function BenchNote({ state }: { state: GameState }) {
+  const bench = benchReport(state);
+  if (!bench) return null;
+  return (
+    <p className="flavour">
+      On the bench: <strong>{bench.name}</strong> — done in {bench.left}.
+    </p>
+  );
+}
 
 /** '· the blue coat…' suffix for a dispatch button, or empty. */
 export function coatNote(state: GameState, edgeId: EdgeId, from: NodeId): string {

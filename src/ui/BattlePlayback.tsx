@@ -9,10 +9,10 @@
 // the battle. All per-dot randomness is deterministic off the dot index and
 // frame (§15.1 owns it; the sim's dice are never touched).
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { canPayOff } from '../sim/combat';
-import type { CombatLog } from '../sim/combat';
+import type { Call, CombatLog } from '../sim/combat';
 import { useGameStore } from '../state/store';
 
 // Every battle should take a watchable ~8–10s regardless of how many frames
@@ -125,6 +125,10 @@ export function BattlePlayback() {
   const battle = useGameStore((s) => s.battle);
   const soundCall = useGameStore((s) => s.soundCall);
   const marshTier = useGameStore((s) => s.state.research.completed.marsh);
+  // §14.4 (M5½e) — a dead Call explains itself ON TAP: the phone has no
+  // tooltips, and a row of grey buttons that says nothing taught the playtest
+  // that "no other defensive options appeared". The reason renders below.
+  const [hint, setHint] = useState<string | null>(null);
   const active = battle !== null;
   const frameCount = battle?.log.frames.length ?? 1;
   const frameMs = Math.max(FRAME_MS_MIN, Math.min(FRAME_MS_MAX, BATTLE_TARGET_MS / frameCount));
@@ -252,53 +256,80 @@ export function BattlePlayback() {
           key={`ev-${frame}`}
         >{events.join(' · ') || ' '}</div>
 
-        <div className="battle-calls">
-          <span className="calls-left">
-            {callsLeft} call{callsLeft === 1 ? '' : 's'} left
-          </span>
-          <button disabled title="No reserve is posted here — the garrison stands as one.">
-            Commit the reserve
-          </button>
-          <button disabled title="No engine — that is Leiden's last work, and it is not built.">
-            Fire the engine
-          </button>
-          {/* §6.18 (M5½c) — the strongest verb in the milestone, and it eats
-              the milestone: the channel goes with the men on the far bank. */}
-          <button
-            disabled={!(frontage > 0 && !forced && callsLeft > 0 && !alreadyCut)}
-            title={
-              frontage <= 0
-                ? 'There is no bank here to break.'
-                : forced
-                  ? 'Too late — they are over.'
-                  : 'Everyone not yet across stays across. The water takes the channel back, the grazing with it, and the parish knows whose spade did it.'
-            }
-            onClick={() => soundCall('cutCrossing')}
-          >
-            Cut the crossing
-          </button>
-          <button
-            disabled={!(marshTier >= 2 && callsLeft > 0 && !battle.calls.some((c) => c.call === 'wightFog'))}
-            title={
-              marshTier >= 2
-                ? 'The raiders fight half-blind for the rest of it — 8 Debt, owed to the stone.'
-                : 'The stone has not taught the fog.'
-            }
-            onClick={() => soundCall('wightFog')}
-          >
-            Call the wight-fog
-          </button>
-          <button disabled={!canRetreat} onClick={() => soundCall('soundRetreat')}>
-            Sound the retreat
-          </button>
-          <button
-            disabled={!canPay}
-            title={canPayOff(attFaction) ? undefined : 'Coin does not move them'}
-            onClick={() => soundCall('payOff')}
-          >
-            Pay them off
-          </button>
-        </div>
+        {(() => {
+          // Each Call renders live or dead; a dead one carries its reason and
+          // says it when tapped. The reason doubles as the desktop tooltip.
+          const noCalls = callsLeft > 0 ? null : 'Three calls a battle, and all three are spent.';
+          const callButton = (
+            label: string,
+            deadReason: string | null,
+            c: Call,
+            liveTitle?: string,
+          ) => (
+            <button
+              className={deadReason ? 'dead' : undefined}
+              aria-disabled={deadReason !== null}
+              title={deadReason ?? liveTitle}
+              onClick={() => {
+                if (deadReason) setHint(deadReason);
+                else {
+                  setHint(null);
+                  soundCall(c);
+                }
+              }}
+            >
+              {label}
+            </button>
+          );
+          return (
+            <div className="battle-calls">
+              <span className="calls-left">
+                {callsLeft} call{callsLeft === 1 ? '' : 's'} left
+              </span>
+              {callButton(
+                'Commit the reserve',
+                'No reserve is posted here — the garrison stands as one.',
+                'commitReserve',
+              )}
+              {callButton(
+                'Fire the engine',
+                'No engine — that is Leiden’s last work, and it is not built.',
+                'fireEngine',
+              )}
+              {/* §6.18 (M5½c) — the strongest verb in the milestone, and it eats
+                  the milestone: the channel goes with the men on the far bank. */}
+              {callButton(
+                'Cut the crossing',
+                frontage <= 0
+                  ? 'There is no bank here to break — no cut channel runs at this foot. The spade earns this Call, days in advance.'
+                  : forced
+                    ? 'Too late — they are over.'
+                    : alreadyCut
+                      ? 'The bank is already cut.'
+                      : noCalls,
+                'cutCrossing',
+                'Everyone not yet across stays across. The water takes the channel back, the grazing with it, and the parish knows whose spade did it.',
+              )}
+              {callButton(
+                'Call the wight-fog',
+                marshTier < 2
+                  ? 'The stone has not taught the fog. Its second lesson waits at the wight-stone.'
+                  : battle.calls.some((c) => c.call === 'wightFog')
+                    ? 'The fog is already up.'
+                    : noCalls,
+                'wightFog',
+                'The raiders fight half-blind for the rest of it — 8 Debt, owed to the stone.',
+              )}
+              {callButton('Sound the retreat', canRetreat ? null : noCalls, 'soundRetreat')}
+              {callButton(
+                'Pay them off',
+                canPayOff(attFaction) ? (canPay ? null : noCalls) : 'Coin does not move them.',
+                'payOff',
+              )}
+              {hint && <p className="call-hint">{hint}</p>}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

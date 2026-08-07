@@ -3,12 +3,12 @@
 
 
 import { storeSummary } from '../format';
-import { CART_COST, CUTTING_HOUSE_COST, FARM_STORE_CAPACITY, MAX_CARTS, MAX_TUB_BOATS, RESEARCH_COST, RESEARCH_DAYS, SHEARER_UNLOCK_SHEARS, SHEARER_WAGE, SHEEP_PRICE_BUY, SHEEP_PRICE_SELL, TUB_BOAT_COST } from '../../sim/balance';
+import { CART_COST, CUTTING_HOUSE_COST, FARM_STORE_CAPACITY, MAX_CARTS, MAX_TUB_BOATS, RESEARCH_COST, RESEARCH_DAYS, SHEARER_UNLOCK_SHEARS, SHEARER_WAGE, SHEEP_PRICE_BUY, SHEEP_PRICE_SELL, TICKS_PER_DAY, TUB_BOAT_COST } from '../../sim/balance';
 import { dykeWaterways, flockCapOf } from '../../sim/dykes';
 import { illicitAnywhere } from '../../sim/revenue';
 import type { GameState } from '../../sim/types';
 import { CartsAtNode } from './CartRows';
-import { Group, StoreFill, cargoCount, useEnqueue } from './shared';
+import { BenchNote, Group, StoreFill, cargoCount, useEnqueue } from './shared';
 import { CellarRow, FortifyRow, GarrisonRow, WorkshopRow } from './works';
 /**
  * Spec §6.16 — the shearing lad: offered once the chore is felt (six hand
@@ -103,7 +103,10 @@ export function BenchRow({ state }: { state: GameState }) {
     );
   }
   if (r.active) {
-    const days = Math.max(1, Math.ceil((r.active.doneTick - state.tick) / (24 * 6)));
+    // §6.14 (M5½e) — the wheelwright's line belongs to the wheelwright's
+    // project; any other tree's work reads out by name from the one bench.
+    if (r.active.tree !== 'trade') return <BenchNote state={state} />;
+    const days = Math.max(1, Math.ceil((r.active.doneTick - state.tick) / TICKS_PER_DAY));
     return (
       <p className="flavour">
         The wheelwright has the carts in his yard. Done in about {days} day{days === 1 ? '' : 's'}.
@@ -127,24 +130,6 @@ export function BenchRow({ state }: { state: GameState }) {
   );
 }
 
-// §6.14 (M5c) — the leiden ladder, for the workshop's menu. Coin is nominal;
-// the price column is the letter each tier wants sent.
-export const LEIDEN_TIERS: ReadonlyArray<{ name: string; effect: string; price: string }> = [
-  {
-    name: 'Galvanic fence',
-    effect: 'the workshop’s men kill the better',
-    price: 'the wired wall reads for miles' },
-  {
-    name: 'Steam-lighter',
-    effect: 'a hull, sixteen tubs, no bedtime — the sea lane opens',
-    price: 'the engine is loud over water' },
-  {
-    name: 'Aetheric Telegraph',
-    effect: 'the overlay defogs — the Revenue’s mind, live',
-    price: 'the largest letter of all' },
-];
-
-
 export function FarmMenu({
   state,
   onPlace }: {
@@ -163,8 +148,11 @@ export function FarmMenu({
   return (
     <>
       <h4>Walland Farm</h4>
+      {/* §6.18 (M5½e playtest) — the pasture's cap in the headline, beside the
+          barn's: they are different numbers with different levers (the spade
+          grows one, and 24 = 24 at the start made them read as one limit). */}
       <p className="flavour">
-        {state.flockSize} sheep
+        {state.flockSize} sheep of a pasture for {flockCapOf(state)}
         {state.sheepArriving > 0 ? ` (+${state.sheepArriving} on the drove road)` : ''} ·{' '}
         {state.fleeceReady} wool on their backs · barn {stored}/
         {FARM_STORE_CAPACITY}: {storeSummary(barn, 'empty')}

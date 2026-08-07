@@ -928,11 +928,24 @@ export function drawDyke(
   ctx.globalAlpha = 1;
 }
 
-/** The surveyor's post at a segment's midpoint — the click target's mark. */
+/** The surveyor's post at a segment's midpoint — the click target's mark.
+ *  §6.18 (M5½e) — an `inviting` post breathes: this cut would open a
+ *  waterway today, or moat a building. A dyke to nowhere stands plain. */
 export function drawSurveyPost(
   ctx: CanvasRenderingContext2D,
   at: { x: number; y: number },
+  inviting = false,
+  phase = 0,
 ): void {
+  if (inviting) {
+    const swell = 0.5 + 0.5 * Math.sin(phase * Math.PI * 2);
+    ctx.fillStyle = LIMEWASH;
+    ctx.globalAlpha = 0.14 + 0.14 * swell;
+    ctx.beginPath();
+    ctx.arc(at.x, at.y - 3, 8 + 2.5 * swell, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
   ctx.strokeStyle = INK;
   ctx.lineWidth = 1.6;
   ctx.beginPath();

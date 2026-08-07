@@ -202,12 +202,28 @@ function musterCard(next: GameState): EventCard {
   const name = nodeById(r.target, next.farm, next.cuttingHouse).name;
   const days = Math.max(1, Math.round((r.battleTick - next.tick) / TICKS_PER_DAY));
   const who = RAIDER_NAME[r.faction] ?? 'A force';
+  // §6.13 (M5½e) — the charge read DAYS before the blow, not only at the wall:
+  // the raid card's reading arrives when digging is already too late, and the
+  // muster is the moment the numbers can still change a decision.
+  const g = next.garrisons[r.target];
+  const men = (g?.militia ?? 0) + (g?.crew ?? 0);
+  const moated = moatedAt(next, r.target);
+  const hold = men > 0 ? defenceCeiling(next, r.target, r.faction) : 0;
+  const behindWater = moated || men === 0 ? 0 : defenceCeiling(next, r.target, r.faction, 'moated');
+  const reading =
+    men === 0
+      ? ` No one holds that wall today.`
+      : ` They bring ${r.size}; as things stand, your ${men} and the works turn back about ${hold}${moated ? ' behind the water' : ''}.` +
+        (behindWater > hold
+          ? ` Behind a cut channel the same men would hold ${behindWater} — and there is no water at that foot.`
+          : '');
   return {
     id: `muster-${r.battleTick}`,
     kind: 'info',
     title: 'A muster gathers',
     body:
       `${who[0].toUpperCase()}${who.slice(1)} is riding for ${name} — the blow falls in about ${days} day${days === 1 ? '' : 's'}. Post men and dig in, or lose the goods.` +
+      reading +
       menElsewhere(next, r.target) +
       (r.faction === 'dragoons' ? ' They are soldiers. They do not rout, and coin does not move them.' : ''),
   };

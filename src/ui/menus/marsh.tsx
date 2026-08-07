@@ -5,13 +5,13 @@
 
 
 import { HEAT_RED } from '../palette';
-import { BINDING_CAPACITY, DYKE_DEBT, DYKE_PASTURE_HEAD, MARSH_VEIL_DEBT, MARSH_VEIL_DIV, RESEARCH_COST, RESEARCH_DAYS, TICKS_PER_DAY, TRIBUTE_RELIEF, TUB_BOAT_CAPACITY, WIGHT_TRAP_IRON } from '../../sim/balance';
-import { dykeCost, dykeDays, dykePreview, dykeWaterways, stoneRefuses } from '../../sim/dykes';
+import { BINDING_CAPACITY, CROSSING_FRONTAGE, DYKE_DEBT, DYKE_PASTURE_HEAD, MARSH_VEIL_DEBT, MARSH_VEIL_DIV, RESEARCH_COST, RESEARCH_DAYS, TICKS_PER_DAY, TRIBUTE_RELIEF, TUB_BOAT_CAPACITY, WIGHT_TRAP_IRON } from '../../sim/balance';
+import { cutWouldMoat, dykeCost, dykeDays, dykePreview, dykeWaterways, stoneRefuses } from '../../sim/dykes';
 import type { WaterwayPair } from '../../sim/dykes';
 import { dykeById, dykeTiles, edgesFor, nodeById } from '../../sim/map';
 import type { GameState } from '../../sim/types';
 import { useGameStore } from '../../state/store';
-import { StoreFill, useEnqueue } from './shared';
+import { BenchNote, MARSH_TIERS, StoreFill, useEnqueue } from './shared';
 /**
  * §6.18 (M5½a) — a surveyed channel's post: the dig offered with its whole
  * price on its face (coin, days, Debt, the parish, the pasture — §21.2's
@@ -32,6 +32,8 @@ export function DykeMenu({ state, dykeId }: { state: GameState; dykeId: string }
   // §6.18 (M5½b playtest) — the route this cut would open, one step of
   // lookahead when it opens none alone.
   const preview = dug || inHand ? null : dykePreview(state, seg.id);
+  // §6.18 (M5½e) — and the wall it would water, the survey's other invitation.
+  const wouldMoat = dug || inHand ? null : cutWouldMoat(state, seg.id);
   const pairName = (p: WaterwayPair) =>
     `${nodeById(p.a, state.farm, state.cuttingHouse).name} to ${
       nodeById(p.b, state.farm, state.cuttingHouse).name
@@ -84,6 +86,18 @@ export function DykeMenu({ state, dykeId }: { state: GameState; dykeId: string }
               only pasture, and the marsh does not mind which you dig.
             </p>
           ) : null}
+          {/* §6.18 (M5½e) — the other reason to dig: water at a wall's foot.
+              Named here as the works menu's charge-reading names its want. */}
+          {!dug && !inHand && wouldMoat && (
+            <p className="flavour">
+              <strong>
+                And it lays water at the foot of{' '}
+                {nodeById(wouldMoat, state.farm, state.cuttingHouse).name}
+              </strong>{' '}
+              — a moat. Raiders come at a moated wall {CROSSING_FRONTAGE} abreast and no more,
+              while {CROSSING_FRONTAGE} of yours stand.
+            </p>
+          )}
           <p className="flavour">
             An old line, silted a century: {dykeTiles(seg)} chains of channel wanting a crew.
             Cut it and the water runs for ever — the marsh smaller by that much ({DYKE_DEBT}{' '}
@@ -176,27 +190,6 @@ export function SignMenu({ state }: { state: GameState }) {
   );
 }
 
-/** §6.14 — marsh research, named for the stone's menu. */
-export const MARSH_TIERS: ReadonlyArray<{ name: string; effect: string; price: string }> = [
-  {
-    name: 'Marsh-lantern haulers',
-    effect: 'night moves read a tenth as loud',
-    price: '+1 Debt each laden night run' },
-  {
-    name: 'Wight-fog',
-    effect: 'a Call in battle: the raiders fight half-blind',
-    price: '+8 Debt each fog' },
-  {
-    name: 'The Hollow Way',
-    effect: 'one marsh track leaves the world’s knowing',
-    price: '+1 Debt each crossing, laden or empty' },
-  {
-    name: 'The Reed-Veil',
-    effect: 'the reeds swallow three parts in four of every work’s showing',
-    price: `+${MARSH_VEIL_DEBT} Debt per hidden building, each dawn it stands` },
-];
-
-
 /**
  * §6.14 — the wight-stone: the account read plainly, tribute paid in sheep,
  * and the marsh tree researched where its teacher leans.
@@ -247,6 +240,7 @@ export function StoneMenu({ state }: { state: GameState }) {
         <p className="flavour">The stone has taught all it will — for now.</p>
       ) : (
         <div className="menu-buttons">
+          {r.active !== null && <BenchNote state={state} />}
           <button
             disabled={r.active !== null || state.coin < cost}
             title={

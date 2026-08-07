@@ -4,13 +4,16 @@
 
 
 
+import { useMemo } from 'react';
 import { CELLAR_COST, CELLAR_COVER_PER_TIER, CREW_MUSTER, CREW_WAGE, FORT_COST, MAX_CELLAR_TIER, MAX_FORT_TIER, MILITIA_MUSTER, MILITIA_WAGE, RESEARCH_COST, RESEARCH_DAYS } from '../../sim/balance';
+import { moatedAt } from '../../sim/dykes';
+import { fenceActiveAt } from '../../sim/leiden';
+import { defenceCeiling, expectedRaid } from '../../sim/raid';
 import { coverOf } from '../../sim/revenue';
 import { garrisonCap } from '../../sim/tick';
 import type { GameState, NodeId } from '../../sim/types';
-import { useEnqueue } from './shared';
-import { LEIDEN_TIERS } from './FarmMenu';
-import { FORT_TIER_LABEL } from './shared';
+import { HEAT_RED } from '../palette';
+import { BenchNote, FORT_TIER_LABEL, LEIDEN_TIERS, useEnqueue } from './shared';
 /**
  * Spec §6.12 — dig in one rung of the Trade line. The cost is coin now; the
  * cost the player learns to fear is being *seen* — the button says so.
@@ -89,6 +92,54 @@ export function FortifyRow({ state, nodeId }: { state: GameState; nodeId: NodeId
 }
 
 
+const RAIDER: Record<string, string> = {
+  hawksmere: 'the Hawksmere Company',
+  'water-guard': 'the Water Guard',
+  dragoons: 'Dragoons' };
+
+/**
+ * §6.13 (M5½e) — the charge, read where the men are posted and while there is
+ * still time to act on it: who would come today, what these men and works turn
+ * back (asked of the engine itself, §M5½d), and — on dry ground — what the
+ * same men would hold behind a cut channel. The raid card says this at the
+ * wall; by then the spade is too slow.
+ */
+function ChargeReading({ state, nodeId }: { state: GameState; nodeId: NodeId }) {
+  const g = state.garrisons[nodeId] ?? { militia: 0, crew: 0 };
+  const men = g.militia + g.crew;
+  const tier = state.fortifications[nodeId] ?? 0;
+  const moated = moatedAt(state, nodeId);
+  const fence = fenceActiveAt(state, nodeId);
+  const { faction, size } = expectedRaid(state);
+  // The bisection runs ~10 battles; memoised on everything the engine reads,
+  // so the menu's once-a-second re-render pays nothing while nothing changed.
+  const reading = useMemo(
+    () =>
+      men === 0
+        ? null
+        : {
+            hold: defenceCeiling(state, nodeId, faction),
+            behindWater: moated ? 0 : defenceCeiling(state, nodeId, faction, 'moated') },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [g.militia, g.crew, tier, moated, fence, faction, nodeId],
+  );
+  if (!state.hawksmere.provoked || men === 0 || !reading) return null;
+  const holds = reading.hold >= size;
+  return (
+    <p className="flavour">
+      The charge: {RAIDER[faction] ?? 'raiders'} would bring <strong>{size}</strong>; these men
+      and works turn back about <strong>{reading.hold}</strong>
+      {moated ? ' behind the water' : ''}.{' '}
+      <span style={holds ? undefined : { color: HEAT_RED }}>
+        {holds ? 'As it stands, the wall holds.' : 'As it stands, they carry it.'}
+      </span>
+      {!moated &&
+        reading.behindWater > reading.hold &&
+        ` Behind a cut channel at this foot the same ${men} would hold ${reading.behindWater} — the water is a wall the works cannot be.`}
+    </p>
+  );
+}
+
 /**
  * Spec §6.13 — the garrison: the men behind the works. Militia are cheap and
  * break early; crew hold. Wages fall at dawn with the carter's, and a wall
@@ -118,6 +169,7 @@ export function GarrisonRow({ state, nodeId }: { state: GameState; nodeId: NodeI
           ? 'Works without men stop nothing — a raid walks in over empty steps.'
           : `Wages at dawn: ${wageBill} coin. A wall that cannot be paid deserts.`}
       </p>
+      <ChargeReading state={state} nodeId={nodeId} />
       {/* §6.13 / §14 — the difference, on the face (read-the-charge rule):
           the smuggler's price buys alpha AND nerve, and the card must say so. */}
       <p className="flavour">
@@ -194,6 +246,8 @@ export function WorkshopRow({ state, nodeId }: { state: GameState; nodeId: NodeI
       {state.leiden.letterPending !== null && (
         <p className="flavour">A letter sits sealed on the bench. He will not work past it.</p>
       )}
+      {/* §6.14 (M5½e) — the bench's read-out: the project by name, days left. */}
+      <BenchNote state={state} />
       {tier < LEIDEN_TIERS.length && state.leiden.letterPending === null && (
         <div className="menu-buttons">
           <button

@@ -28,8 +28,7 @@ import {
 import { dayPhaseOf, isFlooded } from '../sim/time';
 import { woolOnTheBooks } from '../sim/tick';
 import { REVENUE_BLUE } from './palette';
-import {
-  dykeWaterways } from '../sim/dykes';
+import { cutInvites, dykeWaterways } from '../sim/dykes';
 import { CONTRABAND, coverOf, fortVisibility, illicitCount } from '../sim/revenue';
 import type { Cart, EdgeId, GameState, Good, NodeId } from '../sim/types';
 import { useGameStore } from '../state/store';
@@ -37,8 +36,8 @@ import { useUiStore } from '../state/ui';
 import { Sheet, useIsPhone } from './Sheet';
 import { firstMorningHint, isFreshGame } from './firstMorning';
 import { CameraController } from './camera';
-import { pathPoints, pointAlong, TILE, tileCenter } from './geometry';
-import { getTerrainCanvas } from './paint';
+import { APRON_TILES, pathPoints, pointAlong, TILE, tileCenter, WORLD_H, WORLD_W } from './geometry';
+import { getApronCanvas, getTerrainCanvas } from './paint';
 import {
   drawCart,
   drawCarterRoute,
@@ -269,6 +268,8 @@ export function GameMap({ state }: { state: GameState }) {
   const prevFxRef = useRef<GameState | null>(null);
   // Live touch points, for two-finger pinch. One pointer pans; two pinch.
   const pointersRef = useRef(new Map<number, { x: number; y: number }>());
+  // §6.18 (M5½e) — the survey posts that breathe, cached on the dug-set.
+  const invitingCutsRef = useRef<{ key: string; ids: Set<string> }>({ key: '', ids: new Set() });
 
   const flooded = isFlooded(state.tick);
   const phase = dayPhaseOf(state.tick);
@@ -282,6 +283,7 @@ export function GameMap({ state }: { state: GameState }) {
     const cam = camRef.current!;
     if (import.meta.env.DEV) (window as unknown as { __cam: unknown }).__cam = cam;
     const terrain = getTerrainCanvas();
+    const apron = getApronCanvas();
     const RES_PER_TILE = terrain.width / 40 / TILE; // painted px per world px
     let raf = 0;
 
@@ -305,7 +307,19 @@ export function GameMap({ state }: { state: GameState }) {
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
 
-      // Layer 0: the land, painted once, scaled by the camera.
+      // Layer 0: the world continuing past its own edge (§15.2) — the coarse
+      // apron underneath, then the land itself, painted once, camera-scaled.
+      ctx.drawImage(
+        apron,
+        0,
+        0,
+        apron.width,
+        apron.height,
+        -APRON_TILES * TILE,
+        -APRON_TILES * TILE,
+        WORLD_W + 2 * APRON_TILES * TILE,
+        WORLD_H + 2 * APRON_TILES * TILE,
+      );
       ctx.drawImage(
         terrain,
         0,
@@ -354,6 +368,9 @@ export function GameMap({ state }: { state: GameState }) {
           if (served.has(edge.id)) drawCarterRoute(ctx, pathPoints(edge, false), county ? 2.4 : 1);
         }
       }
+      // §6.14 — one shared slow pulse: the wights' marks, and the survey's
+      // inviting posts (M5½e). Defined before both users of it.
+      const wightPhase = (performance.now() / 2600) % 1;
       const fc = tileCenter(s.farm);
       if (county) {
         drawPlaceMark(ctx, fc.x, fc.y);
@@ -371,6 +388,15 @@ export function GameMap({ state }: { state: GameState }) {
       // §6.18 (M5½a) — the survey and the water: under the buildings, over
       // the roads. The lines appear with the improver's eye (cutting house).
       if (s.cuttingHouse) {
+        // §6.18 (M5½e) — which posts breathe: the cuts that DO something
+        // today. The probe walks hypothetical dug-sets, so it is cached on
+        // everything it reads and recomputed only when the water changes.
+        const cutsKey = `${s.dykesDug.join(',')}|${s.cuttingHouse.x},${s.cuttingHouse.y}|${s.farm.x},${s.farm.y}`;
+        if (invitingCutsRef.current.key !== cutsKey) {
+          const ids = new Set<string>();
+          for (const seg of DYKE_SEGMENTS) if (cutInvites(s, seg.id)) ids.add(seg.id);
+          invitingCutsRef.current = { key: cutsKey, ids };
+        }
         for (const seg of DYKE_SEGMENTS) {
           const status = s.dykesDug.includes(seg.id)
             ? 'dug'
@@ -379,7 +405,12 @@ export function GameMap({ state }: { state: GameState }) {
               : 'survey';
           drawDyke(ctx, seg.path, status);
           if (status !== 'dug' && !county) {
-            drawSurveyPost(ctx, pointAlong(seg.path.map(tileCenter), 0.5));
+            drawSurveyPost(
+              ctx,
+              pointAlong(seg.path.map(tileCenter), 0.5),
+              status === 'survey' && invitingCutsRef.current.ids.has(seg.id),
+              wightPhase,
+            );
           }
         }
       }
@@ -426,7 +457,6 @@ export function GameMap({ state }: { state: GameState }) {
       }
 
       // §6.14 — the marsh's own marks: the sign, and the stone once bound.
-      const wightPhase = (performance.now() / 2600) % 1;
       if (!county && s.wights.sign) drawWightSign(ctx, s.wights.sign, wightPhase);
       if (s.wights.stone) {
         if (!county) drawWightStone(ctx, s.wights.stone, wightPhase);
