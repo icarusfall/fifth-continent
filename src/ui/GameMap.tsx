@@ -35,6 +35,7 @@ import type { Cart, EdgeId, GameState, Good, NodeId } from '../sim/types';
 import { useGameStore } from '../state/store';
 import { useUiStore } from '../state/ui';
 import { Sheet, useIsPhone } from './Sheet';
+import { isFreshGame } from './firstMorning';
 import { CameraController } from './camera';
 import { pathPoints, pointAlong, TILE, tileCenter } from './geometry';
 import { getTerrainCanvas } from './paint';
@@ -193,18 +194,6 @@ function routesVisible(state: GameState): boolean {
   const cart = state.carts[0];
   return (
     !!cart && ((cart.cargo.fleece ?? 0) > 0 || cart.location.kind === 'edge' || state.coin > 0)
-  );
-}
-
-/** A brand-new tenancy: nothing earned, nothing moved — the farm glows. */
-function isFreshGame(state: GameState): boolean {
-  const cart = state.carts[0];
-  return (
-    state.coin === 0 &&
-    state.rentPaid === 0 &&
-    (state.stores.farm?.fleece ?? 0) === 0 &&
-    (cart?.cargo.fleece ?? 0) === 0 &&
-    cart?.location.kind === 'node'
   );
 }
 
@@ -379,7 +368,7 @@ export function GameMap({ state }: { state: GameState }) {
       }
       if (!yard) drawLabel(ctx, 'Walland Farm', fc.x, fc.y - 16);
       if (isFreshGame(s) && !farmVisitedRef.current) {
-        drawFarmGlow(ctx, s.farm, (performance.now() / 1800) % 1);
+        drawFarmGlow(ctx, s.farm, (performance.now() / 1800) % 1, cam.zoom);
       }
       // §6.18 (M5½a) — the survey and the water: under the buildings, over
       // the roads. The lines appear with the improver's eye (cutting house).
@@ -785,6 +774,34 @@ export function GameMap({ state }: { state: GameState }) {
   // on the map (a real help on a phone), and glide the map to it. Only the
   // places the map itself shows are listed — the coast and the cutting house
   // join as they enter the world.
+  // §10 (the first morning) — the ticker's pointing sentence lives outside
+  // the map; it asks, the map answers. Consumed once, then cleared.
+  const focusRequest = useUiStore((sx) => sx.focusRequest);
+  const clearFocus = useUiStore((sx) => sx.clearFocus);
+  useEffect(() => {
+    if (!focusRequest) return;
+    selectPlace(focusRequest as Selection);
+    clearFocus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusRequest]);
+
+  // A brand-new tenancy opens LOOKING AT THE FARM — sheep, glow and all —
+  // not at the county's strategic view. What is yours fills the screen; the
+  // wider marsh is discovered by zooming out. Two frames in, so the render
+  // loop's first setViewport has initialised the camera before we aim it
+  // (focusOn before init would be clobbered by the fit).
+  useEffect(() => {
+    if (!isFreshGame(stateRef.current)) return;
+    const id = requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        const w = tileCenter(stateRef.current.farm);
+        camRef.current!.focusOn(w.x, w.y, isPhone ? 0.3 : 0.5);
+      }),
+    );
+    return () => cancelAnimationFrame(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function selectPlace(sel: Selection) {
     if (sel === 'farm') farmVisitedRef.current = true;
     const w = anchorWorld(sel, stateRef.current);

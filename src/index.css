@@ -1000,6 +1000,48 @@ button.danger {
   font-size: 11px;
 }
 
+/* §10 — the first morning's pointing sentence: one tappable line where the
+   log lives, gone for good at the first sale. It breathes, gently. */
+.hint-line {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: var(--panel);
+  border: 1px solid var(--limewash);
+  border-radius: 4px;
+  color: var(--limewash);
+  font-size: var(--fs-s);
+  font-style: italic;
+  padding: 8px 12px;
+  margin-bottom: 6px;
+  pointer-events: auto;
+  animation: breathe 2.6s ease-in-out infinite;
+}
+
+.hint-line:hover {
+  background: var(--panel-solid);
+  color: var(--limewash);
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    border-color: rgba(232, 225, 210, 0.9);
+    box-shadow: 0 0 0 0 rgba(232, 225, 210, 0);
+  }
+  50% {
+    border-color: rgba(232, 225, 210, 0.45);
+    box-shadow: 0 0 10px 1px rgba(232, 225, 210, 0.18);
+  }
+}
+
+/* …and while the thread runs, the way to the places breathes too. */
+.bar-places.breathe {
+  animation: breathe 2.6s ease-in-out infinite;
+  border-color: var(--limewash);
+  color: var(--limewash);
+}
+
 /* The 800px split (clean-sheet pass, phone-led): below it the chrome
    becomes sheet-and-bar; above it the dock and the ledger's spine tab
    return, and the bar sheds the buttons those replace. */

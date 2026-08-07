@@ -39,6 +39,14 @@ interface UiStore {
    *  a long menu folds to its headings and remembers what you kept out. */
   groupOpen: Record<string, boolean>;
   toggleGroup: (id: string) => void;
+  /**
+   * §10 (the first morning) — a request from chrome OUTSIDE the map (the
+   * ticker's pointing sentence) to focus and open a place. GameMap consumes
+   * it and clears it; nothing else reads it.
+   */
+  focusRequest: string | null;
+  requestFocus: (sel: string) => void;
+  clearFocus: () => void;
 }
 
 export const useUiStore = create<UiStore>((set) => ({
@@ -63,4 +71,7 @@ export const useUiStore = create<UiStore>((set) => ({
   setLogOpen: (open) => set({ logOpen: open }),
   groupOpen: {},
   toggleGroup: (id) => set((s) => ({ groupOpen: { ...s.groupOpen, [id]: !(s.groupOpen[id] ?? true) } })),
+  focusRequest: null,
+  requestFocus: (sel) => set({ focusRequest: sel }),
+  clearFocus: () => set({ focusRequest: null }),
 }));

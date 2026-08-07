@@ -627,18 +627,23 @@ export function drawFarmGlow(
   ctx: CanvasRenderingContext2D,
   site: { x: number; y: number },
   phase: number,
+  zoom = 1,
 ): void {
   const c = tileCenter(site);
   const pulse = 0.5 + 0.5 * Math.sin(phase * Math.PI * 2);
+  // §10 (the first morning) — the glow keeps a minimum SCREEN size: zoomed
+  // out to the county the affordance must still ring the mark, not vanish
+  // into a six-pixel halo around a six-pixel dot.
+  const k = Math.max(1, 42 / (34 * zoom));
   ctx.strokeStyle = LIMEWASH;
-  ctx.lineWidth = 1.6 + pulse * 1.2;
+  ctx.lineWidth = (1.6 + pulse * 1.2) * Math.max(1, k * 0.75);
   ctx.globalAlpha = 0.5 - pulse * 0.25;
   ctx.beginPath();
-  ctx.ellipse(c.x, c.y + 2, 26 + pulse * 8, 17 + pulse * 5.5, 0, 0, Math.PI * 2);
+  ctx.ellipse(c.x, c.y + 2, (26 + pulse * 8) * k, (17 + pulse * 5.5) * k, 0, 0, Math.PI * 2);
   ctx.stroke();
   ctx.globalAlpha = 0.25 - pulse * 0.12;
   ctx.beginPath();
-  ctx.ellipse(c.x, c.y + 2, 33 + pulse * 10, 21.5 + pulse * 7, 0, 0, Math.PI * 2);
+  ctx.ellipse(c.x, c.y + 2, (33 + pulse * 10) * k, (21.5 + pulse * 7) * k, 0, 0, Math.PI * 2);
   ctx.stroke();
   ctx.globalAlpha = 1;
 }

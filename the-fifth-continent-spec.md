@@ -2465,6 +2465,35 @@ gained problem-shaped conditions — the second cart waits until a carter
 already runs a round, and the wheelwright's false bottoms (card *and*
 bench row) wait until contraband has actually touched the player's hands.
 
+**The first morning (2026-08, phone playtest: "it's not immediately obvious
+what to do").** Rung 1 was taught by a glow and a log line, and the
+clean-sheet shell diluted both: a fresh game opened on the County band with
+the farm a six-pixel mark, and the opening line scrolled away with the log.
+The fix points, and never pauses:
+
+```
+the opening      a fresh tenancy opens LOOKING AT THE FARM — camera
+                 pre-focused into the Parish band, sheep and glow filling
+                 the screen. The county view is discovered by zooming out
+the thread       until the first coin rings, the ticker's spot carries ONE
+                 pointing sentence derived from the world each frame — the
+                 flock heavy with wool → the clip in the barn → send the
+                 cart → the road → the stalls — each line tappable, easing
+                 the camera to the place it names. It advances however the
+                 player actually plays (menu, hand, or ignoring it), resumes
+                 correctly from any save still inside the first round, and
+                 vanishes for good at the first sale. No popups, no pause,
+                 no GameState: the thread is read off the world, never
+                 written anywhere
+the glow         keeps a minimum SCREEN size, so it rings the farm's mark
+                 at any zoom instead of vanishing into it
+the door         while the thread runs, the Places button breathes — the
+                 quietest possible "this one"
+```
+
+The dialogue budget stands: the thread's five sentences are rung 1's whole
+script, and every later mechanic still arrives with its problem.
+
 1. **Cart wool to Ryne.** Twelve sheep, one cart. Teaches routes, capacity, latency — and the tide-locked low road vs the slow high road past the Customs House.
 2. **The price is insulting.** The market screen shows why: wool cannot legally leave the country, and the domestic buyers know it. The player *feels* a policy without reading about one.
 3. **A Dutchman on the shingle offers four times.** Night, falling tide. Your existing product is *already contraband*. The player doesn't choose to become a criminal — they choose whether to accept the actual value of their own labour. **This is the inciting incident and it is emergent, not narrated.** *(M5 tutorial pass: the first invitation cannot be missed — he waits all night until first met — and rungs 3–4 cannot be skipped: automation to the shingle, and every mention of a contraband good in any menu, waits until the player has met him and sold contraband in town by hand. His hold opens one good at a time — lace, then tea, then jenever — each arriving with the problem the next mechanic solves.)*

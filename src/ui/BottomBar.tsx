@@ -6,6 +6,7 @@
 import { useEffect } from 'react';
 import type { GameState } from '../sim/types';
 import { gossipAvailable, useUiStore } from '../state/ui';
+import { firstMorningHint } from './firstMorning';
 import { SpeedControls, SystemControls } from './SpeedControls';
 
 /** What the overlay button says: the mode it is IN, briefly. */
@@ -50,7 +51,9 @@ export function BottomBar({ state }: { state: GameState }) {
   return (
     <div className="bottom-bar" onPointerDown={(e) => e.stopPropagation()}>
       <button
-        className={dockOpen ? 'bar-places on' : 'bar-places'}
+        // §10 (the first morning) — while the thread runs, the door to the
+        // places breathes: the quietest possible "this one".
+        className={`bar-places${dockOpen ? ' on' : ''}${firstMorningHint(state) ? ' breathe' : ''}`}
         title="The places. One tap each; the map eases over."
         onClick={() => setDockOpen(!dockOpen)}
       >
