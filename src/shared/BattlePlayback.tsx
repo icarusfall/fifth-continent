@@ -9,6 +9,7 @@
 // the battle. All per-dot randomness is deterministic off the dot index and
 // frame (§15.1 owns it; the sim's dice are never touched).
 
+import './battle.css';
 import { useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { canPayOff } from '../sim/combat';

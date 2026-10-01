@@ -3414,6 +3414,22 @@ D4  the look: field terrain, the lit night, the tide, mist; the shader pass;
 D5  the designer's playtest at a desk, then tuning
 ```
 
+*D1 as built (2026-10-01).* A place's verbs are DATA on the desk — a sheet of
+facts and verbs (label, charge, what-for, blocked-reason, the Action), built by
+one pure function per place in `src/desk/sheets/` and rendered by one
+inspector — so the knowledge the phone keeps in JSX is said once, in words,
+and laid out once. The blocked reason is shown under the button, never in a
+tooltip. The pause beats on the desk are the decision cards (rent, raid,
+Leiden, the letter, the vigil, a new tenancy) and five info beats that are
+blows, not news: a muster, a seizure, distraint, a breach, a person taken.
+Every other card is a slip. An order given while the clock is paused waits
+for the next tick, as on the phone — the desk says so ("Paused — 1 order
+waits for the clock") rather than leaving a click that seems to do nothing.
+Until D2, a cart's sheet sends it road by road from where it stands; the
+hire and the round arrive with cart command. Shared now: the terrain
+painter, the sprites, the camera, the battle and its sheet, and the
+read-aloud words (`src/shared/words.ts`).
+
 *Decisions taken (2026-10-01):* the phone UI frozen; carts clicked directly on
 the desk; the playable mock's direction approved ("a GREAT improvement");
 rendering option B (Canvas 2D plus one WebGL2 pass) over A (2D only) and C

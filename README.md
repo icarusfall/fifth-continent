@@ -6,11 +6,26 @@ A single-player, browser-based god/builder game about smuggling, logistics, and
 the two kinds of magic you can use to hide a crime. Design spec and build brief:
 [the-fifth-continent-spec.md](./the-fifth-continent-spec.md).
 
-**424 tests green · save v26 · M5½ complete · the desk rework begun (D0).**
+**424 tests green · save v26 · M5½ complete · the desk rework: D1, the table (`?desk`).**
 
 ---
 
-## Status: white wool and dark wool — the books become a switch ✅ (spec §6.10 M5½f)
+## Status: the desk rework — D1, the table ✅ (then D2, cart command)
+
+`?desk` now opens **the Smuggler's Table**: the map in the middle, the stable
+on the left (every cart, where it is, its load in colour, its hand), the
+inspector on the right, dispatches pinned at the top, the instrument bar
+across the head of the table. No popovers. Every place's verbs are ported as
+data and rendered one way: facts first, each verb with its price on its face,
+its reason shown when it cannot be done, its purpose folded under a "?". Carts
+are clicked directly on the map or by number key; L opens the ledger; Space
+pauses; Esc lets go. Most cards are slips that do not stop the clock; the
+blows and the decisions still do. Everyone without `?desk` still gets the
+phone layout.
+
+---
+
+## Earlier: white wool and dark wool — the books become a switch ✅ (spec §6.10 M5½f)
 
 *"Even I don't really understand how to use the ledger to optimise play. I just
 went max crime."* The declared-yield dial had two positions anyone used, and

@@ -3,7 +3,7 @@
 // drag-to-pan, trackpad pinch (ctrl+wheel) for free, and true two-finger
 // touch pinch via pinch(). Pure UI state, no React.
 
-import { APRON_TILES, TILE, WORLD_H, WORLD_W } from '../shared/geometry';
+import { APRON_TILES, TILE, WORLD_H, WORLD_W } from './geometry';
 
 const ZOOM_MAX = 8;
 const ZOOM_SPEED = 0.0015; // spec §15.2
