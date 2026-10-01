@@ -1214,3 +1214,40 @@ button.danger {
     padding-right: var(--sp-3);
   }
 }
+
+/* §6.10 M5½f — the books switch and the wool's two colours. */
+.books-switch {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  overflow: hidden;
+  margin: var(--sp-1) 0;
+}
+.books-switch button {
+  font: inherit;
+  font-size: var(--fs-s);
+  color: var(--limewash);
+  background: transparent;
+  border: 0;
+  padding: 3px 12px;
+  cursor: pointer;
+}
+.books-switch button.on {
+  background: var(--limewash);
+  color: var(--ink);
+}
+.wool-chip {
+  display: inline-block;
+  padding: 0 5px;
+  border-radius: 3px;
+  font-size: var(--fs-s);
+  font-weight: bold;
+  line-height: 1.4;
+}
+.wool-chip.white {
+  color: var(--ink);
+}
+.wool-chip.dark {
+  color: var(--limewash);
+  border: 1px solid rgba(232, 225, 210, 0.35);
+}

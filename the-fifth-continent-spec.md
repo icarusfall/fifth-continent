@@ -548,6 +548,77 @@ sold-out-not-sold (the fence-or-wait fork, §6.17), and take-up-the-pen
 (first wool over the gunwale). The goods overlay (§20.2) names cover too:
 what the clutter hides, and what stands showing past it.
 
+#### M5½f — white wool and dark wool: the books become a switch (2026-10-01)
+
+**Why (designer, playtest of the spec itself).** *"I was speccing the ledger
+feature, and even I don't really understand how to use it to optimise play. I
+just went max crime."* The dial `declaredYield` (0..flock) had two positions
+anyone used: the agent's square page, and the floor. Every smuggling bot in
+`policy.ts` set it to exactly `floor(flock × PLAUSIBLE_YIELD_MIN)`; every
+honest one never touched it. And the dial was only half the strategy — the
+routes that had to match it lived elsewhere, and nothing connected the two:
+a short page sold white-knuckled at Ryne against a number the player could
+not see in the barn. So the dial collapses to its two corners, and **the lie
+gets a colour**: the books split the wool at the shears.
+
+```
+the books    ledger.books ∈ { square, short } — one switch replaces
+             declaredYield and penTaken. SQUARE is the default (the agent
+             keeps the page, §6.10's honest default: no bookkeeping at all)
+the clip     at dawn, grown = flock × FLEECE_PER_HEAD_PER_DAY splits on the
+             sheep's backs:
+               white = square ? grown : ceil(grown × SHORT_BOOKS_SHARE)
+                       SHORT_BOOKS_SHARE = PLAUSIBLE_YIELD_MIN = 0.5
+               dark  = grown − white
+             fleeceReady += white; darkReady += dark
+             declaredToDate += white   (the page admits exactly the white)
+             The ceil keeps a short page on the floor, never under it, so
+             PLAUSIBLE_YIELD_MIN's term never fires on an odd flock. The
+             switch changes tomorrow's clip, never wool already grown.
+shearing     both colours go into the barn; when its walls stop the shears,
+             it takes them in proportion: dark = floor(qty × darkReady /
+             (fleeceReady + darkReady)), white the rest
+WHITE wool   good `fleece`. On the books. Ryne's stapler buys it (into the
+             town's appetite and woolOnTheBooks, unchanged)
+DARK wool    good `dark-fleece`. Never admitted. No lawful buyer: the stapler
+             will not weigh it, and it never holds a carter at a market — he
+             names it and carries it on (unlike jenever, which the town might
+             buy cut; dark wool has no tomorrow at Ryne)
+the gunwale  the Dutchman takes both colours, DARK FIRST, at the same price
+             and into the same appetite. Dark wool leaves the page untouched.
+             White wool over the side is wool the page admitted and the farm
+             cannot show — the audit prices it, as ever
+the audit    the formula is unchanged: accounted = soldLawfully + every
+             fleece on hand, BOTH colours (barn, carts, backs) — he counts
+             wool, not paperwork. Then the page is initialled and what he
+             counted goes on the record: every dark fleece at the farm, in a
+             cart, or on the backs TURNS WHITE. Dark wool he found was priced
+             once as gap; from here it is honest wool. §6.10's "laundering
+             fee", made visible as a change of colour
+losses       wool lost off the backs (sheep sold, a wight collecting) comes
+             off dark first
+orders       a carter's stop may take either colour (§6.19); an old order's
+             `fleece` is white
+legacy       saved action logs replay: setDeclaredYield(n) → short if n is
+             below the flock's clip, else square; returnPen → square
+```
+
+**What the player sees (read the charge aloud, §6.10 / the playtest rule).**
+White wool is limewash; dark wool is soot-brown — neither a reserved colour
+nor Heat red (§15.3). The barn chip, a cart's load and a round's ribbon show
+the colours they hold. The switch names its trade where it is set:
+*"Square: Ryne buys all 24 a day; any fleece the lugger takes shows at the
+audit"* — *"Short: 12 a day go dark, free for the lugger; Ryne buys only the
+12 white"*. A mismatch is named where the order is written, never discovered
+at the audit: dark wool bound for Ryne (*"the stapler won't weigh it"*);
+white wool bound for the shingle (*"+1 Heat a fleece at the audit"*). And
+the ledger reads the barn's risk before the officer does: *"6 dark fleece at
+the farm: if he comes, he writes them onto the page"*.
+
+Save v26: `ledger.books` replaces `declaredYield`/`penTaken` (a taken pen
+below the flock's clip migrates to short, else square); `darkReady` joins at
+0; wool already held stays white.
+
 **What the player sees (§20.2, first cut).** `gossip` = suspicion snapshotted
 at each dawn — the parish talks over breakfast, so the player reads
 yesterday's Revenue mind, not today's. One toggle paints the gossip stains on

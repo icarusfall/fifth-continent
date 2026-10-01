@@ -15,10 +15,8 @@ import {
   CART_COST,
   CUTTING_HOUSE_COST,
   DUTCHMAN_PRICE,
-  FARM_STORE_CAPACITY,
   LEIDEN_PRICE_MULT,
   MAX_CARTS,
-  PLAUSIBLE_YIELD_MIN,
   RENT_AMOUNT,
   RESEARCH_COST,
   SHEEP_PRICE_BUY,
@@ -29,13 +27,14 @@ import {
 import { flockCapOf } from './dykes';
 import { isFlooded } from './time';
 import { initialState, tick } from './tick';
+import { woolOnBacks } from './wool';
 import type {
   Action,
   Cart,
   CarterOrder,
   GameState,
   Good,
-  LegacyCarterOrder,
+  CarterStop,
   NodeId,
 } from './types';
 
@@ -50,6 +49,39 @@ function takes(order: CarterOrder | null | undefined, good: Good): boolean {
   return !!order && order.stops.some((s) => s.take === good);
 }
 
+/**
+ * §6.10 M5½f — the owl's round: wool to the lugger, with a tea backhaul
+ * dropped at the house once it stands.
+ */
+function owlRound(state: GameState, take: Good): CarterOrder {
+  const stops: CarterStop[] = [{ at: 'farm', take }];
+  if (state.cuttingHouse) stops.push({ at: 'shingle', take: 'tea' }, { at: 'cutting-house' });
+  else stops.push({ at: 'shingle' });
+  return { stops };
+}
+
+/**
+ * §6.10 M5½f — which colour the owl fetches. With a lawful cart in the yard
+ * the white half is that cart's, and the owl carries dark only. Without one
+ * the bots keep the life they always led — every fleece over the gunwale,
+ * the white priced at the audit as the old floor-declared page was — in
+ * colour now: each trip fetches the barn's larger pile, chosen while he is
+ * off the farm so the choice never flaps mid-load.
+ */
+function owlTake(state: GameState, cart: Cart, lawfulLeg: boolean): Good {
+  if (lawfulLeg) return 'dark-fleece';
+  const current = cart.carter?.stops[0]?.take;
+  const atFarm = cart.location.kind === 'node' && cart.location.nodeId === 'farm';
+  if (atFarm && (current === 'fleece' || current === 'dark-fleece')) return current;
+  const barn = state.stores.farm ?? {};
+  return (barn['dark-fleece'] ?? 0) >= (barn.fleece ?? 0) ? 'dark-fleece' : 'fleece';
+}
+
+/** Re-hire only when the round changes: a standing order is a sentence, not a tick. */
+function sameRound(order: CarterOrder | null | undefined, want: CarterOrder): boolean {
+  return !!order && JSON.stringify(order.stops) === JSON.stringify(want.stops);
+}
+
 export function greedyCarterPolicy(state: GameState): Action[] {
   const actions: Action[] = [];
 
@@ -57,7 +89,7 @@ export function greedyCarterPolicy(state: GameState): Action[] {
   if (!cart || cart.location.kind !== 'node') return actions;
 
   if (cart.location.nodeId === 'farm') {
-    if (state.fleeceReady > 0) {
+    if (woolOnBacks(state) > 0) {
       actions.push({ type: 'shear' });
     }
     const fleeceHeld = cart.cargo.fleece ?? 0;
@@ -127,13 +159,10 @@ export function smugglerPolicy(state: GameState): Action[] {
   const at = cart.location.nodeId;
 
   if (at === 'farm') {
-    if (state.fleeceReady > 0) actions.push({ type: 'shear' });
-    // Short the books to the plausible floor: the surplus clip stops existing
-    // on paper the day the lugger starts buying it (§6.10).
-    const floor = Math.floor(state.flockSize * PLAUSIBLE_YIELD_MIN);
-    if (state.ledger.declaredYield > floor) {
-      actions.push({ type: 'setDeclaredYield', fleecePerDay: floor });
-    }
+    if (woolOnBacks(state) > 0) actions.push({ type: 'shear' });
+    // Short the books: from the day the lugger starts buying, half the clip
+    // grows dark — wool that never exists on paper (§6.10 M5½f).
+    if (state.ledger.books !== 'short') actions.push({ type: 'setBooks', books: 'short' });
     // Raise the cutting house once there is coin beyond the rent reserve.
     if (!state.cuttingHouse && state.coin >= CUTTING_HOUSE_COST + RENT_AMOUNT) {
       actions.push({ type: 'placeCuttingHouse', ...BOT_CUTTING_HOUSE_SITE });
@@ -143,8 +172,8 @@ export function smugglerPolicy(state: GameState): Action[] {
       return actions;
     }
     if (state.dutchman.present) {
-      // Load up and run for the shingle while the lugger stands off.
-      actions.push({ type: 'loadCart', cartId: cart.id, good: 'fleece', qty: CART_CAPACITY });
+      // Load the dark wool and run for the shingle while the lugger stands off.
+      actions.push({ type: 'loadCart', cartId: cart.id, good: 'dark-fleece', qty: CART_CAPACITY });
       actions.push({ type: 'dispatchCart', cartId: cart.id, edgeId: 'marsh-track' });
       return actions;
     }
@@ -168,7 +197,7 @@ export function smugglerPolicy(state: GameState): Action[] {
   if (at === 'shingle') {
     if (state.dutchman.present) {
       const fleeceSale =
-        Math.min(cargoOf(cart, 'fleece'), state.dutchman.fleeceAppetite) *
+        Math.min(cargoOf(cart, 'fleece') + cargoOf(cart, 'dark-fleece'), state.dutchman.fleeceAppetite) *
         (WOOL_PRICE_DOMESTIC * LEIDEN_PRICE_MULT);
       if (fleeceSale > 0) {
         actions.push({ type: 'sellToDutchman', cartId: cart.id });
@@ -243,7 +272,7 @@ export function delegatorPolicy(state: GameState): Action[] {
       order: { from: 'farm', to: 'ryne', good: 'fleece' },
     });
   }
-  if (state.fleeceReady > 0) actions.push({ type: 'shear' });
+  if (woolOnBacks(state) > 0) actions.push({ type: 'shear' });
   return actions;
 }
 
@@ -260,7 +289,7 @@ export function relayPolicy(state: GameState): Action[] {
   const actions: Action[] = [];
   const [first, second, third] = state.carts;
   if (!first) return actions;
-  if (state.fleeceReady > 0) actions.push({ type: 'shear' });
+  if (woolOnBacks(state) > 0) actions.push({ type: 'shear' });
 
   if (!state.dutchman.unlocked) {
     if (!first.carter) {
@@ -273,11 +302,8 @@ export function relayPolicy(state: GameState): Action[] {
     return actions;
   }
 
-  // The owling begins: the books drop to the plausible floor (§6.10).
-  const floor = Math.floor(state.flockSize * PLAUSIBLE_YIELD_MIN);
-  if (state.ledger.declaredYield > floor) {
-    actions.push({ type: 'setDeclaredYield', fleecePerDay: floor });
-  }
+  // The owling begins: the books go short, and half the clip grows dark (§6.10 M5½f).
+  if (state.ledger.books !== 'short') actions.push({ type: 'setBooks', books: 'short' });
 
   // Crime's proceeds buy the wheels, always keeping the rent in reserve.
   // House rule 3: the cap is balance.ts's, not an inline three. The scripted
@@ -311,14 +337,15 @@ export function relayPolicy(state: GameState): Action[] {
   const wantFlush = !third && teaBanked >= CART_CAPACITY;
   const onFlush = visits(first.carter, 'ryne') && takes(first.carter, 'tea');
   const onOwl = visits(first.carter, 'shingle');
-  if (wantFlush ? !onFlush : !onOwl) {
+  const owl: CarterOrder = {
+    stops: [{ at: 'farm', take: owlTake(state, first, !!second) }, { at: 'shingle', take: 'tea' }],
+  };
+  if (wantFlush ? !onFlush : !onOwl || !sameRound(first.carter, owl)) {
     if (first.carter) actions.push({ type: 'dismissCarter', cartId: first.id });
     actions.push({
       type: 'hireCarter',
       cartId: first.id,
-      order: wantFlush
-        ? { from: 'farm', to: 'ryne', good: 'tea' }
-        : { from: 'farm', to: 'shingle', good: 'fleece', back: 'tea' },
+      order: wantFlush ? { from: 'farm', to: 'ryne', good: 'tea' } : owl,
     });
   }
   return actions;
@@ -359,7 +386,7 @@ function runHub(state: GameState, alibi: boolean): Action[] {
   const actions: Action[] = [];
   const [first, second, third] = state.carts;
   if (!first) return actions;
-  if (state.fleeceReady > 0) actions.push({ type: 'shear' });
+  if (woolOnBacks(state) > 0) actions.push({ type: 'shear' });
 
   // The lawful life, until the first rent has been felt.
   if (!state.dutchman.unlocked) {
@@ -373,14 +400,9 @@ function runHub(state: GameState, alibi: boolean): Action[] {
     return actions;
   }
 
-  // The owling begins: the books drop to the plausible floor (§6.10). Under
-  // the stapler's cap this also caps the valve's lawful sales at the floor —
-  // declaring more was tried and buys its own audit gap unless every
-  // declared fleece is reliably sold; the floor, fully sold, reads cleanest.
-  const floor = Math.floor(state.flockSize * PLAUSIBLE_YIELD_MIN);
-  if (state.ledger.declaredYield !== floor) {
-    actions.push({ type: 'setDeclaredYield', fleecePerDay: floor });
-  }
+  // The owling begins: the books go short (§6.10 M5½f). Half the clip grows
+  // dark for the owl; the white half is the valve's, and Ryne's.
+  if (state.ledger.books !== 'short') actions.push({ type: 'setBooks', books: 'short' });
 
   // The night trade pays for the hub: the house when affordable, then the
   // wheels, then the flock toward the pasture cap (§6.16's loop) — rent
@@ -402,14 +424,8 @@ function runHub(state: GameState, alibi: boolean): Action[] {
   // Cart-1 owls from the first unlocked night. Once the house stands, the
   // same order grows the back leg (§6.17): fleece over the gunwale, home
   // with tea, the tea dropped where it will be smouched.
-  const owl: LegacyCarterOrder = state.cuttingHouse
-    ? { from: 'farm', to: 'shingle', good: 'fleece', back: 'tea', backTo: 'cutting-house' }
-    : { from: 'farm', to: 'shingle', good: 'fleece' };
-  if (
-    !first.carter ||
-    !visits(first.carter, 'shingle') ||
-    visits(first.carter, 'cutting-house') !== !!state.cuttingHouse
-  ) {
+  const owl = owlRound(state, owlTake(state, first, alibi && !!second));
+  if (!sameRound(first.carter, owl)) {
     actions.push({ type: 'hireCarter', cartId: first.id, order: owl });
   }
 
@@ -424,11 +440,11 @@ function runHub(state: GameState, alibi: boolean): Action[] {
     // barn drains, so honest sales never undercut the owl's 4× price.
     const teaCart = alibi ? third : second;
     if (alibi && second) {
-      // True surplus only: the barn brimming (wool already stuck on the
-      // sheep's backs) hires him; a barn back down to one owl-load stands
-      // him down. He skims the top and never strips the gunwale's stock.
+      // §6.10 M5½f — the white half has no other road: the owl carries only
+      // dark. A cart-load of white in the barn hires him; an empty barn and
+      // an empty cart stand him down.
       const woolBanked = state.stores.farm?.fleece ?? 0;
-      if (!second.carter && woolBanked >= FARM_STORE_CAPACITY - CART_CAPACITY / 2) {
+      if (!second.carter && woolBanked >= CART_CAPACITY) {
         actions.push({
           type: 'hireCarter',
           cartId: second.id,
@@ -436,7 +452,7 @@ function runHub(state: GameState, alibi: boolean): Action[] {
         });
       } else if (
         visits(second.carter, 'ryne') &&
-        woolBanked <= CART_CAPACITY &&
+        woolBanked === 0 &&
         (second.cargo.fleece ?? 0) === 0
       ) {
         actions.push({ type: 'dismissCarter', cartId: second.id });

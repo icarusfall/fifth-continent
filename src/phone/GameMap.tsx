@@ -27,7 +27,7 @@ import {
   otherEnd } from '../sim/map';
 import { dayPhaseOf, isFlooded } from '../sim/time';
 import { woolOnTheBooks } from '../sim/tick';
-import { REVENUE_BLUE } from '../shared/palette';
+import { DARK_WOOL_TEXT, REVENUE_BLUE } from '../shared/palette';
 import { cutInvites, dykeWaterways } from '../sim/dykes';
 import { CONTRABAND, coverOf, fortVisibility, illicitCount } from '../sim/revenue';
 import type { Cart, EdgeId, GameState, Good, NodeId } from '../sim/types';
@@ -547,8 +547,13 @@ export function GameMap({ state }: { state: GameState }) {
         // draws nothing early on and its button reads as dead.
         if (s.fleeceReady > 0) {
           farmRows.push({
-            text: `${s.fleeceReady} wool on the sheep`,
+            text: `${s.fleeceReady} ${s.darkReady > 0 ? 'white ' : ''}wool on the sheep`,
             color: farmCount >= FARM_STORE_CAPACITY ? '#E0837A' : undefined });
+        }
+        if (s.darkReady > 0) {
+          farmRows.push({
+            text: `${s.darkReady} dark wool on the sheep`,
+            color: farmCount >= FARM_STORE_CAPACITY ? '#E0837A' : DARK_WOOL_TEXT });
         }
         // §18 made visible (M5 tutorial pass): what the clutter hides, and
         // what stands showing past it — the storage-heat rule, on the map.

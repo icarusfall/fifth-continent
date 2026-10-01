@@ -16,6 +16,8 @@ export type DykeId = string;
 // with the market model (§17); overproof jenever has no legal buyer at all.
 export type Good =
   | 'fleece'
+  /** §6.10 M5½f — wool the books never admitted: no lawful buyer, free for the lugger. */
+  | 'dark-fleece'
   | 'jenever'
   | 'tea'
   | 'bulked-tea'
@@ -23,6 +25,9 @@ export type Good =
   | 'brandy-rough'
   | 'brandy-fair'
   | 'brandy-gent';
+
+/** §6.10 M5½f — how the page is kept: square (all white) or short (half dark). */
+export type Books = 'square' | 'short';
 
 /** Depth of the cut (spec §6.9): volume against tier. */
 export type CutDepth = 'gentle' | 'standard' | 'deep';
@@ -261,8 +266,10 @@ export interface GameState {
   lastRoundDay: number;
   /** Spec §6.14 — the research bench. */
   research: Research;
-  /** Wool on the sheep's backs, grown at dawn, collected by the shear action. */
+  /** WHITE wool on the sheep's backs (on the books), grown at dawn, sheared. */
   fleeceReady: number;
+  /** §6.10 M5½f — DARK wool on the backs: the share a short page never admits. */
+  darkReady: number;
   /** The cutting house site, once raised on the marsh (spec §6.9). */
   cuttingHouse: { x: number; y: number } | null;
   /**
@@ -302,16 +309,12 @@ export interface GameState {
   };
   /** Spec §6.10 / §19.2 — the books, one page per inspection. */
   ledger: {
-    /** Fleece per day the books admit the flock gives. Set at will. */
-    declaredYield: number;
     /**
-     * §6.10 (M5 tutorial pass) — false until the player first sets the
-     * declared yield by hand. Until then the agent keeps honest books:
-     * declaredYield follows the flock each dawn, so an honest life needs
-     * no bookkeeping at all. Cooking the books is the act that takes the
-     * pen — after it, the number is yours and never auto-moves again.
+     * §6.10 M5½f — the switch that replaced the declared-yield dial. Square
+     * (the default, the agent's honest page): the whole clip is white.
+     * Short: the page swears to half, and the other half grows dark.
      */
-    penTaken: boolean;
+    books: Books;
     declaredToDate: number;
     grownToDate: number;
     /** Fleece sold at Ryne since the page opened. */
@@ -468,7 +471,10 @@ export type Action =
   | { type: 'dismissGarrison'; nodeId: NodeId; kind: GarrisonKind }
   | { type: 'hireCarter'; cartId: CartId; order: CarterOrder | LegacyCarterOrder }
   | { type: 'dismissCarter'; cartId: CartId }
+  | { type: 'setBooks'; books: Books }
+  /** Legacy (pre-M5½f action logs): replays as setBooks — §6.10's legacy row. */
   | { type: 'setDeclaredYield'; fleecePerDay: number }
+  /** Legacy: replays as setBooks square. */
   | { type: 'returnPen' }
   | { type: 'payRent' }
   | { type: 'takeDutchmanLoan' }

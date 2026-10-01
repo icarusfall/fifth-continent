@@ -126,7 +126,7 @@ describe('the flock market (spec §6.16)', () => {
     expect(s.coin).toBe(4 * SHEEP_PRICE_SELL);
     expect(s.flockSize).toBe(STARTING_FLOCK - 4);
     expect(s.fleeceReady).toBe(s.flockSize * FLEECE_PER_HEAD_PER_DAY);
-    expect(s.ledger.declaredYield).toBeLessThanOrEqual(s.flockSize);
+    expect(s.darkReady).toBe(0); // square books: nothing dark to lose
   });
 
   it('a grown flock clips more wool than the town will buy', () => {

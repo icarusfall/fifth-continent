@@ -7,6 +7,7 @@
 //
 // Pure functions of GameState, like revenue.ts: no dice, no clocks.
 
+import { capWoolOnBacks } from './wool';
 import {
   BINDING_CAPACITY,
   COLLECTION_GRACE_DAYS,
@@ -330,8 +331,7 @@ export function applyTrapWight(state: GameState): void {
   }
   state.coin -= WIGHT_TRAP_IRON;
   state.flockSize -= bait;
-  state.fleeceReady = Math.min(state.fleeceReady, state.flockSize);
-  state.ledger.declaredYield = Math.min(state.ledger.declaredYield, state.flockSize);
+  capWoolOnBacks(state, state.flockSize);
   w.trap = { bait };
   logEvent(
     state,
@@ -355,8 +355,7 @@ export function applyPayTribute(state: GameState): void {
     return;
   }
   state.flockSize -= 1;
-  state.fleeceReady = Math.min(state.fleeceReady, state.flockSize);
-  state.ledger.declaredYield = Math.min(state.ledger.declaredYield, state.flockSize);
+  capWoolOnBacks(state, state.flockSize);
   state.debt = Math.max(0, state.debt - TRIBUTE_RELIEF);
   logEvent(
     state,

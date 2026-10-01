@@ -34,6 +34,7 @@ import {
   TICKS_PER_HOUR,
   SHEARING_HOUR,
   WOOL_GAP_COEFF,
+  PLAUSIBLE_YIELD_MIN,
   WOOL_PRICE_DOMESTIC,
 } from '../balance';
 import { applyPublishLetter } from '../leiden';
@@ -350,7 +351,7 @@ describe('the books (spec §6.10 / §19.2)', () => {
 
   it('honest books balance: all wool declared, sold or on hand', () => {
     const { after } = inspectionAt((s) => {
-      s.ledger = { declaredYield: 12, declaredToDate: 24, grownToDate: 24, soldLawfully: 16, soldToday: 0, penTaken: true, openingStock: 0 };
+      s.ledger = { books: 'short', declaredToDate: 24, grownToDate: 24, soldLawfully: 16, soldToday: 0, openingStock: 0 };
       s.stores.farm = { fleece: 8 };
     });
     expect(after.heat.regional).toBe(0);
@@ -360,7 +361,7 @@ describe('the books (spec §6.10 / §19.2)', () => {
   it('vanished wool is priced at the gap', () => {
     const { after } = inspectionAt((s) => {
       // Declared 24, sold 8 lawfully, nothing on hand: 16 fleece adrift.
-      s.ledger = { declaredYield: 12, declaredToDate: 24, grownToDate: 24, soldLawfully: 8, soldToday: 0, penTaken: true, openingStock: 0 };
+      s.ledger = { books: 'short', declaredToDate: 24, grownToDate: 24, soldLawfully: 8, soldToday: 0, openingStock: 0 };
       s.stores.farm = { fleece: 0 };
     });
     expect(after.heat.regional).toBeCloseTo(16 * WOOL_GAP_COEFF, 5);
@@ -370,14 +371,14 @@ describe('the books (spec §6.10 / §19.2)', () => {
   it('swearing to less than half the clip is priced as a lie', () => {
     const { after } = inspectionAt((s) => {
       // Declared nothing, holds nothing, sold nothing — but 24 grew: floor is 12.
-      s.ledger = { declaredYield: 0, declaredToDate: 0, grownToDate: 24, soldLawfully: 0, soldToday: 0, penTaken: true, openingStock: 0 };
+      s.ledger = { books: 'short', declaredToDate: 0, grownToDate: 24, soldLawfully: 0, soldToday: 0, openingStock: 0 };
     });
     expect(after.heat.regional).toBeCloseTo(12 * WOOL_GAP_COEFF, 5);
   });
 
   it('the page is initialled: a gap is paid for once, not nightly', () => {
     const { after } = inspectionAt((s) => {
-      s.ledger = { declaredYield: 12, declaredToDate: 24, grownToDate: 24, soldLawfully: 8, soldToday: 0, penTaken: true, openingStock: 0 };
+      s.ledger = { books: 'short', declaredToDate: 24, grownToDate: 24, soldLawfully: 8, soldToday: 0, openingStock: 0 };
     });
     expect(after.ledger.declaredToDate).toBe(0);
     expect(after.ledger.grownToDate).toBe(0);
@@ -398,11 +399,11 @@ describe('the books (spec §6.10 / §19.2)', () => {
     expect(again.heat.regional).toBeCloseTo(after.heat.regional * SEARCH_HEAT_RELIEF, 5);
   });
 
-  it('declaredYield clamps to the flock that exists', () => {
+  it('the legacy dial replays onto the switch: a full clip is square, anything less short', () => {
     const s = tick(initialState(1), [{ type: 'setDeclaredYield', fleecePerDay: 99 }]);
-    expect(s.ledger.declaredYield).toBe(STARTING_FLOCK);
+    expect(s.ledger.books).toBe('square');
     const s2 = tick(s, [{ type: 'setDeclaredYield', fleecePerDay: -4 }]);
-    expect(s2.ledger.declaredYield).toBe(0);
+    expect(s2.ledger.books).toBe('short');
   });
 });
 
@@ -658,10 +659,9 @@ describe('the wool-stapler’s tally — lawful sales cap at the page’s unsold
   function cartInRyne(fleece: number, onBooks: number): GameState {
     const s = initialState(3);
     s.tick = 60; // mid-morning: today's line is already written
-    s.ledger.penTaken = true;
+    s.ledger.books = 'short'; // tomorrow's line, when dawn writes it: half of 12
     s.ledger.openingStock = 0;
     s.ledger.declaredToDate = onBooks;
-    s.ledger.declaredYield = 6; // tomorrow's line, when dawn writes it
     s.carts[0].cargo = { fleece };
     s.carts[0].location = { kind: 'node', nodeId: 'ryne' };
     return s;
@@ -689,10 +689,10 @@ describe('the wool-stapler’s tally — lawful sales cap at the page’s unsold
     expect(s.carts[0].cargo.fleece).toBe(0); // the rest sells on the new line
   });
 
-  it('the pen writes tomorrow’s page: raising the figure frees nothing today', () => {
+  it('the switch writes tomorrow’s page: squaring the books frees nothing today', () => {
     let s = cartInRyne(10, 6);
     s = tick(s, [{ type: 'sell', cartId: 'cart-1', good: 'fleece' }]);
-    s = tick(s, [{ type: 'setDeclaredYield', fleecePerDay: 12 }]);
+    s = tick(s, [{ type: 'setBooks', books: 'square' }]);
     s = tick(s, [{ type: 'sell', cartId: 'cart-1', good: 'fleece' }]);
     expect(s.carts[0].cargo.fleece).toBe(4); // today's page is already sworn
     s = runTicks(s, TICKS_PER_DAY); // dawn writes the fatter line
@@ -705,7 +705,7 @@ describe('the wool-stapler’s tally — lawful sales cap at the page’s unsold
     // the page. The book is the thing that saves you (playtest, §6.10).
     const s0 = cartInRyne(16, 24);
     s0.flockSize = 8;
-    s0.ledger.declaredYield = 8;
+    s0.ledger.books = 'square';
     const s = tick(s0, [{ type: 'sell', cartId: 'cart-1', good: 'fleece' }]);
     // One day, 16 fleece: capped by the town's appetite, not the flock.
     expect(s.carts[0].cargo.fleece).toBe(16 - DAILY_DEMAND.fleece);
@@ -715,14 +715,14 @@ describe('the wool-stapler’s tally — lawful sales cap at the page’s unsold
   it('the gunwale has no scales: undeclared wool vanishes over it uncapped', () => {
     const s0 = initialState(3);
     s0.tick = 60;
-    s0.ledger.declaredYield = 0; // the book swears the flock gives nothing
+    s0.ledger.books = 'short';
     s0.dutchman.unlocked = true;
     s0.dutchman.present = true;
     s0.dutchman.fleeceAppetite = 24;
-    s0.carts[0].cargo = { fleece: 8 };
+    s0.carts[0].cargo = { 'dark-fleece': 8 };
     s0.carts[0].location = { kind: 'node', nodeId: 'shingle' };
     const s = tick(s0, [{ type: 'sellToDutchman', cartId: 'cart-1' }]);
-    expect(s.carts[0].cargo.fleece).toBe(0);
+    expect(s.carts[0].cargo['dark-fleece']).toBe(0);
     expect(s.ledger.soldToday).toBe(0); // no page records it
   });
 });
@@ -737,19 +737,21 @@ describe('honest by default — the books follow the flock until the pen is take
     // clip, so no gap ever opens.
     s = runTicks(s, 2 * TICKS_PER_DAY);
     expect(s.flockSize).toBe(STARTING_FLOCK + 6);
-    expect(s.ledger.penTaken).toBe(false);
-    expect(s.ledger.declaredYield).toBe(s.flockSize);
+    expect(s.ledger.books).toBe('square');
+    expect(s.darkReady).toBe(0);
+    expect(s.ledger.declaredToDate).toBe(s.ledger.grownToDate);
   });
 
-  it('taking the pen stops the agent’s hand for good', () => {
+  it('short books follow the flock too: the page admits the white half of every clip', () => {
     let s = initialState(4);
     s.coin = 200;
-    s = tick(s, [{ type: 'setDeclaredYield', fleecePerDay: 6 }]);
-    expect(s.ledger.penTaken).toBe(true);
-    s = tick(s, [{ type: 'buySheep', qty: 6 }]);
-    s = runTicks(s, TICKS_PER_DAY);
-    expect(s.flockSize).toBe(STARTING_FLOCK + 6);
-    expect(s.ledger.declaredYield).toBe(6); // the number is yours now
+    s = tick(s, [{ type: 'setBooks', books: 'short' }]);
+    s = tick(s, [{ type: 'buySheep', qty: 7 }]);
+    s = runTicks(s, 2 * TICKS_PER_DAY);
+    expect(s.flockSize).toBe(STARTING_FLOCK + 7);
+    // The page never falls under the plausible floor, odd flock or not.
+    expect(s.ledger.declaredToDate).toBeGreaterThanOrEqual(s.ledger.grownToDate * PLAUSIBLE_YIELD_MIN);
+    expect(s.darkReady + (s.stores.farm?.['dark-fleece'] ?? 0)).toBeGreaterThan(0);
   });
 
   it('distraint thins the flock and the honest book follows it down', () => {
@@ -762,6 +764,6 @@ describe('honest by default — the books follow the flock until the pen is take
     if (s.rentPending) s = tick(s, [{ type: 'payRent' }]);
     s = runTicks(s, TICKS_PER_DAY);
     expect(s.flockSize).toBeLessThan(STARTING_FLOCK);
-    expect(s.ledger.declaredYield).toBe(s.flockSize); // no phantom sworn wool
+    expect(s.ledger.declaredToDate).toBe(s.ledger.grownToDate); // no phantom sworn wool
   });
 });

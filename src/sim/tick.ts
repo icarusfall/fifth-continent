@@ -106,9 +106,11 @@ import {
   leidenTierCompleted,
 } from './leiden';
 import { seedRng } from './rng';
+import { capWoolOnBacks, whiteShare, woolOnBacks } from './wool';
 import { clockOf, dayPhaseOf, isFlooded, tideIsRising, tideLevel } from './time';
 import type {
   Action,
+  Books,
   Cart,
   CarterOrder,
   CarterStop,
@@ -152,6 +154,7 @@ export function initialState(seed: number, difficulty: Difficulty = 'fair'): Gam
     // The flock takes the tenancy already in wool (spec §6.7): the very first
     // action is a shear, not a wait for dawn.
     fleeceReady: STARTING_FLOCK * FLEECE_PER_HEAD_PER_DAY,
+    darkReady: 0,
     cuttingHouse: null,
     dutchman: {
       unlocked: false,
@@ -175,8 +178,7 @@ export function initialState(seed: number, difficulty: Difficulty = 'fair'): Gam
     },
     // The books open honest: the flock gives what the flock gives (§6.10).
     ledger: {
-      declaredYield: STARTING_FLOCK * FLEECE_PER_HEAD_PER_DAY,
-      penTaken: false,
+      books: 'square',
       declaredToDate: 0,
       grownToDate: 0,
       soldLawfully: 0,
@@ -454,10 +456,14 @@ function creditProceeds(state: GameState, proceeds: number): number {
  */
 function dutchmanFleeceSale(state: GameState, cart: Cart): number {
   if (!state.dutchman.present) return 0;
-  const held = cart.cargo.fleece ?? 0;
-  const qty = Math.min(held, state.dutchman.fleeceAppetite);
+  // §6.10 M5½f — he takes both colours, DARK FIRST: the wool the page never
+  // admitted goes before the wool it did.
+  const dark = Math.min(cart.cargo['dark-fleece'] ?? 0, state.dutchman.fleeceAppetite);
+  const white = Math.min(cart.cargo.fleece ?? 0, state.dutchman.fleeceAppetite - dark);
+  const qty = dark + white;
   if (qty <= 0) return 0;
-  cart.cargo.fleece = held - qty;
+  if (dark > 0) cart.cargo['dark-fleece'] = (cart.cargo['dark-fleece'] ?? 0) - dark;
+  if (white > 0) cart.cargo.fleece = (cart.cargo.fleece ?? 0) - white;
   state.dutchman.fleeceAppetite -= qty;
   // §6.9 — coin across the gunwale: he is met, and the wool climbs his trust.
   state.dutchman.met = true;
@@ -473,6 +479,7 @@ function dutchmanFleeceSale(state: GameState, cart: Cart): number {
  */
 function marketSale(state: GameState, cart: Cart, good: Good): number {
   if (good === 'jenever') return 0; // no legal buyer at any price
+  if (good === 'dark-fleece') return 0; // §6.10 M5½f — the stapler will not weigh it
   const held = cart.cargo[good] ?? 0;
   const appetite = state.demandRemaining[good] ?? 0;
   // §6.10 — the wool-stapler reads the whole page: lawful fleece sells only
@@ -563,6 +570,43 @@ export function woolOnTheBooks(state: GameState): number {
   return Math.max(0, l.openingStock + l.declaredToDate - l.soldLawfully);
 }
 
+/**
+ * §6.10 M5½f — the shears fill the barn as far as its walls allow (§6.9),
+ * taking the colours in proportion when the walls stop them.
+ */
+function shearIntoBarn(state: GameState): { qty: number; dark: number } {
+  state.stores.farm = state.stores.farm ?? {};
+  const onBacks = woolOnBacks(state);
+  const room = FARM_STORE_CAPACITY - cargoCount(state.stores.farm);
+  const qty = Math.min(onBacks, room);
+  if (qty <= 0) return { qty: 0, dark: 0 };
+  const dark = qty === onBacks ? state.darkReady : Math.floor((qty * state.darkReady) / onBacks);
+  const white = qty - dark;
+  state.darkReady -= dark;
+  state.fleeceReady -= white;
+  if (white > 0) addToStore(state.stores.farm, 'fleece', white);
+  if (dark > 0) addToStore(state.stores.farm, 'dark-fleece', dark);
+  return { qty, dark };
+}
+
+function shornText(qty: number, dark: number): string {
+  return dark > 0 ? `${qty - dark} white fleece and ${dark} dark` : `${qty} fleece`;
+}
+
+/** §6.10 M5½f — the switch. It changes tomorrow's clip, never wool already grown. */
+function setBooks(state: GameState, books: Books): void {
+  if (state.ledger.books === books) return;
+  state.ledger.books = books;
+  const clip = state.flockSize * FLEECE_PER_HEAD_PER_DAY;
+  const white = whiteShare(books, clip);
+  logEvent(
+    state,
+    books === 'short'
+      ? `The book now swears the flock gives ${white} fleece a day. Scrapie, if anyone asks. From dawn, ${clip - white} a day grow dark.`
+      : 'You hand the pen back. The agent keeps the book square with the flock from dawn: every fleece white, and no arithmetic of yours to defend.',
+  );
+}
+
 function garrisonWageBill(g: Garrison): number {
   return g.militia * MILITIA_WAGE + g.crew * CREW_WAGE;
 }
@@ -584,26 +628,20 @@ const FORT_WORKS: readonly ((name: string) => string)[] = [
 function applyAction(state: GameState, action: Action): void {
   switch (action.type) {
     case 'shear': {
-      if (state.fleeceReady <= 0) {
+      if (woolOnBacks(state) <= 0) {
         logEvent(state, 'The sheep are shorn bare. Wool grows by dawn.');
         return;
       }
       state.shearer.handShears += 1; // the chore, counted toward his offer (§6.16)
-      state.stores.farm = state.stores.farm ?? {};
-      // The barn is finite (spec §6.9): wool it cannot take stays on the sheep.
-      const room = FARM_STORE_CAPACITY - cargoCount(state.stores.farm);
-      const qty = Math.min(state.fleeceReady, room);
+      const { qty, dark } = shearIntoBarn(state);
       if (qty <= 0) {
         logEvent(state, 'The barn is full to the rafters. The wool stays on the sheep.');
         return;
       }
-      state.fleeceReady -= qty;
-      addToStore(state.stores.farm, 'fleece', qty);
       logEvent(
         state,
-        state.fleeceReady > 0
-          ? `Sheared ${qty} fleece; the barn takes no more. The rest stays on the sheep.`
-          : `Sheared ${qty} fleece into the farm store.`,
+        `Sheared ${shornText(qty, dark)}` +
+          (woolOnBacks(state) > 0 ? '; the barn takes no more. The rest stays on the sheep.' : ' into the farm store.'),
       );
       return;
     }
@@ -730,6 +768,10 @@ function applyAction(state: GameState, action: Action): void {
         logEvent(state, 'No buyer in Ryne will touch overproof jenever. It wants cutting.');
         return;
       }
+      if (action.good === 'dark-fleece') {
+        logEvent(state, 'The wool-stapler will not weigh dark wool: it was never on your books. It goes over a gunwale or nowhere.');
+        return;
+      }
       const held = cart.cargo[action.good] ?? 0;
       if (held <= 0) return;
       if ((state.demandRemaining[action.good] ?? 0) <= 0) {
@@ -793,11 +835,14 @@ function applyAction(state: GameState, action: Action): void {
         logEvent(state, 'Shingle and sea-wrack. Nobody is buying wool from the water tonight.');
         return;
       }
+      const whiteBefore = cart.cargo.fleece ?? 0;
       const qty = dutchmanFleeceSale(state, cart);
       if (qty <= 0) return;
+      const whiteGone = whiteBefore - (cart.cargo.fleece ?? 0);
       logEvent(
         state,
-        `${qty} fleece over the gunwale for ${qty * WOOL_PRICE_DOMESTIC * LEIDEN_PRICE_MULT} coin. Four times the Ryne price, and no questions.`,
+        `${qty} fleece over the gunwale for ${qty * WOOL_PRICE_DOMESTIC * LEIDEN_PRICE_MULT} coin. Four times the Ryne price, and no questions.` +
+          (whiteGone > 0 ? ` ${whiteGone} of it was white: the book admitted it, and the audit will look for it.` : ''),
       );
       return;
     }
@@ -1336,8 +1381,7 @@ function applyAction(state: GameState, action: Action): void {
       if (qty <= 0) return;
       state.flockSize -= qty;
       // The wool on their backs goes with them; the alibi thins with the flock.
-      state.fleeceReady = Math.min(state.fleeceReady, state.flockSize * FLEECE_PER_HEAD_PER_DAY);
-      state.ledger.declaredYield = Math.min(state.ledger.declaredYield, state.flockSize);
+      capWoolOnBacks(state, state.flockSize * FLEECE_PER_HEAD_PER_DAY);
       state.coin += creditProceeds(state, qty * SHEEP_PRICE_SELL);
       logEvent(
         state,
@@ -1465,29 +1509,19 @@ function applyAction(state: GameState, action: Action): void {
       return;
     }
 
+    case 'setBooks': {
+      setBooks(state, action.books);
+      return;
+    }
+
+    // §6.10 M5½f — legacy action logs replay through the switch.
     case 'returnPen': {
-      // §6.10 (M5c playtest) — hand the pen back: the agent resumes keeping
-      // the books square with the flock. Honest play needs no bookkeeping.
-      if (!state.ledger.penTaken) return;
-      state.ledger.penTaken = false;
-      state.ledger.declaredYield = state.flockSize * FLEECE_PER_HEAD_PER_DAY;
-      logEvent(
-        state,
-        'You hand the pen back. The agent keeps the book square with the flock from here — an honest page, and no arithmetic of yours to defend.',
-      );
+      setBooks(state, 'square');
       return;
     }
 
     case 'setDeclaredYield': {
-      const declared = Math.max(0, Math.min(state.flockSize, Math.round(action.fleecePerDay)));
-      state.ledger.declaredYield = declared;
-      state.ledger.penTaken = true; // §6.10 — the number is yours now
-      logEvent(
-        state,
-        declared < state.flockSize * FLEECE_PER_HEAD_PER_DAY
-          ? `The book now swears the flock gives ${declared} fleece a day. Scrapie, if anyone asks.`
-          : `The book admits the flock's full clip: ${declared} fleece a day.`,
-      );
+      setBooks(state, action.fleecePerDay < state.flockSize * FLEECE_PER_HEAD_PER_DAY ? 'short' : 'square');
       return;
     }
   }
@@ -1497,22 +1531,24 @@ function applyAction(state: GameState, action: Action): void {
 
 function growWoolAtDawn(state: GameState): void {
   if (!isDawn(state.tick)) return;
-  // §6.10 (M5 tutorial pass) — until the pen is taken, the agent keeps the
-  // books square with the flock: an honest life needs no bookkeeping. Done
-  // before the day's declaration accrues, so the page never drifts.
-  if (!state.ledger.penTaken) {
-    state.ledger.declaredYield = state.flockSize * FLEECE_PER_HEAD_PER_DAY;
-  }
+  // §6.10 M5½f — the clip splits on the backs: the page admits the white.
   const grown = state.flockSize * FLEECE_PER_HEAD_PER_DAY;
-  state.fleeceReady += grown;
-  logEvent(state, `Dawn. The flock carries ${state.fleeceReady} fleece of wool.`);
+  const white = whiteShare(state.ledger.books, grown);
+  state.fleeceReady += white;
+  state.darkReady += grown - white;
+  logEvent(
+    state,
+    state.darkReady > 0
+      ? `Dawn. The flock carries ${state.fleeceReady} white fleece and ${state.darkReady} dark.`
+      : `Dawn. The flock carries ${state.fleeceReady} fleece of wool.`,
+  );
   // Ryne wakes hungry (spec §6.9): yesterday's saturation is forgiven —
   // and the wool-stapler turns to a fresh page of his own (§6.10).
   state.demandRemaining = { ...DAILY_DEMAND };
   state.ledger.soldToday = 0;
   // The books accrue (§6.10): what grew, and what the page admits grew.
   state.ledger.grownToDate += grown;
-  state.ledger.declaredToDate += Math.min(state.ledger.declaredYield, grown);
+  state.ledger.declaredToDate += white;
 }
 
 /** Spec §6.16 — bought sheep come up the drove road overnight and join at dawn. */
@@ -1536,17 +1572,13 @@ function shearerAtDawn(state: GameState): void {
     return;
   }
   state.coin -= SHEARER_WAGE;
-  if (state.fleeceReady <= 0) return;
-  state.stores.farm = state.stores.farm ?? {};
-  const room = FARM_STORE_CAPACITY - cargoCount(state.stores.farm);
-  const qty = Math.min(state.fleeceReady, room);
+  if (woolOnBacks(state) <= 0) return;
+  const { qty, dark } = shearIntoBarn(state);
   if (qty <= 0) {
     logEvent(state, 'The lad finds the barn full to the rafters. The wool stays on the sheep.');
     return;
   }
-  state.fleeceReady -= qty;
-  addToStore(state.stores.farm, 'fleece', qty);
-  logEvent(state, `The lad shears ${qty} fleece into the barn before breakfast.`);
+  logEvent(state, `The lad shears ${shornText(qty, dark)} into the barn before breakfast.`);
 }
 
 /**
@@ -1695,6 +1727,7 @@ function carterDispatch(state: GameState, cart: Cart, target: NodeId): void {
  */
 const SELL_ORDER: readonly Good[] = [
   'fleece',
+  'dark-fleece',
   'tea',
   'bulked-tea',
   'lace',
@@ -1789,7 +1822,7 @@ function carterDeliver(state: GameState, cart: Cart, stop: CarterStop): boolean 
         `The carter passes ${sold} fleece over the gunwale for ${sold * WOOL_PRICE_DOMESTIC * LEIDEN_PRICE_MULT} coin, and does not look at the boat.`,
       );
     }
-    if ((cart.cargo.fleece ?? 0) > 0) return true; // waiting on the lugger
+    if ((cart.cargo.fleece ?? 0) + (cart.cargo['dark-fleece'] ?? 0) > 0) return true; // waiting on the lugger
     // Goods the Dutchman does not buy come off onto the open shingle (§6.11).
     carterUnloadAll(state, cart, at, stop.take);
     return false;
@@ -1825,7 +1858,12 @@ function carterDeliver(state: GameState, cart: Cart, stop: CarterStop): boolean 
     // buy at any price. That is deliberate and it is §6.11's lesson: a
     // standing order full of jenever is legal to write and stupid to keep, and
     // the player learns it by watching a laden cart stand in the square.
-    if (cargoCount(cart.cargo) > 0) {
+    // §6.10 M5½f — dark wool has no tomorrow at a market: it never holds him.
+    const darkAboard = cart.cargo['dark-fleece'] ?? 0;
+    if (darkAboard > 0 && cart.marketPatienceUntil === undefined && cargoCount(cart.cargo) === darkAboard) {
+      logEvent(state, `The stapler will not weigh dark wool. The carter carries ${darkAboard} dark fleece on.`);
+    }
+    if (cargoCount(cart.cargo) - darkAboard > 0) {
       if (cart.marketPatienceUntil === undefined) {
         cart.marketPatienceUntil = state.tick + CARTER_MARKET_PATIENCE_DAYS * TICKS_PER_DAY;
         // §6.10: wool can be stopped by the book, not the town — the stapler's

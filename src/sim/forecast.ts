@@ -68,7 +68,7 @@ export function forecastDay(state: GameState): DayForecast {
       // gunwale, if the wool reaches the shingle before any town.
       for (let step = 1; step <= stops.length; step++) {
         const there = stops[(i + step) % stops.length].at;
-        if (there === 'shingle' && picked === 'fleece') {
+        if (there === 'shingle' && (picked === 'fleece' || picked === 'dark-fleece')) {
           const sold = Math.min(hauled, gunwale);
           gunwale -= sold;
           takings += sold * WOOL_PRICE_DOMESTIC * LEIDEN_PRICE_MULT;

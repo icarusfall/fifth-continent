@@ -69,7 +69,8 @@ export function illicitCount(store: Store): number {
  *  UI both speak them. Lives sim-side so seizures can name what they take
  *  (§6.10, M5c playtest: "seizes 6 goods" reads as nothing at all). */
 export const GOOD_LABEL: Record<Good, string> = {
-  fleece: 'fleece',
+  fleece: 'white fleece',
+  'dark-fleece': 'dark fleece',
   jenever: 'tubs of jenever',
   tea: 'bohea tea',
   'bulked-tea': 'bulked tea',
@@ -490,11 +491,41 @@ function searchNode(state: GameState, nodeId: NodeId): void {
 
 /** Every fleece not yet weighed, wherever it sits — barn, boards, or backs. */
 function fleeceOnHand(state: GameState): number {
+  // §6.10 M5½f — he counts wool, not paperwork: both colours.
   return (
     (state.stores.farm?.fleece ?? 0) +
-    state.carts.reduce((sum, c) => sum + (c.cargo.fleece ?? 0), 0) +
-    state.fleeceReady
+    (state.stores.farm?.['dark-fleece'] ?? 0) +
+    state.carts.reduce((sum, c) => sum + (c.cargo.fleece ?? 0) + (c.cargo['dark-fleece'] ?? 0), 0) +
+    state.fleeceReady +
+    state.darkReady
   );
+}
+
+/** §6.10 M5½f — dark wool the audit would find (and write onto the page). */
+export function darkOnHand(state: GameState): number {
+  return (
+    (state.stores.farm?.['dark-fleece'] ?? 0) +
+    state.carts.reduce((sum, c) => sum + (c.cargo['dark-fleece'] ?? 0), 0) +
+    state.darkReady
+  );
+}
+
+/** §6.10 M5½f — what he counted goes on the record: dark wool turns white. */
+function whitenCountedWool(state: GameState): void {
+  const farm = state.stores.farm;
+  if (farm && (farm['dark-fleece'] ?? 0) > 0) {
+    farm.fleece = (farm.fleece ?? 0) + farm['dark-fleece']!;
+    farm['dark-fleece'] = 0;
+  }
+  for (const c of state.carts) {
+    const d = c.cargo['dark-fleece'] ?? 0;
+    if (d > 0) {
+      c.cargo.fleece = (c.cargo.fleece ?? 0) + d;
+      c.cargo['dark-fleece'] = 0;
+    }
+  }
+  state.fleeceReady += state.darkReady;
+  state.darkReady = 0;
 }
 
 /**
@@ -535,6 +566,13 @@ function checkBooks(state: GameState): void {
     );
   } else {
     logEvent(state, 'He reads the book against the flock. It balances. He looks almost sorry.');
+  }
+
+  // §6.10 M5½f — dark wool he counted is on the record now: it turns white.
+  const found = darkOnHand(state);
+  if (found > 0) {
+    whitenCountedWool(state);
+    logEvent(state, `He writes ${found} dark fleece onto the page. It is honest wool now, and paid for.`);
   }
 
   // The page is initialled: each gap is paid for once (§6.10).
