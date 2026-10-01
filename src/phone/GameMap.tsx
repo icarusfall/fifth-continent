@@ -35,9 +35,9 @@ import { useGameStore } from '../state/store';
 import { useUiStore } from '../state/ui';
 import { Sheet, useIsPhone } from './Sheet';
 import { firstMorningHint, isFreshGame } from './firstMorning';
-import { CameraController } from './camera';
+import { CameraController } from '../shared/camera';
 import { APRON_TILES, pathPoints, pointAlong, TILE, tileCenter, WORLD_H, WORLD_W } from '../shared/geometry';
-import { getApronCanvas, getTerrainCanvas } from './paint';
+import { getApronCanvas, getTerrainCanvas } from '../shared/paint';
 import {
   drawCart,
   drawCarterRoute,
@@ -66,7 +66,7 @@ import {
   drawWightStone,
   drawWoolMote,
   drawPlaceMark,
-  drawWorkshopBadge } from './sprites';
+  drawWorkshopBadge } from '../shared/sprites';
 
 type Selection =
   | 'farm'

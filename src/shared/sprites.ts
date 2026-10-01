@@ -3,8 +3,8 @@
 // fills, ink outlines, deterministic wobble. Line widths are world-space,
 // so outlines scale with the camera as the spec asks.
 
-import { hash2, jitter, TILE, tileCenter } from '../shared/geometry';
-import { CLAY, DYKE, HEAT_RED, ICHOR_GREEN, INK, LIMEWASH, MARSH_DARK, PHLOGISTON_ORANGE, REVENUE_BLUE, ROOF, SEA } from '../shared/palette';
+import { hash2, jitter, TILE, tileCenter } from './geometry';
+import { CLAY, DYKE, HEAT_RED, ICHOR_GREEN, INK, LIMEWASH, MARSH_DARK, PHLOGISTON_ORANGE, REVENUE_BLUE, ROOF, SEA } from './palette';
 import { mix } from './paint';
 
 const OUT = 1.6; // outline width at world scale

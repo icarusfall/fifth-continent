@@ -1,6 +1,6 @@
 import './phone.css';
 import { useGameStore } from '../state/store';
-import { BattlePlayback } from './BattlePlayback';
+import { BattlePlayback } from '../shared/BattlePlayback';
 import { BottomBar } from './BottomBar';
 import { EventCard } from './EventCard';
 import { EventLog } from './EventLog';

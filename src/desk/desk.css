@@ -1,12 +1,29 @@
-/* The desk's own sheet (spec §20.4). Palette from spec §15.3. */
+/* The Smuggler's Table (spec §20.4). The desk's own sheet: the phone's CSS
+   never loads here. Palette from spec §15.3; the lamp is warm limewash,
+   never Phlogiston orange. Type is sized to be read at a glance, not peered at. */
+
+@import url('https://fonts.googleapis.com/css2?family=IM+Fell+English+SC&family=IM+Fell+English:ital@0;1&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap');
 
 :root {
   --ink: #241c18;
   --ground: #17120f;
+  --panel: rgba(26, 21, 18, 0.93);
   --paper: #e8e1d2;
   --paper-dim: #b9ae9b;
-  --lamp: #f0cf8a;
+  --paper-faint: #8d8273;
   --rule: rgba(232, 225, 210, 0.14);
+  --lamp: #f0cf8a;
+  --heat: #c4453a;
+  --good: #9fbf7a;
+  --dark-wool: #5c4b40;
+  /* the shared battle sheet speaks these */
+  --clay: #9b8265;
+  --limewash: #e8e1d2;
+  --roof: #a85d4a;
+  --display: 'IM Fell English SC', 'IM Fell English', Georgia, serif;
+  --display-lc: 'IM Fell English', Georgia, serif;
+  --body: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+  color-scheme: dark;
 }
 
 * {
@@ -23,35 +40,624 @@ body,
 body {
   background: var(--ground);
   color: var(--paper);
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: var(--body);
+  font-size: 15px;
+  overflow: hidden;
 }
 
-.desk-wip {
+button {
+  font: inherit;
+  color: inherit;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--lamp);
+  outline-offset: 1px;
+}
+
+kbd {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  padding: 0 4px;
+}
+
+.desk {
   height: 100%;
   display: grid;
-  place-content: center;
-  gap: 12px;
-  padding: 24px;
-  text-align: center;
+  grid-template-rows: auto 1fr;
 }
 
-.desk-wip h1 {
-  font-weight: 400;
-  margin: 0;
-}
-
-.desk-wip p {
-  color: var(--paper-dim);
-  margin: 0;
-}
-
-.desk-wip button {
-  justify-self: center;
-  font: inherit;
-  color: var(--ink);
-  background: var(--lamp);
-  border: 0;
-  border-radius: 3px;
+/* ---- the top bar ---- */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 18px;
   padding: 6px 14px;
+  background: linear-gradient(#211a16, #1b1512);
+  border-bottom: 1px solid var(--rule);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  z-index: 5;
+}
+.tb {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.tb em {
+  font-style: normal;
+  font-family: var(--display);
+  letter-spacing: 0.08em;
+  font-size: 12px;
+  color: var(--paper-dim);
+}
+.tb.clock {
+  font-family: var(--display-lc);
+  font-size: 17px;
+}
+.tb.clock b {
+  font-weight: 400;
+}
+.tb.urgent,
+.tb.urgent em {
+  color: #e8897f;
+}
+.tb-note {
+  color: var(--paper-dim);
+  font-size: 12px;
+  font-style: italic;
+}
+.tb-spacer {
+  flex: 1;
+}
+.meter {
+  position: relative;
+  display: inline-block;
+  width: 70px;
+  height: 7px;
+  border-radius: 4px;
+  background: rgba(232, 225, 210, 0.13);
+  overflow: hidden;
+}
+.meter i {
+  position: absolute;
+  inset: 0 auto 0 0;
+}
+.meter b {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--paper);
+}
+.tb-btn,
+.speeds button {
+  background: rgba(232, 225, 210, 0.08);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  padding: 3px 10px;
   cursor: pointer;
+}
+.tb-btn:hover,
+.speeds button:hover {
+  background: rgba(232, 225, 210, 0.16);
+}
+.tb-btn.quiet {
+  color: var(--paper-dim);
+}
+.speeds {
+  display: inline-flex;
+  gap: 3px;
+}
+.speeds button.on {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+/* ---- the table ---- */
+.table {
+  position: relative;
+  overflow: hidden;
+}
+.desk-map {
+  position: absolute;
+  inset: 0;
+  cursor: grab;
+  touch-action: none;
+}
+.desk-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.night-veil {
+  position: absolute;
+  inset: 0;
+  background: #0b1020;
+  pointer-events: none;
+  transition: opacity 1.5s;
+}
+.placing-banner {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  background: var(--lamp);
+  color: var(--ink);
+  padding: 7px 14px;
+  border-radius: 3px;
+  font-size: 14px;
+  pointer-events: none;
+}
+
+.panel {
+  position: absolute;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(3px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.panel-title {
+  margin: 0;
+  padding: 10px 14px 6px;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  color: var(--paper-dim);
+  border-bottom: 1px solid var(--rule);
+}
+
+/* ---- the stable ---- */
+.stable {
+  top: 12px;
+  left: 12px;
+  width: 270px;
+  max-height: calc(100% - 24px);
+}
+.stable-rows {
+  display: grid;
+}
+.stable-row {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: 0 10px;
+  text-align: left;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  padding: 9px 14px;
+  cursor: pointer;
+}
+.stable-row:hover {
+  background: rgba(232, 225, 210, 0.05);
+}
+.stable-row.on {
+  background: rgba(240, 207, 138, 0.11);
+}
+.stable-row .num {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--paper-dim);
+  display: grid;
+  place-items: center;
+  font-family: var(--display);
+  font-size: 12px;
+  margin-top: 1px;
+}
+.stable-row.on .num {
+  background: var(--lamp);
+  border-color: var(--lamp);
+  color: var(--ink);
+}
+.stable-row .who {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.stable-row .name {
+  font-weight: 600;
+}
+.stable-row .where,
+.stable-row .hand {
+  font-size: 13px;
+  color: var(--paper-dim);
+}
+.stable-row .warn {
+  font-size: 12px;
+  color: #e8897f;
+}
+.cargo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+.cargo.empty {
+  font-size: 13px;
+  color: var(--paper-faint);
+  font-style: italic;
+}
+.chip {
+  font-size: 12px;
+  padding: 0 6px;
+  border-radius: 3px;
+  line-height: 1.5;
+}
+.chip.white {
+  background: var(--paper);
+  color: var(--ink);
+}
+.chip.dark {
+  background: var(--dark-wool);
+  color: var(--paper);
+  border: 1px solid rgba(232, 225, 210, 0.3);
+}
+.chip.goods {
+  background: rgba(196, 69, 58, 0.25);
+  color: #f0c4bd;
+}
+.stable-men {
+  margin: 0;
+  padding: 8px 14px;
+  font-size: 13px;
+  color: var(--paper-dim);
+  border-bottom: 1px solid var(--rule);
+}
+.place-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 14px 12px;
+}
+.place-links button {
+  background: rgba(232, 225, 210, 0.07);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  padding: 3px 9px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.place-links button:hover {
+  background: rgba(232, 225, 210, 0.14);
+}
+.place-links button.on {
+  background: var(--lamp);
+  color: var(--ink);
+  border-color: var(--lamp);
+}
+
+/* ---- the inspector ---- */
+.inspector {
+  top: 12px;
+  right: 12px;
+  width: 380px;
+  max-height: calc(100% - 24px);
+}
+.panel-close {
+  position: sticky;
+  top: 0;
+  float: right;
+  margin: 8px 8px 0 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--rule);
+  background: var(--panel);
+  cursor: pointer;
+  color: var(--paper-dim);
+  z-index: 1;
+}
+.sheet-head {
+  padding: 12px 16px 8px;
+  border-bottom: 1px solid var(--rule);
+}
+.kicker {
+  font-family: var(--display);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  color: var(--paper-dim);
+}
+.sheet-head h2 {
+  margin: 2px 0 0;
+  font-family: var(--display-lc);
+  font-weight: 400;
+  font-size: 26px;
+  line-height: 1.1;
+}
+.sheet-body {
+  padding: 10px 16px 14px;
+  display: grid;
+  gap: 6px;
+}
+.sheet-body.idle {
+  padding: 16px;
+}
+.fact {
+  margin: 0;
+  line-height: 1.45;
+}
+.fact.quiet {
+  color: var(--paper-dim);
+  font-size: 14px;
+}
+.fact.warn {
+  color: #f0a69c;
+}
+.fact.good {
+  color: var(--good);
+}
+.fact.dark {
+  border-left: 3px solid var(--dark-wool);
+  padding-left: 8px;
+}
+.fill {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+  margin: 2px 0;
+}
+.fill i {
+  display: block;
+  height: 100%;
+}
+.sheet-section {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--rule);
+}
+.sheet-section h3 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  color: var(--paper-dim);
+}
+.verbs {
+  display: grid;
+  gap: 5px;
+}
+.verb-row {
+  display: flex;
+  gap: 5px;
+}
+.verb-btn {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 2px 10px;
+  text-align: left;
+  padding: 7px 11px;
+  background: rgba(232, 225, 210, 0.1);
+  border: 1px solid rgba(232, 225, 210, 0.2);
+  border-radius: 4px;
+  cursor: pointer;
+  min-width: 0;
+}
+.verb-btn:hover:not(:disabled) {
+  background: rgba(240, 207, 138, 0.2);
+  border-color: rgba(240, 207, 138, 0.5);
+}
+.verb-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.verb-label {
+  font-weight: 600;
+}
+.verb-charge {
+  font-size: 13px;
+  color: var(--lamp);
+  font-variant-numeric: tabular-nums;
+}
+.verb.danger .verb-btn {
+  border-color: rgba(196, 69, 58, 0.55);
+}
+.verb.danger .verb-charge {
+  color: #f0a69c;
+}
+.why-btn {
+  width: 32px;
+  border-radius: 4px;
+  border: 1px solid var(--rule);
+  background: none;
+  color: var(--paper-dim);
+  cursor: pointer;
+  font-family: var(--display-lc);
+}
+.why-btn.on,
+.why-btn:hover {
+  background: rgba(232, 225, 210, 0.12);
+  color: var(--paper);
+}
+.verb-reason,
+.verb-why {
+  margin: 3px 0 0 2px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.verb-reason {
+  color: var(--paper-dim);
+  font-style: italic;
+}
+.verb-why {
+  color: var(--paper);
+  border-left: 2px solid var(--lamp);
+  padding-left: 8px;
+}
+
+/* an order given while the clock stands still waits for it — say so */
+.queued {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  background: rgba(240, 207, 138, 0.16);
+  color: var(--lamp);
+  padding: 8px 16px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+/* ---- dispatches: slips pinned at the top of the table ---- */
+.dispatches {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(380px, calc(100% - 700px));
+  min-width: 260px;
+  display: grid;
+  gap: 7px;
+  pointer-events: none;
+  z-index: 3;
+}
+.slip {
+  pointer-events: auto;
+  display: grid;
+  gap: 2px;
+  text-align: left;
+  background: var(--paper);
+  color: var(--ink);
+  border: 0;
+  border-radius: 2px;
+  padding: 8px 12px 9px;
+  font-size: 14px;
+  line-height: 1.35;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  transform: rotate(var(--r, -0.4deg));
+  cursor: pointer;
+  animation: slipin 0.35s ease-out;
+}
+.slip b {
+  font-family: var(--display);
+  font-weight: 400;
+  letter-spacing: 0.05em;
+  font-size: 15px;
+}
+@keyframes slipin {
+  from {
+    transform: translateY(-10px) rotate(var(--r, -0.4deg));
+    opacity: 0;
+  }
+}
+
+/* ---- the log, faint in the corner ---- */
+.desk-log {
+  position: absolute;
+  left: 296px;
+  bottom: 12px;
+  width: min(460px, calc(100% - 720px));
+  min-width: 240px;
+  pointer-events: none;
+  font-size: 13px;
+  line-height: 1.35;
+  text-shadow: 0 1px 2px #000, 0 0 6px #000;
+}
+.desk-log p {
+  margin: 3px 0 0;
+}
+.desk-log span {
+  color: var(--paper-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- pause beats ---- */
+.pause-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(23, 18, 15, 0.72);
+  display: grid;
+  place-items: center;
+  z-index: 30;
+}
+.pause-card {
+  width: min(500px, 92vw);
+  background: #1e1814;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 22px 26px;
+  box-shadow: 0 14px 50px rgba(0, 0, 0, 0.6);
+}
+.pause-card h2 {
+  margin: 4px 0 10px;
+  font-family: var(--display-lc);
+  font-weight: 400;
+  font-size: 28px;
+}
+.pause-card p {
+  line-height: 1.55;
+  margin: 0 0 12px;
+}
+.pause-flavour {
+  color: var(--paper-dim);
+  font-style: italic;
+}
+.pause-acts {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+.pause-acts .primary,
+.pause-acts .secondary {
+  padding: 9px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: left;
+}
+.pause-acts .primary {
+  background: var(--paper);
+  color: var(--ink);
+  border: 0;
+  font-weight: 600;
+}
+.pause-acts .primary.danger {
+  background: var(--roof);
+  color: var(--paper);
+}
+.pause-acts .secondary {
+  background: none;
+  border: 1px solid var(--rule);
+  color: var(--paper-dim);
+}
+.pause-acts .check {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: var(--paper-dim);
+  font-size: 14px;
+}
+
+/* the shared battle playback's buttons, in the desk's hand */
+.battle-card button {
+  background: rgba(232, 225, 210, 0.1);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+/* The desk is a desktop thing; below its line, say so plainly. */
+@media (max-width: 1000px) {
+  .dispatches {
+    width: 300px;
+  }
+  .desk-log {
+    display: none;
+  }
 }

@@ -1,44 +1,36 @@
 // Shared menu machinery (clean-sheet pass, stage 2): the popover shell,
+// the close context, the enqueue hook, and the small JSX helpers every place
+// menu leans on. The pure read-aloud helpers now live in src/shared/words.ts
+// (spec §20.3) and are re-exported here, so the frozen menus read unchanged.
 
-// the close context, the enqueue hook, and the small helpers every place
-
-// menu leans on. Moved verbatim out of GameMap.tsx; behaviour unchanged.
-
-
-
-import { DARK_WOOL_TEXT } from '../../shared/palette';
-import { GOOD_LABEL, spanOf } from '../../shared/format';
-import {
-  DUTCHMAN_TRUST_JENEVER,
-  DUTCHMAN_TRUST_TEA,
-  MARSH_VEIL_DEBT,
-  TICKS_PER_DAY } from '../../sim/balance';
-import { edgeById, edgesFor, nodeById } from '../../sim/map';
-import { CONTRABAND } from '../../sim/revenue';
-import { dayPhaseOf } from '../../sim/time';
-import type { Cart, CarterOrder, EdgeId, GameState, Good, NodeId, ResearchTree } from '../../sim/types';
 import { useGameStore } from '../../state/store';
 import { useUiStore } from '../../state/ui';
+import type { EdgeId, GameState, NodeId } from '../../sim/types';
 import { createContext, useContext, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
-export function cargoCount(cargo: Partial<Record<Good, number>>): number {
-  return Object.values(cargo).reduce((a, b) => a + (b ?? 0), 0);
-}
+export {
+  cargoCount,
+  orderLabel,
+  undirectedCartsAt,
+  backOptionsFor,
+  shingleRoutesOpen,
+  GOOD_WHISPER,
+  coatOn,
+  LEIDEN_TIERS,
+  MARSH_TIERS,
+  benchReport,
+  coatNote,
+  lanternNote,
+  GOOD_SHORT,
+  stockRows,
+  heldAnywhere,
+  FORT_TIER_LABEL,
+  cartWhereabouts,
+} from '../../shared/words';
+import { benchReport, undirectedCartsAt } from '../../shared/words';
 
 
-/** §6.19 — a standing order read aloud: the stops in order, each naming what
- *  he picks up there. This is the sentence the picker builds, spoken back. */
-export function orderLabel(state: GameState, order: CarterOrder): string {
-  return order.stops
-    .map((s) => {
-      const where = nodeById(s.at, state.farm, state.cuttingHouse).name;
-      if (s.take === undefined) return where;
-      return `${GOOD_LABEL[s.take]} from ${where}${s.max !== undefined ? ` (up to ${s.max})` : ''}${
-        s.fenceRest ? ' — fence the rest' : ''
-      }`;
-    })
-    .join(', then ');
-}
+
 
 
 // §20 (M5a-4): the popover closes itself when a dispatch or a hire leaves no
@@ -47,12 +39,6 @@ export function orderLabel(state: GameState, order: CarterOrder): string {
 export const CloseCtx = createContext<() => void>(() => {});
 
 
-export function undirectedCartsAt(state: GameState, nodeId: NodeId, exceptId?: string): number {
-  return state.carts.filter(
-    (c) =>
-      c.id !== exceptId && !c.carter && c.location.kind === 'node' && c.location.nodeId === nodeId,
-  ).length;
-}
 
 
 /** Dispatch a cart and close the popover if that emptied the yard (§20). */
@@ -66,119 +52,14 @@ export function useSendCart(state: GameState, nodeId: NodeId) {
 }
 
 
-/** §6.11 (M5a-4) — what a carter can bring home from each destination. The
- *  shingle's list follows the Dutchman's trust ladder (§6.9): no menu names
- *  a good he has not yet shown you. */
-export function backOptionsFor(state: GameState, to: NodeId): Good[] {
-  switch (to) {
-    case 'shingle': {
-      const goods: Good[] = ['lace'];
-      if (state.dutchman.fleeceBought >= DUTCHMAN_TRUST_TEA) goods.unshift('tea');
-      if (state.dutchman.fleeceBought >= DUTCHMAN_TRUST_JENEVER) goods.unshift('jenever');
-      return goods;
-    }
-    case 'cutting-house':
-      return ['brandy-gent', 'brandy-fair', 'brandy-rough'];
-    case 'farm':
-      return ['fleece'];
-    default:
-      return [];
-  }
-}
 
 
-/** §6.11 / §10 (M5 tutorial pass) — the Dutchman tutorial, done by hand:
- *  met at the gunwale, and the trade itself made once — wool over the
- *  gunwale, or contraband sold in town (the fence counts). Until then no
- *  standing order names the shingle and no backhaul exists — no carter
- *  automates a trade his master has never made. (M5½ playtest: the old
- *  gate demanded a TOWN contraband sale even for the wool run, which read
- *  as the shingle arriving broken.) */
-export function shingleRoutesOpen(state: GameState): boolean {
-  return state.dutchman.met && (state.dutchman.fleeceBought > 0 || state.contrabandSold > 0);
-}
 
 
-/** §10 — one-line whispers for the smuggled goods, so nothing arrives unnamed. */
-export const GOOD_WHISPER: Partial<Record<Good, string>> = {
-  lace: 'Flanders lace — Ryne pays 24 the parcel, quietly, for about 2 a day. The Crown calls it smuggling.',
-  tea: 'Bohea tea — Ryne drinks 8 chests a day at 7 the chest. The Crown calls it smuggling.',
-  jenever: 'Overproof jenever — no buyer in Ryne will touch it raw. It wants cutting, and cutting wants a house.' };
 
 
-/**
- * Spec §6.10: dispatch buttons carry the warning a marshman's eyes would.
- * True when the officer rides this edge or stands at its far end.
- */
-export function coatOn(state: GameState, edgeId: EdgeId, from: NodeId): boolean {
-  const officer = state.revenue.officer;
-  if (!officer.arrived) return false;
-  if (officer.location.kind === 'edge') return officer.location.edgeId === edgeId;
-  const edge = edgesFor(state.farm, state.cuttingHouse).find((e) => e.id === edgeId);
-  if (!edge) return false;
-  const far = edge.a === from ? edge.b : edge.a;
-  return officer.location.nodeId === far;
-}
 
 
-// §6.14 (M5c) — the leiden ladder, for the workshop's menu. Coin is nominal;
-// the price column is the letter each tier wants sent. (M5½e: moved here from
-// FarmMenu so the bench read-out can name any tree's project without cycles.)
-export const LEIDEN_TIERS: ReadonlyArray<{ name: string; effect: string; price: string }> = [
-  {
-    name: 'Galvanic fence',
-    effect: 'the workshop’s men kill the better',
-    price: 'the wired wall reads for miles' },
-  {
-    name: 'Steam-lighter',
-    effect: 'a hull, sixteen tubs, no bedtime — the sea lane opens',
-    price: 'the engine is loud over water' },
-  {
-    name: 'Aetheric Telegraph',
-    effect: 'the overlay defogs — the Revenue’s mind, live',
-    price: 'the largest letter of all' },
-];
-
-/** §6.14 — marsh research, named for the stone's menu. */
-export const MARSH_TIERS: ReadonlyArray<{ name: string; effect: string; price: string }> = [
-  {
-    name: 'Marsh-lantern haulers',
-    effect: 'night moves read a tenth as loud',
-    price: '+1 Debt each laden night run' },
-  {
-    name: 'Wight-fog',
-    effect: 'a Call in battle: the raiders fight half-blind',
-    price: '+8 Debt each fog' },
-  {
-    name: 'The Hollow Way',
-    effect: 'one marsh track leaves the world’s knowing',
-    price: '+1 Debt each crossing, laden or empty' },
-  {
-    name: 'The Reed-Veil',
-    effect: 'the reeds swallow three parts in four of every work’s showing',
-    price: `+${MARSH_VEIL_DEBT} Debt per hidden building, each dawn it stands` },
-];
-
-/** Every project the one bench can hold, named — index = tier (§6.14). */
-const RESEARCH_NAME: Record<ResearchTree, readonly string[]> = {
-  trade: ['False bottoms'],
-  marsh: MARSH_TIERS.map((t) => t.name),
-  leiden: LEIDEN_TIERS.map((t) => t.name) };
-
-/**
- * §6.14 (M5½e) — the bench's read-out: the active project, named, with its
- * time left to run. Null when the bench is idle. The state was always in
- * `research.active`; this gives it a mouth (the HUD chip, the menus' line).
- */
-export function benchReport(state: GameState): { name: string; left: string } | null {
-  const a = state.research.active;
-  if (!a) return null;
-  const name = RESEARCH_NAME[a.tree][state.research.completed[a.tree]] ?? 'the work';
-  const ticks = Math.max(0, a.doneTick - state.tick);
-  const days = ticks / TICKS_PER_DAY;
-  const left = days >= 1 ? `about ${Math.ceil(days)} day${Math.ceil(days) === 1 ? '' : 's'}` : spanOf(ticks);
-  return { name, left };
-}
 
 /** The bench's line for any menu that offers research: what it holds now. */
 export function BenchNote({ state }: { state: GameState }) {
@@ -191,56 +72,13 @@ export function BenchNote({ state }: { state: GameState }) {
   );
 }
 
-/** '· the blue coat…' suffix for a dispatch button, or empty. */
-export function coatNote(state: GameState, edgeId: EdgeId, from: NodeId): string {
-  return coatOn(state, edgeId, from) ? ' · the blue coat rides it' : '';
-}
-
-
-/** '· lanterns lit' suffix (§6.14 Marsh 1 — M5c playtest): the word is
- *  passive and the game must say when it is working. Night moves over marsh
- *  read a tenth as loud, one Debt the laden run; the button says so at the
- *  moment the choice is made. */
-export function lanternNote(state: GameState, edgeId: EdgeId): string {
-  if (state.research.completed.marsh < 1) return '';
-  if (!(edgeId === 'marsh-track' || edgeId.startsWith('cut-'))) return '';
-  return dayPhaseOf(state.tick) === 'night' ? ' · lanterns lit — a tenth as loud' : '';
-}
 
 
 
-// §20.2 — the goods overlay's short names: one small chip per place, so
-// "which goods are where" is read off the map, not hunted through popovers.
-export const GOOD_SHORT: Record<Good, string> = {
-  fleece: 'white wool',
-  'dark-fleece': 'dark wool',
-  jenever: 'jenever',
-  tea: 'tea',
-  'bulked-tea': 'bulked tea',
-  lace: 'lace',
-  'brandy-rough': 'rough brandy',
-  'brandy-fair': 'brandy',
-  'brandy-gent': 'gent’s brandy' };
 
 
-export function stockRows(store: Partial<Record<Good, number>>): Array<{ text: string; color?: string }> {
-  return (Object.entries(store) as Array<[Good, number]>)
-    .filter(([, n]) => n > 0)
-    .map(([g, n]) => ({
-      text: `${n} ${GOOD_SHORT[g]}`,
-      // contraband reads warm; dark wool reads soot (§6.10 M5½f)
-      color: CONTRABAND.includes(g) ? '#D9A6A0' : g === 'dark-fleece' ? DARK_WOOL_TEXT : undefined,
-    }));
-}
 
 
-/** Units of a good held anywhere the player controls — stores and carts. */
-export function heldAnywhere(state: GameState, good: Good): number {
-  let n = 0;
-  for (const k of Object.keys(state.stores)) n += state.stores[k]?.[good] ?? 0;
-  for (const c of state.carts) n += c.cargo[good] ?? 0;
-  return n;
-}
 
 
 /**
@@ -302,10 +140,6 @@ export function useEnqueue() {
   return useGameStore((s) => s.enqueue);
 }
 
-// The Trade fortification ladder, for the menu (spec §6.12 / §22). Index = tier.
-// Tier 2 says "firing steps", not men (spec §6.12, playtest): the works are a
-// wall for §6.13's garrison to shoot from — the men are posted separately.
-export const FORT_TIER_LABEL = ['open ground', 'dogs & hedge', 'bolted doors & firing steps', 'gunported', 'a fortress'];
 
 
 /**
@@ -331,15 +165,3 @@ export function StoreFill({ count, cap }: { count: number; cap: number }) {
 }
 
 
-/**
- * Spec §20: click the place, not the pixel. Every cart standing at a node
- * shows its business here — cargo, carter, the hire flow, and the dyke.
- */
-/** Where a cart is, in words — for the stable roster (a moving sprite is no
- *  place to hang a button, so the farm lists every cart, §20). */
-export function cartWhereabouts(state: GameState, cart: Cart): string {
-  if (cart.location.kind === 'node') {
-    return `at ${nodeById(cart.location.nodeId, state.farm, state.cuttingHouse).name}`;
-  }
-  return `on ${edgeById(cart.location.edgeId, state.farm, state.cuttingHouse).name.toLowerCase()}`;
-}
