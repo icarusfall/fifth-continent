@@ -4,7 +4,7 @@
 
 
 
-import { HEAT_RED } from '../palette';
+import { HEAT_RED } from '../../shared/palette';
 import { BINDING_CAPACITY, CROSSING_FRONTAGE, DYKE_DEBT, DYKE_PASTURE_HEAD, MARSH_VEIL_DEBT, MARSH_VEIL_DIV, RESEARCH_COST, RESEARCH_DAYS, TICKS_PER_DAY, TRIBUTE_RELIEF, TUB_BOAT_CAPACITY, WIGHT_TRAP_IRON } from '../../sim/balance';
 import { cutWouldMoat, dykeCost, dykeDays, dykePreview, dykeWaterways, stoneRefuses } from '../../sim/dykes';
 import type { WaterwayPair } from '../../sim/dykes';

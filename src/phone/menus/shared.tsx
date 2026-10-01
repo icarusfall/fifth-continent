@@ -6,7 +6,7 @@
 
 
 
-import { GOOD_LABEL, spanOf } from '../format';
+import { GOOD_LABEL, spanOf } from '../../shared/format';
 import {
   DUTCHMAN_TRUST_JENEVER,
   DUTCHMAN_TRUST_TEA,

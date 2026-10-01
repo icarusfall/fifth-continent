@@ -15,8 +15,8 @@
 // features and the seam is only a change of resolution.
 
 import { MAP_HEIGHT, MAP_WIDTH, terrainAt } from '../sim/map';
-import { APRON_TILES, hash2 } from './geometry';
-import { CLAY, DYKE, INK, LIMEWASH, MARSH, MARSH_DARK, SEA } from './palette';
+import { APRON_TILES, hash2 } from '../shared/geometry';
+import { CLAY, DYKE, INK, LIMEWASH, MARSH, MARSH_DARK, SEA } from '../shared/palette';
 
 export const PAINT_RES = 40; // painted px per tile (the world canvas)
 const APRON_RES = 8; // painted px per tile (the apron is only ever seen small)

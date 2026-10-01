@@ -17,7 +17,7 @@ import { clockOf } from '../sim/time';
 import type { GameState } from '../sim/types';
 import { useGameStore } from '../state/store';
 import { useUiStore } from '../state/ui';
-import { HEAT_RED, ROOF } from './palette';
+import { HEAT_RED, ROOF } from '../shared/palette';
 
 /** The day's standing wages: carters (danger money and all), the shearing
  *  lad, the refiner, and every posted man. */

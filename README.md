@@ -6,7 +6,23 @@ A single-player, browser-based god/builder game about smuggling, logistics, and
 the two kinds of magic you can use to hide a crime. Design spec and build brief:
 [the-fifth-continent-spec.md](./the-fifth-continent-spec.md).
 
-**406 tests green · save v25 · M5½ complete · the clean-sheet UI pass shipped.**
+**410 tests green · save v25 · M5½ complete · the desk rework begun (D0).**
+
+---
+
+## Status: the desk rework — D0 ✅ (then D1, the table)
+
+One sim, two games (spec §20.3–20.4). The clean-sheet UI made one interface
+serve a thumb and a mouse, and the desktop lost: a phone column floating over
+the map, and carts that existed only as rows of text in a place's menu. Now
+there are two shells over the same sim and store. `src/phone` is today's UI,
+frozen to bug fixes: the quick game. `src/desk` is **the Smuggler's Table**:
+fixed panels at the edges, carts commanded directly on the map with every
+destination's roads, hours and risk named, a day-ahead strip for the timing
+the whole game turns on, and a lit night under a single WebGL2 compositing
+pass (spec §15.1, option B). D0 is foundations only: the spec, the folder
+split, and the boot switch. The desk is reached by `?desk` until D2 makes it
+playable; everyone else gets the phone exactly as before.
 
 ---
 

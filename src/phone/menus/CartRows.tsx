@@ -4,7 +4,7 @@
 
 
 
-import { GOOD_LABEL, spanOf, storeSummary } from '../format';
+import { GOOD_LABEL, spanOf, storeSummary } from '../../shared/format';
 import { CARTER_DANGER_WAGE, CARTER_MAX_STOPS, CARTER_UNLOCK_FLEECE, CARTER_WAGE, CART_CAPACITY, CART_RESALE, DUTCHMAN_PRICE, DUTCHMAN_TRUST_JENEVER, DUTCHMAN_TRUST_TEA, FARM_STORE_CAPACITY, FENCE_PRICE_MULT, LEIDEN_PRICE_MULT, RYNE_PRICE, TUB_TIDE_MIN, WOOL_PRICE_DOMESTIC } from '../../sim/balance';
 import { dykeWaterways } from '../../sim/dykes';
 import { edgesFor, nodeById } from '../../sim/map';

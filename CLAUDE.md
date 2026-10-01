@@ -19,13 +19,20 @@ in README.md.
 6. Nothing in the game states a date.
 7. Reserved palette colours (Revenue blue `#2E4A6B`, Ichor green `#6FBF8F`,
    Phlogiston orange `#E09B3D`) must not appear until their owners enter the
-   game — declared in `src/ui/palette.ts`.
+   game — declared in `src/shared/palette.ts`.
 
 ## Commands
 
 - `npm test` — full suite; must be green before any commit.
 - `npm run headless [seed] [days]` — scripted-policy game in Node.
 - `npm run dev` / `npm run build` — Vite.
+
+## Two shells (spec §20.3)
+
+`src/phone` is the clean-sheet UI and is **frozen** (bug fixes only).
+`src/desk` is the Smuggler's Table (§20.4), built in D0–D5 order, stopping at
+each. Shell-neutral UI lives in `src/shared`. Neither shell may add state to
+GameState: every verb is an existing Action.
 
 ## Milestones
 
