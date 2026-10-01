@@ -1,16 +1,17 @@
-import { useGameStore } from './state/store';
-import { BattlePlayback } from './ui/BattlePlayback';
-import { BottomBar } from './ui/BottomBar';
-import { EventCard } from './ui/EventCard';
-import { EventLog } from './ui/EventLog';
-import { GameMap } from './ui/GameMap';
-import { Hud } from './ui/Hud';
-import { LedgerPanel } from './ui/LedgerPanel';
-import { useGameLoop } from './ui/useGameLoop';
+import './phone.css';
+import { useGameStore } from '../state/store';
+import { BattlePlayback } from './BattlePlayback';
+import { BottomBar } from './BottomBar';
+import { EventCard } from './EventCard';
+import { EventLog } from './EventLog';
+import { GameMap } from './GameMap';
+import { Hud } from './Hud';
+import { LedgerPanel } from './LedgerPanel';
+import { useGameLoop } from '../shared/useGameLoop';
 
 // The clean-sheet shell (§20): no header — the map IS the screen, and every
 // piece of chrome floats over it. The title lives on the new-game card.
-export default function App() {
+export default function PhoneApp() {
   useGameLoop();
   const state = useGameStore((s) => s.state);
 

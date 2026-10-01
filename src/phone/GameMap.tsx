@@ -27,7 +27,7 @@ import {
   otherEnd } from '../sim/map';
 import { dayPhaseOf, isFlooded } from '../sim/time';
 import { woolOnTheBooks } from '../sim/tick';
-import { REVENUE_BLUE } from './palette';
+import { REVENUE_BLUE } from '../shared/palette';
 import { cutInvites, dykeWaterways } from '../sim/dykes';
 import { CONTRABAND, coverOf, fortVisibility, illicitCount } from '../sim/revenue';
 import type { Cart, EdgeId, GameState, Good, NodeId } from '../sim/types';
@@ -36,7 +36,7 @@ import { useUiStore } from '../state/ui';
 import { Sheet, useIsPhone } from './Sheet';
 import { firstMorningHint, isFreshGame } from './firstMorning';
 import { CameraController } from './camera';
-import { APRON_TILES, pathPoints, pointAlong, TILE, tileCenter, WORLD_H, WORLD_W } from './geometry';
+import { APRON_TILES, pathPoints, pointAlong, TILE, tileCenter, WORLD_H, WORLD_W } from '../shared/geometry';
 import { getApronCanvas, getTerrainCanvas } from './paint';
 import {
   drawCart,

@@ -2,7 +2,7 @@
 
 
 
-import { storeSummary } from '../format';
+import { storeSummary } from '../../shared/format';
 import { CART_COST, CUTTING_HOUSE_COST, FARM_STORE_CAPACITY, MAX_CARTS, MAX_TUB_BOATS, RESEARCH_COST, RESEARCH_DAYS, SHEARER_UNLOCK_SHEARS, SHEARER_WAGE, SHEEP_PRICE_BUY, SHEEP_PRICE_SELL, TICKS_PER_DAY, TUB_BOAT_COST } from '../../sim/balance';
 import { flockCapOf, waterwayTouches } from '../../sim/dykes';
 import { illicitAnywhere } from '../../sim/revenue';

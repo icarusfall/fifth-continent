@@ -12,7 +12,7 @@ import { defenceCeiling, expectedRaid } from '../../sim/raid';
 import { coverOf } from '../../sim/revenue';
 import { garrisonCap } from '../../sim/tick';
 import type { GameState, NodeId } from '../../sim/types';
-import { HEAT_RED } from '../palette';
+import { HEAT_RED } from '../../shared/palette';
 import { BenchNote, FORT_TIER_LABEL, LEIDEN_TIERS, useEnqueue } from './shared';
 /**
  * Spec §6.12 — dig in one rung of the Trade line. The cost is coin now; the

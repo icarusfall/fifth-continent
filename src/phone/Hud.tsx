@@ -30,9 +30,9 @@ import {
 import type { GameState } from '../sim/types';
 import { useGameStore } from '../state/store';
 import { useUiStore } from '../state/ui';
-import { DYKE, HEAT_RED, ICHOR_GREEN, LIMEWASH, REVENUE_BLUE, ROOF, SEA } from './palette';
+import { DYKE, HEAT_RED, ICHOR_GREEN, LIMEWASH, REVENUE_BLUE, ROOF, SEA } from '../shared/palette';
 
-import { spanOf } from './format';
+import { spanOf } from '../shared/format';
 import { benchReport } from './menus/shared';
 import { SystemControls } from './SpeedControls';
 

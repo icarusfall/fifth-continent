@@ -1,0 +1,57 @@
+/* The desk's own sheet (spec §20.4). Palette from spec §15.3. */
+
+:root {
+  --ink: #241c18;
+  --ground: #17120f;
+  --paper: #e8e1d2;
+  --paper-dim: #b9ae9b;
+  --lamp: #f0cf8a;
+  --rule: rgba(232, 225, 210, 0.14);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--ground);
+  color: var(--paper);
+  font-family: Georgia, 'Times New Roman', serif;
+}
+
+.desk-wip {
+  height: 100%;
+  display: grid;
+  place-content: center;
+  gap: 12px;
+  padding: 24px;
+  text-align: center;
+}
+
+.desk-wip h1 {
+  font-weight: 400;
+  margin: 0;
+}
+
+.desk-wip p {
+  color: var(--paper-dim);
+  margin: 0;
+}
+
+.desk-wip button {
+  justify-self: center;
+  font: inherit;
+  color: var(--ink);
+  background: var(--lamp);
+  border: 0;
+  border-radius: 3px;
+  padding: 6px 14px;
+  cursor: pointer;
+}

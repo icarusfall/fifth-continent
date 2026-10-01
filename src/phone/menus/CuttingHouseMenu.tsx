@@ -2,7 +2,7 @@
 
 
 
-import { GOOD_LABEL, storeSummary } from '../format';
+import { GOOD_LABEL, storeSummary } from '../../shared/format';
 import { CUTS, CUTTING_HOUSE_STORE_CAPACITY, CUT_SUGAR_COST, REFINER_UNLOCK, REFINER_WAGE, RYNE_PRICE, SMOUCH_COST, SMOUCH_YIELD } from '../../sim/balance';
 import type { CutDepth, GameState } from '../../sim/types';
 import { CartsAtNode } from './CartRows';

@@ -14,7 +14,10 @@ You are building a single-player, browser-based strategy/builder game. Read this
 - TypeScript + React + Vite
 - **The simulation is a pure function.** `tick(state: GameState, actions: Action[]): GameState`. No side effects, no `Date.now()`, no `Math.random()` — all randomness from a seeded PRNG carried *in* the state. This is the single most important architectural rule in the project.
 - Sim lives in `/src/sim` with **zero React imports**. It must be runnable headlessly in Node.
-- Rendering: SVG or Canvas 2D. No game engine, no physics library.
+- Rendering: Canvas 2D for all drawing. The desk shell (§20.3) adds **one WebGL2
+  compositing pass** over the finished Canvas 2D frame (§15.1) — hand-written, no
+  library — and falls back to plain Canvas 2D where WebGL2 is missing. No game
+  engine, no physics library, no renderer library.
 - State container: Zustand, wrapping the pure sim.
 - Tests: Vitest. Every formula in §6 gets a unit test. A full game must be replayable from `(seed, actionLog)` and produce a byte-identical final state.
 - Persistence: serialise `GameState` to JSON → localStorage. Deployment target is Vercel (static).
@@ -2858,6 +2861,22 @@ debt         += guardianActiveFrames * 2
 - **Layer 2 (overlay):** the Revenue intel map, heat heatmap, route graph. Toggled.
 - **Layer 3 (UI):** React, DOM, above the canvas.
 
+*(The desk rework, 2026-10-01 — option B of three, chosen by the designer over
+Canvas-2D-only and PixiJS.)* On the desk (§20.4) layers 0–1 draw to an
+offscreen **scene canvas**, and a single full-frame WebGL2 fragment shader
+composites it to the screen, with layer 2 and every label drawn on a canvas
+*above* the shader so no text ever ripples. The shader takes the scene, a
+static **water mask** (the sea and every dug channel, painted once with the
+terrain), the lamps (world position, radius, strength — the same list the 2D
+night uses) and the hour, and adds only what 2D cannot: refraction and glints
+on water, foam working the shoreline, wind moving across the fields, bloom
+round each lamp with its light laid on the water as a broken column, fog that
+drifts and thins near light, and a colour grade by the hour. All of it is
+look: nothing the shader does is read by the sim, and nothing may encode
+information the 2D fallback does not also show. The phone keeps plain
+Canvas 2D. A later move to a sprite renderer (PixiJS, once §15.4's building
+art exists) carries this shader over as a filter; nothing is thrown away.
+
 Camera is a single transform: `ctx.setTransform(zoom, 0, 0, zoom, -cam.x*zoom, -cam.y*zoom)`.
 
 ### 15.2 Navigation
@@ -3092,6 +3111,9 @@ the node's popover: a cart in the farmyard is part of the farm's menu (its
 cargo, its carter, its dyke), never a separate sprite to hunt for. Only a
 cart on the road — where there is no place to click — answers for itself.
 
+*(The desk rework: "click the place" is now the **phone** shell's rule. On the
+desk the cart is the actor and is clicked directly — §20.4.)*
+
 **Every cart answers on its own row (M5a-4, playtest).** A node's popover
 lists each cart standing there as a self-contained row — its cargo, its
 carter or "yours to drive", and its own load / sell / send / hire controls.
@@ -3216,6 +3238,115 @@ the log          a floating recent-history card on a desktop; a one-line
 None of this touches GameState: overlay mode, folded groups, open panels
 are UI store only (house rules 1–2), and losing them costs a preference,
 never a tenancy.
+
+### 20.3 Two shells — one sim, two games (the desk rework, 2026-10-01)
+
+The clean-sheet pass made one UI serve a thumb and a mouse, and the desk lost:
+the same menu components either side of 800px gave a desktop a 300px phone
+column floating over the map, thirty controls deep by mid-game, with prose
+between the buttons — and the cart, the game's actor, existed only as a row of
+text inside a place's menu. The designer's diagnosis: two games were being
+built with one interface. So there are two shells over one sim.
+
+```
+src/sim, src/state   shared and untouched by either shell; every verb either
+                     shell offers is an existing Action — no save bump, and
+                     the replay test holds
+src/shared           shell-neutral UI: palette, formatting, map geometry,
+                     the game loop
+src/phone            the clean-sheet UI (§20 above): the quick game, played in
+                     a spare five minutes. FROZEN from 2026-10-01 — bug fixes
+                     only, so the desk is not built on a moving target
+src/desk             the Smuggler's Table (§20.4)
+```
+
+The choice is made at boot (`src/shell.ts`), UI-only and never in the save, so
+a tenancy moves freely between the two: `?desk` / `?phone` override
+everything; then a remembered choice (the settings switch); then detection —
+a fine pointer on a screen at least 1100px wide gets the desk. Until the desk
+is playable end to end (D2 below) detection is gated off and the desk is
+reached by `?desk` alone. Each shell is its own lazily-loaded chunk with its
+own stylesheet. The rules of §20 bind both shells: the map is the truth, no
+modal management screens, a charge is read aloud where it accrues, and
+anything that moves has a control that does not.
+
+### 20.4 The desk — the Smuggler's Table
+
+Carts are the actors and the map is the table. The overwhelm the designer
+asked for comes from a busy map — lanterns moving, the lugger's light, the
+officer's sightline on the road — not from a wall of text.
+
+```
+the table      fixed panels at the edges, never over the place being acted
+               on: THE STABLE (left) — every cart, where it is or which road
+               it is on and for where, its cargo, its hand; THE INSPECTOR
+               (right) — the selection's verbs, a place's grouped as the
+               phone's are (the yard / works & men / the stable), each verb's
+               charge on its button and its explanation folded beneath it,
+               never between buttons; DISPATCHES (top) — event notices as
+               slips that do not stop the clock; THE DAY AHEAD (bottom).
+               No popovers.
+dispatches     every card becomes a slip, except the beats the spec names as
+               pauses (the first rent §6.8, a raid §6.13, Leiden's arrival
+               §6.14, a seizure §6.10): those still stop the world
+the day ahead  a 24-hour strip from now: darkness, the tide curve with high
+               water marked, the lugger's window, the officer's beat, each
+               travelling cart's arrival, the rent. Most decisions in this
+               game are timing; this is where timing is read
+cart command   select a cart (click it, its stable row, or 1–9; Tab cycles)
+               and every place it could go shows a tag: up to two routes,
+               each with its roads, its hours (tide-blind latency, as the
+               ribbons use) and its worst risk named — watched (an officer's
+               beat, the Customs House windows), drowns at high water, or
+               quiet. Click a route to send. A route of more than one road
+               is sent hop by hop — the desk issues each dispatchCart as the
+               cart arrives, exactly as a player's click would, from a queue
+               in the UI store (a reload costs only the queue: the cart
+               waits where it stands). Shift-click chains stops into a draft
+               ROUND, drawn on the map as a numbered loop; Enter hires it as
+               a §6.19 stop list (verbs inferred as there), the button naming
+               the carter's wage
+catching       a moving or crowded cart must never be hard to click:
+                 · the pick area includes the cart's numbered badge, and the
+                   nearest cart under the pointer lights before the click
+                 · THE WORLD LEANS IN: while the pointer rests on a moving
+                   cart the clock drops to its slowest speed, and returns
+                   when the pointer leaves or clicks (UI-only — the store's
+                   tick rate, never GameState)
+                 · a second click on the same spot cycles a pile
+                 · carts at a place park in slots fanned round it and never
+                   stack; past four they fold into a chip that fans on hover
+                 · the stable row and number key are every cart's stationary
+                   home
+the look       §15 on the desk: the marsh as Romney's field-and-ditch
+               pattern (calm, low contrast, never the dappled camouflage the
+               designer rejected); a lit night — windows, the cutting house
+               fire, every cart's lantern, the lugger's signal, the
+               officer's lamp, punched out of the dark as a light map; the
+               tide visibly over the flats and drowning the marsh track by
+               the coast; cloud shadows by day, mist by night; the §15.1
+               shader pass. Lamp light is warm limewash, never Phlogiston
+               orange (§15.3). Weather is LOOK ONLY until a formula gives it
+               a consequence (§16.1's noise is the obvious hook)
+```
+
+Build order — stop at each for review, as ever:
+```
+D0  this section, §0 and §15.1 written; the folder split; the boot switch.
+    The phone plays exactly as before
+D1  the table: layout, the stable, the inspector, dispatches; every place's
+    verbs ported. No popovers
+D2  cart command: tags, send, hop queue, rounds, catching. DESK_READY on
+D3  the day ahead
+D4  the look: field terrain, the lit night, the tide, mist; the shader pass;
+    then building and cart art
+D5  the designer's playtest at a desk, then tuning
+```
+
+*Decisions taken (2026-10-01):* the phone UI frozen; carts clicked directly on
+the desk; the playable mock's direction approved ("a GREAT improvement");
+rendering option B (Canvas 2D plus one WebGL2 pass) over A (2D only) and C
+(PixiJS, deferred until there is sprite art worth lighting).
 
 ---
 

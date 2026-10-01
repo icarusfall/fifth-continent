@@ -2,7 +2,7 @@
 
 
 
-import { GOOD_LABEL } from '../format';
+import { GOOD_LABEL } from '../../shared/format';
 import { DAILY_DEMAND, LEIDEN_PRICE_MULT, ROUND_COST, RUMOUR_TRUST, TICKS_PER_DAY, WOOL_PRICE_DOMESTIC } from '../../sim/balance';
 import { CONTRABAND, illicitAnywhere } from '../../sim/revenue';
 import type { GameState, Good } from '../../sim/types';
