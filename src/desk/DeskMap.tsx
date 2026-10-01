@@ -50,6 +50,9 @@ import { cargoCount } from '../shared/words';
 import { useGameStore } from '../state/store';
 import { useDeskUi } from './deskUi';
 import type { DeskSelection } from './sheet';
+import { Tags } from './Tags';
+import { draftStops } from './command';
+import { routeRisk, routesBetween, type Route } from './routes';
 
 const LAMP = '#F0CF8A';
 
@@ -172,6 +175,67 @@ function hitTest(state: GameState, x: number, y: number): DeskSelection | null {
     if (d <= t.r && (!best || score < best.d)) best = { sel: t.sel, d: score };
   }
   return best?.sel ?? null;
+}
+
+/** Every cart under the pointer, nearest first — a second click on a pile
+ *  takes the next one (§20.4's catching). */
+function cartsAt(state: GameState, x: number, y: number): string[] {
+  return state.carts
+    .map((c) => {
+      const p = cartPos(state, c);
+      return p ? { id: c.id, d: Math.hypot(x - p.x, y - p.y) } : null;
+    })
+    .filter((o): o is { id: string; d: number } => !!o && o.d <= 16)
+    .sort((a, b) => a.d - b.d)
+    .map((o) => o.id);
+}
+
+/** A route's points in world px, leg by leg, each leg the way it is ridden. */
+function routePoints(route: Route): Array<{ x: number; y: number }> {
+  const pts: Array<{ x: number; y: number }> = [];
+  for (const leg of route.legs) {
+    const p = pathPoints(leg.edge, leg.from !== leg.edge.a);
+    pts.push(...(pts.length ? p.slice(1) : p));
+  }
+  return pts;
+}
+
+const TONE_STROKE: Record<string, string> = {
+  quiet: '#9fbf7a',
+  seen: '#e0c27a',
+  watched: '#e0837a',
+  water: '#8fb2b5',
+};
+
+function strokeRoute(
+  ctx: CanvasRenderingContext2D,
+  pts: Array<{ x: number; y: number }>,
+  color: string,
+  width: number,
+  zoom: number,
+  dash: number[] | null,
+): void {
+  if (pts.length < 2) return;
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+  ctx.strokeStyle = 'rgba(36, 28, 24, 0.7)';
+  ctx.lineWidth = (width + 2.4) / zoom;
+  ctx.stroke();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width / zoom;
+  if (dash) {
+    ctx.setLineDash(dash.map((d) => d / zoom));
+    ctx.lineDashOffset = -performance.now() / 50 / zoom;
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+function routeToneOf(state: GameState, route: Route): string {
+  return routeRisk(state, route).tone;
 }
 
 function routesVisible(state: GameState): boolean {
@@ -326,6 +390,35 @@ export function DeskMap() {
         ctx.stroke();
         ctx.restore();
       };
+      // Cart command's lines (D2): the selected cart's standing round, faint;
+      // its journey still to ride; the round being drafted, numbered; and,
+      // brightest, the route under the pointer, in its risk's colour.
+      const selCart = ui.selection?.kind === 'cart' ? s.carts.find((c) => c.id === (ui.selection as { id: string }).id) : null;
+      if (selCart?.carter && !(ui.draft && ui.draft.cartId === selCart.id)) {
+        const st = selCart.carter.stops;
+        for (let i = 0; i < st.length; i++) {
+          const r = routesBetween(s, selCart, st[i].at, st[(i + 1) % st.length].at, 1)[0];
+          if (r) strokeRoute(ctx, routePoints(r), 'rgba(232, 225, 210, 0.6)', 2.2, cam.zoom, [6, 6]);
+        }
+      }
+      for (const [cartId, j] of Object.entries(ui.journeys)) {
+        const rest = { legs: j.route.legs.slice(Math.max(0, j.next - 1)), ticks: 0 };
+        strokeRoute(ctx, routePoints(rest), cartId === selCart?.id ? LAMP : 'rgba(240, 207, 138, 0.45)', 2.6, cam.zoom, [8, 5]);
+      }
+      if (ui.draft && selCart && ui.draft.cartId === selCart.id) {
+        const stops = draftStops(s, ui.draft);
+        for (let i = 0; i < stops.length; i++) {
+          const closing = i === stops.length - 1;
+          if (closing && stops.length < 3) continue; // a two-stop round reads as one line
+          const r = routesBetween(s, selCart, stops[i].at, stops[(i + 1) % stops.length].at, 1)[0];
+          if (r) strokeRoute(ctx, routePoints(r), closing ? 'rgba(240, 207, 138, 0.55)' : LAMP, closing ? 2.2 : 3.4, cam.zoom, closing ? [3, 6] : [10, 5]);
+        }
+      }
+      const hr = ui.hoverRoute;
+      if (hr) {
+        const tone = routeToneOf(s, hr.route);
+        strokeRoute(ctx, routePoints(hr.route), TONE_STROKE[tone], 4.4, cam.zoom, [12, 6]);
+      }
       ring(hoverRef.current, 0.55, false);
       ring(ui.selection, 1, true);
 
@@ -352,6 +445,64 @@ export function DeskMap() {
         ctx.fillText(String(i + 1), sp.x - 14, sp.y - 13.5);
         ctx.restore();
       });
+
+      if (ui.draft && selCart && ui.draft.cartId === selCart.id) {
+        draftStops(s, ui.draft).forEach((stop, i) => {
+          const at = placeAt(s, stop.at);
+          if (!at) return;
+          const sp = cam.worldToScreen(at.x, at.y);
+          ctx.save();
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          const x = sp.x + 22 + i * 4;
+          const y = sp.y - 24 - i * 4;
+          ctx.beginPath();
+          ctx.arc(x, y, 10, 0, Math.PI * 2);
+          ctx.fillStyle = LAMP;
+          ctx.fill();
+          ctx.lineWidth = 1.5;
+          ctx.strokeStyle = '#241C18';
+          ctx.stroke();
+          ctx.fillStyle = '#241C18';
+          ctx.font = 'bold 12px Georgia, serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(String(i + 1), x, y + 0.5);
+          ctx.restore();
+        });
+      }
+
+      // Pin each destination tag beside its place, inside the free table
+      // between the panels, and never off the screen.
+      const tags = shell.querySelectorAll<HTMLElement>('[data-anchor]');
+      const leftBound = Math.min(296, w * 0.25);
+      const rightBound = w - Math.min(404, w * 0.3);
+      // Place each tag, then let them stack: a tag that would land on another
+      // slides down below it, so no route is ever hidden under a neighbour.
+      const placed: Array<{ el: HTMLElement; left: number; top: number; w: number; h: number }> = [];
+      tags.forEach((el) => {
+        const at = placeAt(s, el.dataset.anchor!);
+        if (!at) return;
+        const sp = cam.worldToScreen(at.x, at.y);
+        const tw = el.offsetWidth;
+        const th = el.offsetHeight;
+        placed.push({
+          el,
+          left: Math.max(leftBound, Math.min(sp.x + 26, rightBound - tw - 8)),
+          top: Math.max(8, Math.min(sp.y + 18, h - th - 8)),
+          w: tw,
+          h: th,
+        });
+      });
+      placed.sort((a, b) => a.top - b.top);
+      for (let i = 0; i < placed.length; i++) {
+        const t = placed[i];
+        for (let k = 0; k < i; k++) {
+          const o = placed[k];
+          const overlapX = t.left < o.left + o.w && o.left < t.left + t.w;
+          if (overlapX && t.top < o.top + o.h + 6 && o.top < t.top + t.h) t.top = o.top + o.h + 6;
+        }
+        t.el.style.transform = `translate(${Math.round(t.left)}px, ${Math.round(t.top)}px)`;
+      }
 
       if (ui.placing && hoverTileRef.current) {
         const t = hoverTileRef.current;
@@ -402,6 +553,13 @@ export function DeskMap() {
       ui.setPlacing(false);
       return;
     }
+    // A second click on a pile of carts takes the next one in it.
+    const pile = cartsAt(s, w.x, w.y);
+    if (pile.length > 1 && ui.selection?.kind === 'cart' && pile.includes(ui.selection.id)) {
+      const next = pile[(pile.indexOf(ui.selection.id) + 1) % pile.length];
+      ui.select({ kind: 'cart', id: next });
+      return;
+    }
     ui.select(hitTest(s, w.x, w.y));
   };
 
@@ -427,6 +585,8 @@ export function DeskMap() {
         const w = cam.screenToWorld(p.x, p.y);
         const s = useGameStore.getState().state;
         hoverRef.current = hitTest(s, w.x, w.y);
+        const hc = hoverRef.current?.kind === 'cart' ? s.carts.find((c) => c.id === (hoverRef.current as { id: string }).id) : null;
+        useDeskUi.getState().setLeaning(!!hc && hc.location.kind === 'edge');
         hoverTileRef.current = { x: Math.floor(w.x / TILE), y: Math.floor(w.y / TILE) };
         shellRef.current!.style.cursor = useDeskUi.getState().placing ? 'crosshair' : hoverRef.current ? 'pointer' : 'grab';
       }}
@@ -440,10 +600,12 @@ export function DeskMap() {
       }}
       onPointerLeave={() => {
         hoverRef.current = null;
+        useDeskUi.getState().setLeaning(false);
       }}
       onClick={onClick}
     >
       <canvas ref={canvasRef} className="desk-canvas" />
+      <Tags />
       <NightVeil />
       {placing && (
         <div className="placing-banner">

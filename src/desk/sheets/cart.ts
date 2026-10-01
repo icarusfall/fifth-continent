@@ -274,13 +274,18 @@ export function cartSheet(state: GameState, cartId: string): Sheet | null {
     });
   }
   sections.push({ key: 'last', title: 'and', lines: [], verbs: last });
-  if (!cart.carter) {
-    sections.push({
-      key: 'hire-note',
-      lines: [{ text: 'Hiring a hand and writing him a round arrive with the next stage of the desk.', tone: 'quiet' }],
-      verbs: [],
-    });
-  }
+  sections.push({
+    key: 'command',
+    lines: [
+      {
+        text: cart.carter
+          ? `Click places on the map to write the ${handOf(cart)} a new round.`
+          : 'Click a route on the map to send it. Shift-click places to write a round, and hire a hand to ride it.',
+        tone: 'quiet',
+      },
+    ],
+    verbs: [],
+  });
 
   return {
     kicker: cart.carter ? `a cart · ${handOf(cart)} on the reins` : 'a cart · yours to drive',

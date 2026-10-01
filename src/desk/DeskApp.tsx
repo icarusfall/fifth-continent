@@ -10,14 +10,17 @@ import { Inspector } from './Inspector';
 import { Stable } from './Stable';
 import { TopBar } from './TopBar';
 import { useDeskUi } from './deskUi';
+import { useJourneys, useLeaning } from './command';
 
 // THE SMUGGLER'S TABLE (spec §20.4). The map is the table; the panels sit at
 // its edges and never cover the place being acted on: the stable on the left,
 // the inspector on the right, dispatches pinned at the top. No popovers.
-// D1: the table and every place's verbs. D2 brings cart command on the map.
+// D1: the table and every place's verbs. D2: cart command on the map.
 export default function DeskApp() {
   useGameLoop();
   useDeskKeys();
+  useJourneys();
+  useLeaning();
   const lost = useGameStore((s) => s.state.lost);
   return (
     <div className="desk">

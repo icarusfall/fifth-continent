@@ -6,11 +6,26 @@ A single-player, browser-based god/builder game about smuggling, logistics, and
 the two kinds of magic you can use to hide a crime. Design spec and build brief:
 [the-fifth-continent-spec.md](./the-fifth-continent-spec.md).
 
-**424 tests green · save v26 · M5½ complete · the desk rework: D1, the table (`?desk`).**
+**432 tests green · save v26 · M5½ complete · the desk rework: D2, cart command — the desk is on.**
 
 ---
 
-## Status: the desk rework — D1, the table ✅ (then D2, cart command)
+## Status: the desk rework — D2, cart command ✅ (then D3, the day ahead)
+
+A desktop browser now opens **the Smuggler's Table** by default (`?phone` for
+the old layout; the desk's bar has a button too). Select a cart and every place
+it can reach wears a tag: two routes, their roads, their hours, and what each
+risks — watched, open marsh, drowns at high water, the blue coat on it now.
+Hover a route and it lights on the map in its risk's colour; click to send. A
+journey of several roads drives itself, waiting on the tide where it must.
+Shift-click places to write a round: it draws as a numbered loop, the inspector
+lists each stop with what he picks up there (wool by the colour its next sale
+wants), names any wool sent the wrong way, and Enter hires him. Hover a moving
+cart and the world leans in — the clock drops to the amble until you let go.
+
+---
+
+## Earlier: the desk rework — D1, the table
 
 `?desk` now opens **the Smuggler's Table**: the map in the middle, the stable
 on the left (every cart, where it is, its load in colour, its hand), the
