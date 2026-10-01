@@ -4,6 +4,8 @@
 
 
 
+import { woolMismatches } from '../../sim/wool';
+import { HEAT_RED } from '../../shared/palette';
 import { GOOD_LABEL, spanOf, storeSummary } from '../../shared/format';
 import { CARTER_DANGER_WAGE, CARTER_MAX_STOPS, CARTER_UNLOCK_FLEECE, CARTER_WAGE, CART_CAPACITY, CART_RESALE, DUTCHMAN_PRICE, DUTCHMAN_TRUST_JENEVER, DUTCHMAN_TRUST_TEA, FARM_STORE_CAPACITY, FENCE_PRICE_MULT, LEIDEN_PRICE_MULT, RYNE_PRICE, TUB_TIDE_MIN, WOOL_PRICE_DOMESTIC } from '../../sim/balance';
 import { dykeWaterways } from '../../sim/dykes';
@@ -68,6 +70,14 @@ export function cargoButtons(
     case 'ryne': {
       for (const [good, n] of cargoEntries) {
         if (n <= 0 || good === 'jenever') continue;
+        if (good === 'dark-fleece') {
+          btns.push(
+            <button key="sell-dark" disabled title="Dark wool was never on your books. The lugger takes it; nobody in Ryne will.">
+              {n} dark wool · the stapler won&rsquo;t weigh it
+            </button>,
+          );
+          continue;
+        }
         const appetite = state.demandRemaining[good] ?? 0;
         const q = Math.min(n, appetite);
         btns.push(
@@ -104,14 +114,24 @@ export function cargoButtons(
       const d = state.dutchman;
       if (!d.present) break;
       const beachPrice = WOOL_PRICE_DOMESTIC * LEIDEN_PRICE_MULT;
-      const fleeceSale = Math.min(cart.cargo.fleece ?? 0, d.fleeceAppetite);
+      // §6.10 M5½f — he takes both colours, dark first; white that goes over
+      // the side is named on the button, before the audit names it.
+      const darkSale = Math.min(cart.cargo['dark-fleece'] ?? 0, d.fleeceAppetite);
+      const whiteSale = Math.min(cart.cargo.fleece ?? 0, d.fleeceAppetite - darkSale);
+      const fleeceSale = darkSale + whiteSale;
       if (fleeceSale > 0) {
         btns.push(
           <button
             key="sell-dutchman"
+            title={
+              whiteSale > 0
+                ? 'White wool is on your books. What goes over the side must still show when the officer counts — every fleece is Heat at the audit.'
+                : 'Dark wool was never on your books. It leaves no trace.'
+            }
             onClick={() => enqueue({ type: 'sellToDutchman', cartId: cart.id })}
           >
-            Sell {fleeceSale} fleece · {fleeceSale * beachPrice} coin
+            Sell {fleeceSale} wool · {fleeceSale * beachPrice} coin
+            {whiteSale > 0 ? ` · ${whiteSale} white: +${whiteSale} Heat at the audit` : ''}
           </button>,
         );
       }
@@ -448,6 +468,8 @@ export function CartsAtNode({
    */
   const knownGoods = (): Good[] => {
     const goods: Good[] = ['fleece'];
+    // §6.10 M5½f — dark wool is nameable once the lugger is (or any exists).
+    if (state.dutchman.unlocked || state.ledger.books === 'short') goods.push('dark-fleece');
     if (state.dutchman.met) goods.push('lace');
     if (state.dutchman.fleeceBought >= DUTCHMAN_TRUST_TEA) goods.push('tea');
     if (state.dutchman.fleeceBought >= DUTCHMAN_TRUST_JENEVER) goods.push('jenever');
@@ -521,7 +543,8 @@ export function CartsAtNode({
                   }. ` +
                   (cart.carter.stops.some((s) => s.at === 'shingle')
                     ? 'He deals over the gunwale when the lugger stands off, and waits when it does not.'
-                    : 'He minds the tide and nothing else.')
+                    : 'He minds the tide and nothing else.') +
+                  woolMismatches(cart.carter.stops).map((w) => ` ${w}`).join('')
                 : ` · no ${handOf(cart)} — yours to drive`}
             </p>
             <div className="menu-buttons">
@@ -622,6 +645,11 @@ export function CartsAtNode({
                         {node === 'shingle' ? ' · danger money' : ''}
                         {adrift ? ' · no way there for this hull' : ''}
                       </button>
+                    ))}
+                    {woolMismatches(hiring.stops).map((w) => (
+                      <p key={w} className="flavour" style={{ color: HEAT_RED }}>
+                        {w}
+                      </p>
                     ))}
                     {roundIsSayable(hiring.stops) && (
                       <button

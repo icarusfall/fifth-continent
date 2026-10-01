@@ -5,6 +5,7 @@
 
 import { create } from 'zustand';
 import {
+  FLEECE_PER_HEAD_PER_DAY,
   BINDING_CAPACITY,
   CART_CAPACITY,
   CART_COST,
@@ -88,7 +89,10 @@ import type {
 //      migrates, and walks a live save back down off the Dragoon rung.
 // v25: M5½d — the standing order becomes a list of stops (§6.19); carts carry
 //      a stop cursor. Chain migrates; legacy orders still replay.
-const SAVE_KEY = 'fifth-continent-save-v25';
+// v26: M5½f — white wool and dark wool (§6.10): ledger.books replaces the
+//      declared-yield dial, darkReady joins. Chain migrates.
+const SAVE_KEY = 'fifth-continent-save-v26';
+const SAVE_KEY_V25 = 'fifth-continent-save-v25';
 const SAVE_KEY_V24 = 'fifth-continent-save-v24';
 const SAVE_KEY_V23 = 'fifth-continent-save-v23';
 const SAVE_KEY_V22 = 'fifth-continent-save-v22';
@@ -607,9 +611,9 @@ const MILESTONES: Milestone[] = [
     // §6.10 — the books become a decision at first owling, and not before:
     // until then the agent keeps them square with the flock, unasked.
     key: 'take-up-the-pen',
-    when: (s) => s.dutchman.fleeceBought > 0 && !s.ledger.penTaken,
+    when: (s) => s.dutchman.fleeceBought > 0 && s.ledger.books === 'square',
     title: 'Take up the pen',
-    body: 'That wool crossed the gunwale and left no trace — but the book still swears the flock’s whole clip, and sworn wool must show when the Revenue counts. In THE LEDGER you may teach the book to swear less — scrapie, if anyone asks — and owl the difference free. Mind: the wool-stapler buys in town only wool the book has admitted and not yet sold, and the pen writes tomorrow’s page, not today’s.',
+    body: 'That wool went over the gunwale — but the book swears to every fleece the flock grows, and sworn wool must show when the Revenue counts. In THE LEDGER you may keep SHORT BOOKS: from the next dawn half of every clip grows DARK — wool the page never admits, free for the lugger. The other half stays WHITE, and white is the only wool the stapler in Ryne will buy. Send the dark to the shingle and the white to town, and the arithmetic keeps itself.',
   },
   {
     key: 'cutting-house',
@@ -918,6 +922,26 @@ function migrateV24(parsed: SaveFile): SaveFile {
   return parsed;
 }
 
+/**
+ * v25 → v26 (§6.10 M5½f): the dial becomes a switch. A pen taken below the
+ * flock's clip was a short page; anything else was square. Wool already held
+ * stays white — the colours start with tomorrow's clip.
+ */
+function migrateV25(parsed: SaveFile): SaveFile {
+  const st = parsed.state as GameState & {
+    ledger: GameState['ledger'] & { declaredYield?: number; penTaken?: boolean };
+  };
+  if (!st?.ledger) return parsed;
+  if (typeof st.ledger.books !== 'string') {
+    const clip = st.flockSize * FLEECE_PER_HEAD_PER_DAY;
+    st.ledger.books = st.ledger.penTaken && (st.ledger.declaredYield ?? clip) < clip ? 'short' : 'square';
+  }
+  delete st.ledger.declaredYield;
+  delete st.ledger.penTaken;
+  if (typeof st.darkReady !== 'number') st.darkReady = 0;
+  return parsed;
+}
+
 function loadSave(): SaveFile | null {
   try {
     let raw = localStorage.getItem(SAVE_KEY);
@@ -928,6 +952,11 @@ function loadSave(): SaveFile | null {
     let fromV22 = false;
     let fromV23 = false;
     let fromV24 = false;
+    let fromV25 = false;
+    if (!raw) {
+      raw = localStorage.getItem(SAVE_KEY_V25);
+      fromV25 = raw !== null;
+    }
     if (!raw) {
       raw = localStorage.getItem(SAVE_KEY_V24);
       fromV24 = raw !== null;
@@ -969,6 +998,9 @@ function loadSave(): SaveFile | null {
     if (fromV18 || fromV19 || fromV20 || fromV21 || fromV22 || fromV23 || fromV24) {
       parsed = migrateV24(parsed);
     }
+    if (fromV18 || fromV19 || fromV20 || fromV21 || fromV22 || fromV23 || fromV24 || fromV25) {
+      parsed = migrateV25(parsed);
+    }
     if (parsed.version !== 1 || typeof parsed.state?.tick !== 'number') return null;
     if (typeof parsed.state.farm?.x !== 'number' || typeof parsed.state.fleeceReady !== 'number')
       return null;
@@ -979,7 +1011,7 @@ function loadSave(): SaveFile | null {
     if (
       typeof parsed.state.heat?.regional !== 'number' ||
       typeof parsed.state.revenue?.officer?.arrived !== 'boolean' ||
-      typeof parsed.state.ledger?.declaredYield !== 'number'
+      typeof parsed.state.ledger?.books !== 'string'
     )
       return null;
     if (!parsed.state.fortifications || typeof parsed.state.fortifications !== 'object') return null;
@@ -1005,7 +1037,7 @@ function loadSave(): SaveFile | null {
       typeof parsed.state.dutchman?.fleeceBought !== 'number'
     )
       return null;
-    if (typeof parsed.state.ledger?.penTaken !== 'boolean') return null;
+    if (typeof parsed.state.darkReady !== 'number') return null;
     if (
       typeof parsed.state.debt !== 'number' ||
       typeof parsed.state.boundWights !== 'number' ||

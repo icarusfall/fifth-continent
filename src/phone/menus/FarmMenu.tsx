@@ -154,7 +154,10 @@ export function FarmMenu({
       <p className="flavour">
         {state.flockSize} sheep of a pasture for {flockCapOf(state)}
         {state.sheepArriving > 0 ? ` (+${state.sheepArriving} on the drove road)` : ''} ·{' '}
-        {state.fleeceReady} wool on their backs · barn {stored}/
+        {state.darkReady > 0
+          ? `${state.fleeceReady} white and ${state.darkReady} dark wool on their backs`
+          : `${state.fleeceReady} wool on their backs`}{' '}
+        · barn {stored}/
         {FARM_STORE_CAPACITY}: {storeSummary(barn, 'empty')}
       </p>
       <StoreFill count={stored} cap={FARM_STORE_CAPACITY} />
@@ -164,8 +167,8 @@ export function FarmMenu({
           <Group id="farm-yard" title="the yard">
           <div className="menu-buttons">
             <button
-              disabled={state.fleeceReady <= 0}
-              title={state.fleeceReady <= 0 ? 'The wool grows by dawn.' : undefined}
+              disabled={state.fleeceReady + state.darkReady <= 0}
+              title={state.fleeceReady + state.darkReady <= 0 ? 'The wool grows by dawn.' : undefined}
               onClick={() => enqueue({ type: 'shear' })}
             >
               Shear

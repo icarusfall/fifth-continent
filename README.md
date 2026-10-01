@@ -6,7 +6,25 @@ A single-player, browser-based god/builder game about smuggling, logistics, and
 the two kinds of magic you can use to hide a crime. Design spec and build brief:
 [the-fifth-continent-spec.md](./the-fifth-continent-spec.md).
 
-**410 tests green · save v25 · M5½ complete · the desk rework begun (D0).**
+**424 tests green · save v26 · M5½ complete · the desk rework begun (D0).**
+
+---
+
+## Status: white wool and dark wool — the books become a switch ✅ (spec §6.10 M5½f)
+
+*"Even I don't really understand how to use the ledger to optimise play. I just
+went max crime."* The declared-yield dial had two positions anyone used, and
+every smuggling bot set it to exactly the floor. Worse, it was half a strategy:
+the routes that had to match it lived elsewhere, and nothing connected them. So
+the dial is now a switch, **Square** or **Short**, and the lie has a colour. The
+books split the wool at the shears: square books grow every fleece **white**;
+short books grow half **dark**. Ryne's stapler weighs white wool only; the
+lugger takes either, dark first, and white over the side is what the audit
+finds. Dark wool the officer finds at the farm is written onto the page — Heat
+once, and it turns white. The maths underneath is unchanged; following a
+strategy is now watching colours, not doing sums. A round that sends dark wool
+to Ryne or white to the lugger says so where it is written. Save v26 migrates
+the dial onto the switch; old action logs replay through it.
 
 ---
 

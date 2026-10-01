@@ -11,3 +11,4 @@ export * from './raid';
 export * from './tick';
 export * from './run';
 export * from './policy';
+export * from './wool';

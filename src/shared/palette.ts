@@ -11,6 +11,13 @@ export const DYKE = '#5E7A7D';
 export const LIMEWASH = '#E8E1D2'; // sheep, shingle, plaster
 export const ROOF = '#A85D4A';
 
+// §6.10 M5½f — the two colours of wool. White is the limewash of the sheep;
+// dark is soot-brown — never a reserved colour, never Heat red. The text tone
+// is the same soot lifted so it reads on the ink panels.
+export const WHITE_WOOL = LIMEWASH;
+export const DARK_WOOL = '#5C4B40';
+export const DARK_WOOL_TEXT = '#B9A592';
+
 // Unlocked in M3: the Revenue entered the game wearing the coat (spec §6.10),
 // and Heat is now a number the player reads.
 export const REVENUE_BLUE = '#2E4A6B';

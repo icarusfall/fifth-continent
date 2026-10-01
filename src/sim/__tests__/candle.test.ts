@@ -78,8 +78,7 @@ describe('under the candle (§6.15): the world notes, and does not pounce', () =
       st.coin = 0;
       st.fleeceReady = 0;
       st.ledger = {
-        declaredYield: 4,
-        penTaken: true,
+        books: 'short',
         declaredToDate: 8,
         grownToDate: 24,
         soldLawfully: 20, // sold far past the page: a gap of 12
@@ -116,8 +115,7 @@ describe('the pen and the page (§6.10, M5c playtest)', () => {
     const s = initialState(1);
     s.fleeceReady = 0;
     s.ledger = {
-      declaredYield: 4,
-      penTaken: true,
+      books: 'short',
       declaredToDate: 12, // three days at 4…
       grownToDate: 48, // …against a flock giving 16
       soldLawfully: 12,
@@ -129,18 +127,19 @@ describe('the pen and the page (§6.10, M5c playtest)', () => {
     expect(auditGapNow(s) * WOOL_GAP_COEFF).toBeGreaterThan(0);
   });
 
-  it('returnPen hands the book back: the agent squares it and keeps it square', () => {
+  it('the legacy pen actions replay through the switch (§6.10 M5½f)', () => {
     let s = initialState(1);
     s = tick(s, [{ type: 'setDeclaredYield', fleecePerDay: 4 }]);
-    expect(s.ledger.penTaken).toBe(true);
+    expect(s.ledger.books).toBe('short');
     s = tick(s, [{ type: 'returnPen' }]);
-    expect(s.ledger.penTaken).toBe(false);
-    expect(s.ledger.declaredYield).toBe(s.flockSize * FLEECE_PER_HEAD_PER_DAY);
+    expect(s.ledger.books).toBe('square');
     expect(s.log.some((e) => e.text.includes('hand the pen back'))).toBe(true);
-    // The flock grows; the agent's page follows it without another word.
+    s = tick(s, [{ type: 'setDeclaredYield', fleecePerDay: s.flockSize * FLEECE_PER_HEAD_PER_DAY }]);
+    expect(s.ledger.books).toBe('square');
+    // Square books follow the flock without another word: the whole clip is white.
     s.flockSize += 4;
     s = runTicks(s, TICKS_PER_DAY);
-    expect(s.ledger.declaredYield).toBe(s.flockSize * FLEECE_PER_HEAD_PER_DAY);
+    expect(s.darkReady).toBe(0);
   });
 });
 

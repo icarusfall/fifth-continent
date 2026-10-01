@@ -329,7 +329,10 @@ export function Hud({ state }: { state: GameState }) {
           </div>
           <div className="hud-block">
             <span className="hud-label">Wool on flock</span>
-            <span className="hud-coin">{state.fleeceReady}</span>
+            <span className="hud-coin">
+              {state.fleeceReady + state.darkReady}
+              {state.darkReady > 0 ? ` (${state.darkReady} dark)` : ''}
+            </span>
           </div>
           <div className="hud-block">
             <span className="hud-label">The world&rsquo;s grip</span>

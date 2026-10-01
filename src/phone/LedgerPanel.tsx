@@ -5,19 +5,30 @@
 
 import {
   CREW_WAGE,
+  FLEECE_PER_HEAD_PER_DAY,
   MILITIA_WAGE,
   REFINER_WAGE,
   SHEARER_WAGE,
   TICKS_PER_DAY,
 } from '../sim/balance';
 import { forecastDay } from '../sim/forecast';
-import { auditGapNow, CONTRABAND } from '../sim/revenue';
-import { carterWageOf, rentAmount, woolOnTheBooks } from '../sim/tick';
+import { auditGapNow, CONTRABAND, darkOnHand } from '../sim/revenue';
+import { whiteShare } from '../sim/wool';
+import { carterWageOf, rentAmount } from '../sim/tick';
 import { clockOf } from '../sim/time';
 import type { GameState } from '../sim/types';
 import { useGameStore } from '../state/store';
 import { useUiStore } from '../state/ui';
-import { HEAT_RED, ROOF } from '../shared/palette';
+import { DARK_WOOL, HEAT_RED, ROOF, WHITE_WOOL } from '../shared/palette';
+
+/** §6.10 M5½f — the wool's colour, named in its colour. */
+function WoolChip({ kind }: { kind: 'white' | 'dark' }) {
+  return (
+    <span className={`wool-chip ${kind}`} style={{ background: kind === 'white' ? WHITE_WOOL : DARK_WOOL }}>
+      {kind}
+    </span>
+  );
+}
 
 /** The day's standing wages: carters (danger money and all), the shearing
  *  lad, the refiner, and every posted man. */
@@ -45,7 +56,9 @@ export function LedgerPanel({ state }: { state: GameState }) {
   const l = state.ledger;
   const rent = rentAmount(state);
   const wages = wageBill(state);
-  const honest = l.declaredYield >= state.flockSize;
+  const clip = state.flockSize * FLEECE_PER_HEAD_PER_DAY;
+  const white = whiteShare(l.books, clip);
+  const darkHere = darkOnHand(state);
   const forecast = forecastDay(state);
   // §20.1 — urgent when the purse is short inside two days of the due.
   const rentUrgent =
@@ -113,66 +126,58 @@ export function LedgerPanel({ state }: { state: GameState }) {
           {state.dutchman.unlocked && (
             <section>
               <h5>the books</h5>
-              <p>
-                The page swears the flock gives <strong>{l.declaredYield}</strong> fleece a day
-                (it gives {state.flockSize}).
-              </p>
-              <div className="ledger-controls">
+              {/* §6.10 M5½f — the dial became a switch, and the lie a colour:
+                  each side reads its trade aloud where it is set. */}
+              <div className="books-switch" role="group" aria-label="How the books are kept">
                 <button
-                  disabled={l.declaredYield <= 0}
-                  title="Scrapie, if anyone asks — from tomorrow's page. Undeclared wool never existed, and must vanish."
-                  onClick={() =>
-                    enqueue({ type: 'setDeclaredYield', fleecePerDay: l.declaredYield - 1 })
-                  }
+                  className={l.books === 'square' ? 'on' : undefined}
+                  aria-pressed={l.books === 'square'}
+                  onClick={() => enqueue({ type: 'setBooks', books: 'square' })}
                 >
-                  −
+                  Square
                 </button>
-                <span>{l.declaredYield}</span>
                 <button
-                  disabled={l.declaredYield >= state.flockSize}
-                  title="The book admits more of the clip from tomorrow's page. Declared wool must show at inspection."
-                  onClick={() =>
-                    enqueue({ type: 'setDeclaredYield', fleecePerDay: l.declaredYield + 1 })
-                  }
+                  className={l.books === 'short' ? 'on' : undefined}
+                  aria-pressed={l.books === 'short'}
+                  onClick={() => enqueue({ type: 'setBooks', books: 'short' })}
                 >
-                  +
+                  Short
                 </button>
               </div>
               <p>
-                this page: {Math.round(l.declaredToDate)} declared · {l.soldLawfully} sold at
-                Ryne · {l.grownToDate} grown
-              </p>
-              <p title="The wool-stapler reads the whole page: lawful sales stop when the book holds no admitted wool unsold. The pen writes tomorrow's line, never today's.">
-                on the books, unsold: <strong>{woolOnTheBooks(state)}</strong> fleece the stapler
-                will take · {l.soldToday} weighed today
+                {l.books === 'square' ? (
+                  <>
+                    <strong>Square:</strong> every fleece grows <WoolChip kind="white" /> — Ryne
+                    buys all {clip} a day. Any fleece the lugger takes shows at the audit.
+                  </>
+                ) : (
+                  <>
+                    <strong>Short:</strong> {clip - white} a day grow <WoolChip kind="dark" />,
+                    free for the lugger. Ryne buys only the {white} <WoolChip kind="white" />.
+                  </>
+                )}
               </p>
               <p className="ledger-hint">
-                {!l.penTaken
-                  ? 'The agent keeps the books square with the flock — until you take up the pen. After that, the number is yours.'
-                  : honest
-                    ? 'An honest page. Every fleece the lugger swallows will read as a gap.'
-                    : 'A shorted page. Declared wool must show; the rest never existed — get it over the gunwale.'}
+                {l.books === 'square'
+                  ? 'Switch to Short and, from the next dawn, half of every clip grows dark.'
+                  : 'Send the dark to the shingle and the white to town, and the arithmetic keeps itself.'}
               </p>
-              {/* §6.10 (M5c playtest) — the charge, read aloud BEFORE the
-                  audit: a shorted page with lawful sales is pure self-harm,
-                  and the game says so while the pen can still fix it. */}
-              {l.penTaken && auditGapNow(state) > 0.5 && (
+              {darkHere > 0 && (
                 <p style={{ color: HEAT_RED }}>
-                  If the stapler read this page now: ~
-                  <strong>{Math.round(auditGapNow(state))}</strong> fleece adrift — the audit
-                  will price every one of them in Heat. A shorted page only pays when the
-                  surplus goes over the gunwale.
+                  {darkHere} dark fleece at the farm. If the officer comes, he counts them and writes them
+                  onto the page: Heat once, and they turn white.
                 </p>
               )}
-              {l.penTaken && (
-                <div className="menu-buttons">
-                  <button
-                    title="The agent resumes keeping the book square with the flock. An honest page needs no bookkeeping — and prices no gap."
-                    onClick={() => enqueue({ type: 'returnPen' })}
-                  >
-                    Hand the pen back — let the agent keep it square
-                  </button>
-                </div>
+              <p>
+                this page: {Math.round(l.declaredToDate)} declared · {l.soldLawfully} sold at
+                Ryne · {l.grownToDate} grown · {l.soldToday} weighed today
+              </p>
+              {/* §6.10 (M5c playtest) — the charge, read aloud BEFORE the audit. */}
+              {auditGapNow(state) > 0.5 && (
+                <p style={{ color: HEAT_RED }}>
+                  If he read this page now: ~<strong>{Math.round(auditGapNow(state))}</strong> fleece
+                  adrift — the audit prices every one of them in Heat.
+                </p>
               )}
             </section>
           )}

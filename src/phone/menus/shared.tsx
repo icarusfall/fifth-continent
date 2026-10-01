@@ -6,6 +6,7 @@
 
 
 
+import { DARK_WOOL_TEXT } from '../../shared/palette';
 import { GOOD_LABEL, spanOf } from '../../shared/format';
 import {
   DUTCHMAN_TRUST_JENEVER,
@@ -211,7 +212,8 @@ export function lanternNote(state: GameState, edgeId: EdgeId): string {
 // §20.2 — the goods overlay's short names: one small chip per place, so
 // "which goods are where" is read off the map, not hunted through popovers.
 export const GOOD_SHORT: Record<Good, string> = {
-  fleece: 'wool',
+  fleece: 'white wool',
+  'dark-fleece': 'dark wool',
   jenever: 'jenever',
   tea: 'tea',
   'bulked-tea': 'bulked tea',
@@ -226,7 +228,8 @@ export function stockRows(store: Partial<Record<Good, number>>): Array<{ text: s
     .filter(([, n]) => n > 0)
     .map(([g, n]) => ({
       text: `${n} ${GOOD_SHORT[g]}`,
-      color: CONTRABAND.includes(g) ? '#D9A6A0' : undefined, // contraband reads warm
+      // contraband reads warm; dark wool reads soot (§6.10 M5½f)
+      color: CONTRABAND.includes(g) ? '#D9A6A0' : g === 'dark-fleece' ? DARK_WOOL_TEXT : undefined,
     }));
 }
 

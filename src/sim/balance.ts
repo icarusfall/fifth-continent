@@ -109,6 +109,7 @@ export const BRANDY_BASE_PRICE = 6;
 export const QUALITY_MULT = { rough: 0.6, fair: 1.0, gent: 1.8 } as const; // §17.3
 export const RYNE_PRICE: Record<Good, number> = {
   fleece: WOOL_PRICE_DOMESTIC,
+  'dark-fleece': 0, // §6.10 M5½f — the stapler will not weigh wool the books never grew
   jenever: 0,
   tea: 7,
   'bulked-tea': 4, // §6.17: the undiscerning buyer pays less for the stretched leaf
@@ -124,6 +125,7 @@ export const RYNE_PRICE: Record<Good, number> = {
 // rough 10→12, fair 6→10. Gent holds at the §6.17 retune's floor.
 export const DAILY_DEMAND: Record<Good, number> = {
   fleece: 16,
+  'dark-fleece': 0,
   jenever: 0,
   tea: 12,
   'bulked-tea': 16, // §6.17: a fatter, cheaper channel than the fine leaf's
@@ -201,6 +203,9 @@ export const HORSE_TICKS_PER_TILE_MARSH = 0.45; // the marsh fights horses
 // ---- M3: the books (spec §6.10 / §19.2) ----
 export const PLAUSIBLE_YIELD_MIN = 0.5; // he knows what a Romney ewe gives
 export const WOOL_GAP_COEFF = 1.0; // regional heat per fleece adrift at inspection
+// §6.10 M5½f — a short page admits exactly the floor the officer will swallow:
+// white = ceil(clip × this), so the plausibility term never fires on an odd flock.
+export const SHORT_BOOKS_SHARE = PLAUSIBLE_YIELD_MIN;
 // §6.10 (M5, §6.17 Beat 3) — the audit cadence: the dawn after each rent day
 // the farm is the officer's target regardless of stains, so the books are
 // read even when the hub keeps the barn spotless. Without it a crime run

@@ -38,7 +38,7 @@ console.log(
 );
 console.log(`suspicion: ${JSON.stringify(state.revenue.suspicion)}`);
 console.log(
-  `books: declared ${state.ledger.declaredYield}/day · page d${state.ledger.declaredToDate} g${state.ledger.grownToDate} s${state.ledger.soldLawfully}`,
+  `books: ${state.ledger.books}, dark on backs ${state.darkReady} · page d${state.ledger.declaredToDate} g${state.ledger.grownToDate} s${state.ledger.soldLawfully}`,
 );
 console.log(`--- last events ---`);
 for (const e of state.log.slice(-10)) console.log(`  [${e.tick}] ${e.text}`);

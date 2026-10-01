@@ -59,7 +59,7 @@ export function firstMorningHint(state: GameState): FirstMorningHint | null {
   if (at === 'farm' && inBarn > 0) {
     return { text: 'The clip is in the barn. The cart in the yard will carry it.', sel: 'farm' };
   }
-  if (state.fleeceReady > 0) {
+  if (state.fleeceReady + state.darkReady > 0) {
     return {
       text: `${state.flockSize} sheep stand heavy with wool. Begin at Walland Farm.`,
       sel: 'farm',

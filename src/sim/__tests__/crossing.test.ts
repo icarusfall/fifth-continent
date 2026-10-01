@@ -391,7 +391,11 @@ function moatedHub(state: GameState): Action[] {
 }
 
 const GAMES = 200;
-const DAYS = 30;
+// §6.10 M5½f — 35, from 30: white wool now sells at Ryne's price where it once
+// went over the gunwale at four times it, so the owling hub reaches the
+// Company's notice about two days later. The raid is the subject here, not
+// the clock; no balance number moved.
+const DAYS = 35;
 
 describe(`${GAMES} seeded games, ${DAYS} days — the hub behind the water (spec §13/§6.18)`, () => {
   it('digs its moat, mans it deeper than the crossing, and keeps the tenancy', { timeout: 240_000 }, async () => {
