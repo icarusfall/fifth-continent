@@ -272,6 +272,11 @@ kbd {
   font-size: 13px;
   color: var(--paper-dim);
 }
+.stable-row .idle {
+  font-size: 12px;
+  color: var(--lamp);
+  font-style: italic;
+}
 .stable-row .warn {
   font-size: 12px;
   color: #e8897f;
@@ -860,4 +865,38 @@ kbd {
   font-size: 13px;
   pointer-events: none;
   z-index: 6;
+}
+
+/* ---- D5 prep: the first morning points, it never pauses ---- */
+.first-morning {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%) rotate(-0.4deg);
+  max-width: 420px;
+  background: var(--paper);
+  color: var(--ink);
+  border: 0;
+  border-radius: 2px;
+  padding: 9px 14px 10px;
+  font-size: 15px;
+  line-height: 1.35;
+  text-align: left;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  z-index: 4;
+  animation: breathe 2.6s ease-in-out infinite;
+}
+.first-morning b {
+  font-size: 18px;
+  margin-right: 6px;
+}
+@keyframes breathe {
+  50% { box-shadow: 0 4px 22px rgba(240, 207, 138, 0.55); }
+}
+.first-morning + .dispatches {
+  top: 70px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .first-morning { animation: none; }
 }

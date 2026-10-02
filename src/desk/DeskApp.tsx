@@ -6,6 +6,7 @@ import { useGameLoop } from '../shared/useGameLoop';
 import { useGameStore } from '../state/store';
 import { DeskMap } from './DeskMap';
 import { DayStrip } from './DayStrip';
+import { FirstMorning } from './FirstMorning';
 import { Dispatches, PauseCard } from './Dispatches';
 import { Inspector } from './Inspector';
 import { Stable } from './Stable';
@@ -31,6 +32,7 @@ export default function DeskApp() {
         <DeskMap />
         <Stable />
         <Inspector />
+        <FirstMorning />
         <Dispatches />
         <DeskLog />
       </main>

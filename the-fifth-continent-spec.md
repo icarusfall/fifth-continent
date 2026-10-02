@@ -3521,6 +3521,18 @@ chests. The officer: a big horse, the blue coat, a tricorne. Place labels are
 drawn at a fixed screen size at every zoom. High water reaches about 1.2 tiles
 up the beach, short of the huts.
 
+*D5 preparation (2026-10-02).* Two small mouths for the playtest. THE FIRST
+MORNING on the desk: the phone's pointing thread (§10; now
+`src/shared/firstMorning.ts`, one source for both shells) is pinned as a slip
+at the head of the table with a manicule, its target rung on the map, a click
+easing the map there; only the words naming a gesture are the desk's ("click
+the cart, then its road to Ryne"). It never pauses, and it is gone at the first
+sale. And WHY A HAND STANDS STILL: a hired hand idle at his round's first
+pick-up reads, from the stable, exactly like a broken order — so the stable and
+the cart's sheet say what he waits on: the lugger, the town's appetite, or the
+good his stop takes, naming the cause where the game knows it (the flock wants
+shearing; the books are square, so no dark wool grows).
+
 *Decisions taken (2026-10-01):* the phone UI frozen; carts clicked directly on
 the desk; the playable mock's direction approved ("a GREAT improvement");
 rendering option B (Canvas 2D plus one WebGL2 pass) over A (2D only) and C

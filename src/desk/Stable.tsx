@@ -10,6 +10,7 @@ import type { Cart, GameState, Good, NodeId } from '../sim/types';
 import { woolMismatches } from '../sim/wool';
 import { useDeskUi } from './deskUi';
 import { handOf } from './sheets/cart';
+import { idleReason } from './idle';
 
 function Cargo({ cart }: { cart: Cart }) {
   const goods = (Object.entries(cart.cargo) as Array<[Good, number]>).filter(([, n]) => n > 0);
@@ -71,6 +72,7 @@ export function Stable() {
                     ? `${handOf(cart)}: ${orderLabel(state, cart.carter)}`
                     : `yours to drive · ${cargoCount(cart.cargo)}/${cart.capacity}`}
                 </span>
+                {idleReason(state, cart) && <span className="idle">{idleReason(state, cart)}</span>}
                 {mismatch.map((m) => (
                   <span key={m} className="warn">
                     {m}
