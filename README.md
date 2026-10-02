@@ -10,7 +10,21 @@ the two kinds of magic you can use to hide a crime. Design spec and build brief:
 
 ---
 
-## Status: the desk rework — D4, the look (first half) ✅ (then the building and cart art)
+## Status: the desk rework — D4, the look ✅ (then D5, your playtest)
+
+The second half of the look: the desk now draws its own buildings and carts.
+Roofs seen from above with a lean and the south wall showing, windows that
+light at dusk, chimneys that smoke. The farm has its tiled house, thatched barn,
+haystack and fenced paddock; Ryne is a hill town with a spire and a quay; the
+Customs House flies the Crown's blue once the officer has come; the cutting
+house is a tarred shed with its fire going; the Shingle has a hut, nets and
+boats drawn up; the lugger rides the swell. Carts are ponies that walk, with
+their loads drawn as what they are — white or dark wool, tubs, chests — and
+the officer rides in his blue coat. Labels stay one readable size at any zoom.
+
+---
+
+## Earlier: the desk rework — D4, the look (first half)
 
 The desk paints its own marsh: Romney's fields — irregular, low-contrast, each
 boundary a wet ditch, a faint dry line or none, hedged on the clay — with the

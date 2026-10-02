@@ -3499,7 +3499,27 @@ rises — at high water the beach is under it — and keeps the surf to the sea'
 shore. The shader is §15.1's, tuned calm: a quarter-tile ripple fixed in the
 world (not the screen), faint glints, wind across the fields, bloom, fog, the
 hour's grade. The scene renders at up to 1.5× density to keep each frame's
-texture upload affordable. *Still to come in D4:* the building and cart art.
+texture upload affordable.
+
+*D4 — the art (2026-10-02).* The desk draws its own buildings and carts
+(`src/desk/look/art.ts`), straight top-down with §15.3's slight lean: a roof
+seen from above in two planes (or hipped, or a lean-to), tiled or thatched in
+faint courses, the south wall face showing beneath with windows that light as
+the dark comes (the same `darknessAt` the night uses), a door, a chimney with
+smoke leaning on the wind. Walland Farm: a tiled house, a tarred and thatched
+barn, a haystack, a beaten yard with ruts, the paddock fence, and sheep at a
+size that sits beside the buildings. Ryne: ten houses on the hill's streets, a
+slate-roofed church with its spire, a quay at the shore with two hulls tied up.
+The Customs House: hipped slate, and the Crown's flag in Revenue blue — flown
+only once the Riding Officer has come (§15.3's reserved colour, with its
+owner). The cutting house: a tarred lean-to with its fire's smoke, tubs by the
+wall. The Shingle: a tarred hut, net poles and a hung net, two boats drawn up.
+The lugger: planked, two lug sails shaded on the lee, rising on the swell. A
+cart: a pony whose legs walk while it moves, shafts, wheels, a bed, a lantern
+— and its LOAD drawn as what it is: white wool bales, dark wool bales, tubs,
+chests. The officer: a big horse, the blue coat, a tricorne. Place labels are
+drawn at a fixed screen size at every zoom. High water reaches about 1.2 tiles
+up the beach, short of the huts.
 
 *Decisions taken (2026-10-01):* the phone UI frozen; carts clicked directly on
 the desk; the playable mock's direction approved ("a GREAT improvement");

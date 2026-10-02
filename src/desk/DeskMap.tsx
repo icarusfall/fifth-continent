@@ -22,25 +22,16 @@ import { isFlooded, tideLevel } from '../sim/time';
 import type { Cart, GameState } from '../sim/types';
 import { CameraController } from '../shared/camera';
 import { TILE, pathPoints, pointAlong, tileCenter } from '../shared/geometry';
+import * as art from './look/art';
 import { Compositor } from './look/compositor';
 import { darknessAt, duskAt, lampsOf } from './look/light';
 import { deskApron, deskWorld, drawPainted, waterMask } from './look/terrain';
 import {
-  drawCart,
-  drawCuttingHouse,
-  drawCustoms,
   drawDyke,
-  drawFarm,
   drawFortifications,
-  drawLabel,
   drawLighter,
-  drawLugger,
-  drawOfficer,
   drawRoad,
-  drawRyne,
   drawSeaLane,
-  drawSheep,
-  drawShingle,
   drawSurveyPost,
   drawTileHighlight,
   drawTubBoat,
@@ -272,6 +263,7 @@ export function DeskMap() {
     const light = document.createElement('canvas');
     const lctx = light.getContext('2d')!;
     const cam = camRef.current!;
+    if (import.meta.env.DEV) (window as unknown as { __deskCam: unknown }).__deskCam = cam;
     const world = deskWorld();
     const apron = deskApron();
     let raf = 0;
@@ -311,6 +303,8 @@ export function DeskMap() {
       sctx.imageSmoothingQuality = 'high';
       drawPainted(sctx, apron);
       drawPainted(sctx, world);
+      const lit = darknessAt(s.tick);
+      const tnow = performance.now() / 1000;
 
       const flooded = isFlooded(s.tick);
       for (const edge of edgesFor(s.farm, s.cuttingHouse)) {
@@ -344,17 +338,17 @@ export function DeskMap() {
       }
 
       const fc = tileCenter(s.farm);
-      drawSheep(sctx, s.farm, s.flockSize);
-      drawFarm(sctx, s.farm);
+      art.sheep(sctx, s.farm, s.flockSize, performance.now() / 1000);
+      art.farm(sctx, s.farm, lit, tnow);
       if ((s.fortifications.farm ?? 0) > 0) drawFortifications(sctx, s.farm, s.fortifications.farm ?? 0, fortVisibility(s, 'farm'));
-      drawRyne(sctx);
-      drawCustoms(sctx);
+      art.ryne(sctx, lit);
+      art.customs(sctx, lit, s.revenue.officer.arrived, tnow);
       if (s.dutchman.unlocked) {
-        drawShingle(sctx, SHINGLE);
-        if (s.dutchman.present) drawLugger(sctx, SHINGLE);
+        art.shingle(sctx, lit);
+        if (s.dutchman.present) art.lugger(sctx, tnow);
       }
       if (s.cuttingHouse) {
-        drawCuttingHouse(sctx, s.cuttingHouse);
+        art.cuttingHouse(sctx, s.cuttingHouse, lit, tnow);
         const t = s.fortifications['cutting-house'] ?? 0;
         if (t > 0) drawFortifications(sctx, s.cuttingHouse, t, fortVisibility(s, 'cutting-house'));
       }
@@ -371,10 +365,10 @@ export function DeskMap() {
         const ang = cart.location.kind === 'edge' ? p.angle : 0;
         if (cart.vessel === 'sea') drawLighter(sctx, p.x, p.y, ang, pulse);
         else if (cart.vessel === 'dyke') drawTubBoat(sctx, p.x, p.y, ang, cargoCount(cart.cargo) > 0);
-        else drawCart(sctx, p.x, p.y, ang, cargoCount(cart.cargo) > 0);
+        else art.cart(sctx, p.x, p.y, ang, cart.cargo, cart.location.kind === 'edge', tnow, s.carts.indexOf(cart));
       }
       const op = officerPos(s);
-      if (op) drawOfficer(sctx, op.x, op.y, s.revenue.officer.location.kind === 'edge' ? op.angle : 0);
+      if (op) art.officer(sctx, op.x, op.y, s.revenue.officer.location.kind === 'edge' ? op.angle : 0, s.revenue.officer.location.kind === 'edge', tnow);
 
       // The night (spec §20.4 D4): darkness laid over the scene and cut away
       // where the lamps are — windows, carts, the lugger, the officer — then
@@ -448,21 +442,36 @@ export function DeskMap() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.setTransform(z, 0, 0, z, -cam.x * z, -cam.y * z);
 
-      // Labels: always, at a readable screen size (the desk has room).
-      drawLabel(ctx, 'Walland Farm', fc.x, fc.y - 18, cam.zoom);
-      drawLabel(ctx, 'Ryne', 28.5 * TILE, 19.6 * TILE, cam.zoom);
-      drawLabel(ctx, 'Customs House', 26.5 * TILE, 17.9 * TILE, cam.zoom);
+      // Labels: a fixed screen size at every zoom — read at a glance, never shouting.
+      const label = (text: string, wx: number, wy: number) => {
+        const sp = cam.worldToScreen(wx, wy);
+        ctx.save();
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.font = "15px 'IM Fell English SC', 'IM Fell English', Georgia, serif";
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.lineJoin = 'round';
+        ctx.lineWidth = 3.5;
+        ctx.strokeStyle = 'rgba(36, 28, 24, 0.85)';
+        ctx.strokeText(text, sp.x, sp.y);
+        ctx.fillStyle = '#E8E1D2';
+        ctx.fillText(text, sp.x, sp.y);
+        ctx.restore();
+      };
+      label('Walland Farm', fc.x, fc.y - 18);
+      label('Ryne', 28.5 * TILE, 19.6 * TILE);
+      label('Customs House', 26.5 * TILE, 17.9 * TILE);
       if (s.dutchman.unlocked) {
         const sc = tileCenter(SHINGLE);
-        drawLabel(ctx, 'The Shingle', sc.x - 4, sc.y - 14, cam.zoom);
+        label('The Shingle', sc.x - 4, sc.y - 14);
       }
       if (s.cuttingHouse) {
         const cc = tileCenter(s.cuttingHouse);
-        drawLabel(ctx, 'Cutting House', cc.x, cc.y - 14, cam.zoom);
+        label('Cutting House', cc.x, cc.y - 14);
       }
       if (s.wights.stone) {
         const wc = tileCenter(s.wights.stone);
-        drawLabel(ctx, 'The Wight-Stone', wc.x, wc.y - 16, cam.zoom);
+        label('The Wight-Stone', wc.x, wc.y - 16);
       }
 
       // The hover, and the selection: rings in lamp light, sized for the screen.
