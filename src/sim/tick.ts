@@ -1973,11 +1973,18 @@ function dutchmanHoldFor(state: GameState): Store {
   return hold;
 }
 
-function dutchmanTide(state: GameState): void {
-  const here =
+/** §6.9 — does the lugger stand off the shingle at this tick? One rule, read
+ *  by the tick and by any forecast of it (the desk's day ahead, §20.4 D3). */
+export function luggerStandsOff(state: GameState, tick: number): boolean {
+  return (
     state.dutchman.unlocked &&
-    dayPhaseOf(state.tick) === 'night' &&
-    (state.dutchman.met ? !tideIsRising(state.tick) : true);
+    dayPhaseOf(tick) === 'night' &&
+    (state.dutchman.met ? !tideIsRising(tick) : true)
+  );
+}
+
+function dutchmanTide(state: GameState): void {
+  const here = luggerStandsOff(state, state.tick);
   if (here && !state.dutchman.present) {
     state.dutchman.hold = dutchmanHoldFor(state);
     state.dutchman.fleeceAppetite = DUTCHMAN_FLEECE_DEMAND;

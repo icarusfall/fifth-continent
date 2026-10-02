@@ -5,6 +5,7 @@ import { BattlePlayback } from '../shared/BattlePlayback';
 import { useGameLoop } from '../shared/useGameLoop';
 import { useGameStore } from '../state/store';
 import { DeskMap } from './DeskMap';
+import { DayStrip } from './DayStrip';
 import { Dispatches, PauseCard } from './Dispatches';
 import { Inspector } from './Inspector';
 import { Stable } from './Stable';
@@ -16,6 +17,7 @@ import { useJourneys, useLeaning } from './command';
 // its edges and never cover the place being acted on: the stable on the left,
 // the inspector on the right, dispatches pinned at the top. No popovers.
 // D1: the table and every place's verbs. D2: cart command on the map.
+// D3: the day ahead, along the foot of the table.
 export default function DeskApp() {
   useGameLoop();
   useDeskKeys();
@@ -32,6 +34,7 @@ export default function DeskApp() {
         <Dispatches />
         <DeskLog />
       </main>
+      <DayStrip />
       {lost && <Forfeit />}
       <PauseCard />
       <BattlePlayback />

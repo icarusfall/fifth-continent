@@ -6,11 +6,26 @@ A single-player, browser-based god/builder game about smuggling, logistics, and
 the two kinds of magic you can use to hide a crime. Design spec and build brief:
 [the-fifth-continent-spec.md](./the-fifth-continent-spec.md).
 
-**432 tests green · save v26 · M5½ complete · the desk rework: D2, cart command — the desk is on.**
+**437 tests green · save v26 · M5½ complete · the desk rework: D3, the day ahead.**
 
 ---
 
-## Status: the desk rework — D2, cart command ✅ (then D3, the day ahead)
+## Status: the desk rework — D3, the day ahead ✅ (then D4, the look)
+
+A strip along the foot of the table reads the next 24 hours: night and dusk
+shaded, the tide as a curve with the low road's drowned hours beneath it, the
+lugger's window, the officer's next audit and his arrival where he rides, each
+travelling cart's arrival by number, the rent's dawn (or the days to it), and a
+raid's blow. Every mark comes from the sim's own functions — the lugger's rule
+is now one exported function the tick itself calls, tested tick for tick
+against the strip. Hover a route in a destination tag and the trip lies along
+the strip as if sent now, with "arrives 21:10" — and a low-road leg that would
+meet high water is marked where it drowns. Hover the strip for any hour's
+facts.
+
+---
+
+## Earlier: the desk rework — D2, cart command
 
 A desktop browser now opens **the Smuggler's Table** by default (`?phone` for
 the old layout; the desk's bar has a button too). Select a cart and every place

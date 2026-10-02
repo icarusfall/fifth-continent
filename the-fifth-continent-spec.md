@@ -3454,6 +3454,29 @@ other. DESK_READY is on: a fine pointer at 1100px or more gets the desk; a
 link naming `?desk` or `?phone` is remembered, and the desk's bar offers the
 phone layout.
 
+*D3 — the day ahead (2026-10-02).* A strip along the foot of the table reads
+the next 24 hours, every mark computed from the sim's own pure functions so the
+strip can never promise what the tick will not do:
+```
+darkness     dayPhaseOf over each hour — night shaded deep, dusk half
+the tide     tideLevel as a curve; high water marked; the spans when the low
+             road is drowned (isFlooded) laid as a band beneath
+the lugger   luggerStandsOff(state, tick) — the §6.9 rule, now one exported
+             function the tick itself calls: unlocked, night, and (once met)
+             a falling tide. Until he is unlocked, nothing is drawn
+the officer  his next audit dawn (isAuditDawn), and while he rides, his
+             arrival at the place he is bound for (remaining horse latency)
+the carts    each travelling cart's arrival by number (remaining latency, tide
+             halts not foreseen — "about"), and a desk journey's final arrival
+the rent     its dawn, if inside the window; otherwise the days to it, named
+the raid     the battle's tick, if a muster is gathering
+a route      while the pointer rests on a route in a tag, the trip is drawn
+             on the strip as a bar from now, leg by leg — and any leg on a
+             tide-locked road that would meet high water is marked where it
+             drowns. Timing is read before the cart is sent, not after.
+```
+Hover any mark for its exact hour. Click the strip to see the hour named.
+
 *Decisions taken (2026-10-01):* the phone UI frozen; carts clicked directly on
 the desk; the playable mock's direction approved ("a GREAT improvement");
 rendering option B (Canvas 2D plus one WebGL2 pass) over A (2D only) and C
