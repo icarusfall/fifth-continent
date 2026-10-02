@@ -17,6 +17,7 @@ import { spanOf } from '../shared/format';
 import { benchReport } from '../shared/words';
 import { useGameStore } from '../state/store';
 import { useDeskUi } from './deskUi';
+import { rememberShell } from '../shell';
 
 const PHASE_GLYPH: Record<string, string> = { dawn: '◒', day: '☀', dusk: '◓', night: '☾' };
 
@@ -135,6 +136,13 @@ export function TopBar() {
           </button>
         )}
       </span>
+      <button
+        className="tb-btn quiet"
+        onClick={() => rememberShell('phone')}
+        title="The phone's layout, on this screen. Come back with ?desk."
+      >
+        Phone layout
+      </button>
       <button className="tb-btn quiet" onClick={requestNewGame} title="Start a new tenancy">
         New game
       </button>

@@ -3430,6 +3430,30 @@ hire and the round arrive with cart command. Shared now: the terrain
 painter, the sprites, the camera, the battle and its sheet, and the
 read-aloud words (`src/shared/words.ts`).
 
+*D2 as built (2026-10-01).* Cart command lives in `src/desk/routes.ts` (pure,
+tested) and `command.ts`. A tag offers the two cheapest simple routes over the
+ways the hull may ride (the sim's own wayAllows: wheels on roads, the tub on
+dug water, the lighter on the sea lane; the marsh track only once the coast has
+spoken) — and if both offered routes can drown, the cheapest dry one takes the
+second place, the high road's "slow and sure". Risk words come from edge
+exposure (≥0.9 *watched*, ≥0.6 *open marsh*), the tide-locked flag, the dug
+water, and the live blue coat. A journey of several roads is a UI-store queue:
+the next dispatch is issued the tick the cart stands at its start, never into a
+drowned road (it waits on the tide instead of drawing a refusal every tick),
+and is dropped if the cart is sent elsewhere or crewed. A round's stops default
+their pick-ups — wool by the colour the next dealing stop wants (dark to the
+lugger, white to the town), the house's most plentiful product, nothing at the
+beach or the town (a purchase spends the till and is the player's to say) — and
+every default is a select the player can change. Shift-click, or any click on a
+crewed cart's tags, writes a round; Enter hires or re-orders; Esc puts the pen
+down. The world leans in by setting the store's speed to the amble and
+restoring the player's own pace when the pointer leaves — unless the player
+changed it meanwhile. A pile of carts is cycled by clicking the same spot. The
+"fold past four into a chip" is deferred: five carts still fan clear of each
+other. DESK_READY is on: a fine pointer at 1100px or more gets the desk; a
+link naming `?desk` or `?phone` is remembered, and the desk's bar offers the
+phone layout.
+
 *Decisions taken (2026-10-01):* the phone UI frozen; carts clicked directly on
 the desk; the playable mock's direction approved ("a GREAT improvement");
 rendering option B (Canvas 2D plus one WebGL2 pass) over A (2D only) and C

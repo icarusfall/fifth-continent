@@ -5,10 +5,9 @@
 
 export type Shell = 'phone' | 'desk';
 
-// The desk joins the automatic choice only once it is playable end to end
-// (D2). Until then it is reached by `?desk` alone, so nobody arriving at the
-// deployed site lands on a half-built table.
-export const DESK_READY = false;
+// The desk joins the automatic choice once it is playable end to end (D2,
+// 2026-10-01): a fine pointer on a wide screen gets the table.
+export const DESK_READY = true;
 
 const SHELL_KEY = 'fifth-continent-shell';
 const DESK_MIN_WIDTH = 1100;
@@ -33,6 +32,10 @@ export function browserShell(): Shell {
   let stored: string | null = null;
   try {
     stored = localStorage.getItem(SHELL_KEY);
+    // A link that names a shell is a choice: remember it, so it sticks.
+    const q = new URLSearchParams(window.location.search);
+    if (q.has('desk')) localStorage.setItem(SHELL_KEY, 'desk');
+    else if (q.has('phone')) localStorage.setItem(SHELL_KEY, 'phone');
   } catch {
     // blocked storage only costs the remembered preference
   }

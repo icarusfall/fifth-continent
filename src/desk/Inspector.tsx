@@ -6,7 +6,10 @@
 import { useGameStore } from '../state/store';
 import { useDeskUi } from './deskUi';
 import { sheetFor } from './sheets';
+import { RoundDraft } from './RoundDraft';
 import type { Line, Run, Sheet, Verb } from './sheet';
+import { nodeById } from '../sim/map';
+import { legOpen } from './routes';
 
 function LineView({ line }: { line: Line }) {
   return <p className={`fact${line.tone ? ` ${line.tone}` : ''}`}>{line.text}</p>;
@@ -82,6 +85,26 @@ export function SheetView({ sheet, run }: { sheet: Sheet; run: (r: Run) => void 
   );
 }
 
+/** A cart being driven road by road: where it is bound, and what it waits on. */
+function JourneyNote({ cartId }: { cartId: string }) {
+  const j = useDeskUi((s) => s.journeys[cartId]);
+  const state = useGameStore((s) => s.state);
+  const setJourney = useDeskUi((s) => s.setJourney);
+  if (!j) return null;
+  const leg = j.route.legs[j.next];
+  const waiting = leg && !legOpen(state, leg);
+  return (
+    <div className="journey">
+      <span>
+        Bound for {nodeById(j.to, state.farm, state.cuttingHouse).name}
+        {leg ? `, then ${leg.edge.name.toLowerCase()}` : ''}
+        {waiting ? ' — waits on the tide' : ''}.
+      </span>
+      <button onClick={() => setJourney(cartId, null)}>Stop when he gets there</button>
+    </div>
+  );
+}
+
 export function Inspector() {
   const state = useGameStore((s) => s.state);
   const waiting = useGameStore((s) => s.waitingForLugger);
@@ -130,6 +153,8 @@ export function Inspector() {
           <button className="panel-close" aria-label="Let go" onClick={() => select(null)}>
             ×
           </button>
+          {selection?.kind === 'cart' && <JourneyNote cartId={selection.id} />}
+          {selection?.kind === 'cart' && <RoundDraft />}
           <SheetView sheet={sheet} run={run} />
         </>
       ) : (
