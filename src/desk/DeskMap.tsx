@@ -18,11 +18,13 @@ import {
   nodeById,
   officerEdgesFor,
 } from '../sim/map';
-import { dayPhaseOf, isFlooded } from '../sim/time';
+import { isFlooded, tideLevel } from '../sim/time';
 import type { Cart, GameState } from '../sim/types';
 import { CameraController } from '../shared/camera';
-import { APRON_TILES, TILE, WORLD_H, WORLD_W, pathPoints, pointAlong, tileCenter } from '../shared/geometry';
-import { getApronCanvas, getTerrainCanvas } from '../shared/paint';
+import { TILE, pathPoints, pointAlong, tileCenter } from '../shared/geometry';
+import { Compositor } from './look/compositor';
+import { darknessAt, duskAt, lampsOf } from './look/light';
+import { deskApron, deskWorld, drawPainted, waterMask } from './look/terrain';
 import {
   drawCart,
   drawCuttingHouse,
@@ -246,6 +248,8 @@ function routesVisible(state: GameState): boolean {
 export function DeskMap() {
   const shellRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const sceneRef = useRef<HTMLCanvasElement | null>(null);
+  const glRef = useRef<HTMLCanvasElement | null>(null);
   const camRef = useRef<CameraController | null>(null);
   if (!camRef.current) camRef.current = new CameraController();
   const hoverRef = useRef<DeskSelection | null>(null);
@@ -258,23 +262,39 @@ export function DeskMap() {
   // ---- The render loop (layers 0–1, and the selection's ring) ----
   useEffect(() => {
     const shell = shellRef.current!;
-    const canvas = canvasRef.current!;
+    const canvas = canvasRef.current!; // the overlay: text and lines, crisp, never rippled
     const ctx = canvas.getContext('2d')!;
+    const scene = sceneRef.current!; // the world, lit
+    const sctx = scene.getContext('2d')!;
+    const glCanvas = glRef.current!;
+    const comp = new Compositor(glCanvas);
+    glCanvas.hidden = !comp.ok; // without WebGL2 the scene itself is the picture
+    const light = document.createElement('canvas');
+    const lctx = light.getContext('2d')!;
     const cam = camRef.current!;
-    const terrain = getTerrainCanvas();
-    const apron = getApronCanvas();
-    const RES = terrain.width / 40 / TILE;
+    const world = deskWorld();
+    const apron = deskApron();
     let raf = 0;
     const invite = { key: '', ids: new Set<string>() };
+    let maskKey: string | null = null;
 
     const loop = () => {
       raf = requestAnimationFrame(loop);
       const dpr = window.devicePixelRatio || 1;
       const w = shell.clientWidth;
       const h = shell.clientHeight;
+      // The scene renders a little under full density: it is painted and then
+      // shaded, and every texture upload is paid for each frame.
+      const sdpr = Math.min(dpr, 1.5);
       if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
         canvas.width = Math.round(w * dpr);
         canvas.height = Math.round(h * dpr);
+      }
+      for (const c of [scene, glCanvas, light]) {
+        if (c.width !== Math.round(w * sdpr) || c.height !== Math.round(h * sdpr)) {
+          c.width = Math.round(w * sdpr);
+          c.height = Math.round(h * sdpr);
+        }
       }
       cam.setViewport(w, h);
       cam.ease();
@@ -282,14 +302,15 @@ export function DeskMap() {
       const s = useGameStore.getState().state;
       const ui = useDeskUi.getState();
       const z = cam.zoom * dpr;
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.fillStyle = '#241C18';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.setTransform(z, 0, 0, z, -cam.x * z, -cam.y * z);
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-      ctx.drawImage(apron, 0, 0, apron.width, apron.height, -APRON_TILES * TILE, -APRON_TILES * TILE, WORLD_W + 2 * APRON_TILES * TILE, WORLD_H + 2 * APRON_TILES * TILE);
-      ctx.drawImage(terrain, 0, 0, terrain.width, terrain.height, 0, 0, terrain.width / RES, terrain.height / RES);
+      const sz = cam.zoom * sdpr;
+      sctx.setTransform(1, 0, 0, 1, 0, 0);
+      sctx.fillStyle = '#241C18';
+      sctx.fillRect(0, 0, scene.width, scene.height);
+      sctx.setTransform(sz, 0, 0, sz, -cam.x * sz, -cam.y * sz);
+      sctx.imageSmoothingEnabled = true;
+      sctx.imageSmoothingQuality = 'high';
+      drawPainted(sctx, apron);
+      drawPainted(sctx, world);
 
       const flooded = isFlooded(s.tick);
       for (const edge of edgesFor(s.farm, s.cuttingHouse)) {
@@ -302,8 +323,8 @@ export function DeskMap() {
                 ? true
                 : routesVisible(s);
         if (!visible) continue;
-        if (edge.id === 'sea-lane') drawSeaLane(ctx, pathPoints(edge, false));
-        else drawRoad(ctx, pathPoints(edge, false), edge.condition === 'tideLocked' && flooded);
+        if (edge.id === 'sea-lane') drawSeaLane(sctx, pathPoints(edge, false));
+        else drawRoad(sctx, pathPoints(edge, false), edge.condition === 'tideLocked' && flooded);
       }
 
       const pulse = (performance.now() / 2600) % 1;
@@ -315,45 +336,117 @@ export function DeskMap() {
         }
         for (const seg of DYKE_SEGMENTS) {
           const status = s.dykesDug.includes(seg.id) ? 'dug' : s.digging?.id === seg.id ? 'digging' : 'survey';
-          drawDyke(ctx, seg.path, status);
+          drawDyke(sctx, seg.path, status);
           if (status !== 'dug') {
-            drawSurveyPost(ctx, pointAlong(seg.path.map(tileCenter), 0.5), status === 'survey' && invite.ids.has(seg.id), pulse);
+            drawSurveyPost(sctx, pointAlong(seg.path.map(tileCenter), 0.5), status === 'survey' && invite.ids.has(seg.id), pulse);
           }
         }
       }
 
       const fc = tileCenter(s.farm);
-      drawSheep(ctx, s.farm, s.flockSize);
-      drawFarm(ctx, s.farm);
-      if ((s.fortifications.farm ?? 0) > 0) drawFortifications(ctx, s.farm, s.fortifications.farm ?? 0, fortVisibility(s, 'farm'));
-      drawRyne(ctx);
-      drawCustoms(ctx);
+      drawSheep(sctx, s.farm, s.flockSize);
+      drawFarm(sctx, s.farm);
+      if ((s.fortifications.farm ?? 0) > 0) drawFortifications(sctx, s.farm, s.fortifications.farm ?? 0, fortVisibility(s, 'farm'));
+      drawRyne(sctx);
+      drawCustoms(sctx);
       if (s.dutchman.unlocked) {
-        drawShingle(ctx, SHINGLE);
-        if (s.dutchman.present) drawLugger(ctx, SHINGLE);
+        drawShingle(sctx, SHINGLE);
+        if (s.dutchman.present) drawLugger(sctx, SHINGLE);
       }
       if (s.cuttingHouse) {
-        drawCuttingHouse(ctx, s.cuttingHouse);
+        drawCuttingHouse(sctx, s.cuttingHouse);
         const t = s.fortifications['cutting-house'] ?? 0;
-        if (t > 0) drawFortifications(ctx, s.cuttingHouse, t, fortVisibility(s, 'cutting-house'));
+        if (t > 0) drawFortifications(sctx, s.cuttingHouse, t, fortVisibility(s, 'cutting-house'));
       }
-      if (s.wights.sign) drawWightSign(ctx, s.wights.sign, pulse);
-      if (s.wights.stone) drawWightStone(ctx, s.wights.stone, pulse);
+      if (s.wights.sign) drawWightSign(sctx, s.wights.sign, pulse);
+      if (s.wights.stone) drawWightStone(sctx, s.wights.stone, pulse);
       if (s.leiden.state === 'housed' && s.leiden.node) {
         const host = s.leiden.node === 'farm' ? s.farm : s.cuttingHouse;
-        if (host) drawWorkshopBadge(ctx, host, pulse);
+        if (host) drawWorkshopBadge(sctx, host, pulse);
       }
 
       for (const cart of s.carts) {
         const p = cartPos(s, cart);
         if (!p) continue;
         const ang = cart.location.kind === 'edge' ? p.angle : 0;
-        if (cart.vessel === 'sea') drawLighter(ctx, p.x, p.y, ang, pulse);
-        else if (cart.vessel === 'dyke') drawTubBoat(ctx, p.x, p.y, ang, cargoCount(cart.cargo) > 0);
-        else drawCart(ctx, p.x, p.y, ang, cargoCount(cart.cargo) > 0);
+        if (cart.vessel === 'sea') drawLighter(sctx, p.x, p.y, ang, pulse);
+        else if (cart.vessel === 'dyke') drawTubBoat(sctx, p.x, p.y, ang, cargoCount(cart.cargo) > 0);
+        else drawCart(sctx, p.x, p.y, ang, cargoCount(cart.cargo) > 0);
       }
       const op = officerPos(s);
-      if (op) drawOfficer(ctx, op.x, op.y, s.revenue.officer.location.kind === 'edge' ? op.angle : 0);
+      if (op) drawOfficer(sctx, op.x, op.y, s.revenue.officer.location.kind === 'edge' ? op.angle : 0);
+
+      // The night (spec §20.4 D4): darkness laid over the scene and cut away
+      // where the lamps are — windows, carts, the lugger, the officer — then
+      // the dusk's warmth. Done in 2D so the fallback keeps its night.
+      const now = performance.now() / 1000;
+      const dark = darknessAt(s.tick);
+      const dusk = duskAt(s.tick);
+      const lamps = lampsOf(s, now, cartPos, officerPos);
+      if (dusk > 0.01) {
+        sctx.setTransform(1, 0, 0, 1, 0, 0);
+        sctx.globalCompositeOperation = 'multiply';
+        sctx.fillStyle = `rgba(236, 178, 146, ${0.4 * dusk})`;
+        sctx.fillRect(0, 0, scene.width, scene.height);
+        sctx.globalCompositeOperation = 'source-over';
+      }
+      if (dark > 0.01) {
+        lctx.setTransform(1, 0, 0, 1, 0, 0);
+        lctx.globalCompositeOperation = 'source-over';
+        lctx.clearRect(0, 0, light.width, light.height);
+        lctx.fillStyle = `rgba(10, 14, 30, ${0.62 * dark})`;
+        lctx.fillRect(0, 0, light.width, light.height);
+        lctx.globalCompositeOperation = 'destination-out';
+        lctx.setTransform(sz, 0, 0, sz, -cam.x * sz, -cam.y * sz);
+        for (const lp of lamps) {
+          const g = lctx.createRadialGradient(lp.x, lp.y, 0, lp.x, lp.y, lp.r);
+          g.addColorStop(0, `rgba(0,0,0,${0.92 * lp.i})`);
+          g.addColorStop(0.5, `rgba(0,0,0,${0.45 * lp.i})`);
+          g.addColorStop(1, 'rgba(0,0,0,0)');
+          lctx.fillStyle = g;
+          lctx.beginPath();
+          lctx.arc(lp.x, lp.y, lp.r, 0, Math.PI * 2);
+          lctx.fill();
+        }
+        sctx.setTransform(1, 0, 0, 1, 0, 0);
+        sctx.drawImage(light, 0, 0);
+        // a warm breath at each lamp, for the fallback's sake as much as the shader's
+        sctx.setTransform(sz, 0, 0, sz, -cam.x * sz, -cam.y * sz);
+        sctx.globalCompositeOperation = 'lighter';
+        for (const lp of lamps) {
+          const g = sctx.createRadialGradient(lp.x, lp.y, 0, lp.x, lp.y, lp.r * 0.6);
+          const [r, gg, b] = lp.rgb.map((v) => Math.round(v * 255));
+          g.addColorStop(0, `rgba(${r},${gg},${b},${0.22 * dark * lp.i})`);
+          g.addColorStop(1, `rgba(${r},${gg},${b},0)`);
+          sctx.fillStyle = g;
+          sctx.beginPath();
+          sctx.arc(lp.x, lp.y, lp.r * 0.6, 0, Math.PI * 2);
+          sctx.fill();
+        }
+        sctx.globalCompositeOperation = 'source-over';
+      }
+      if (comp.ok) {
+        const dugKey = s.dykesDug.join(',');
+        if (dugKey !== maskKey) {
+          maskKey = dugKey;
+          comp.setMask(waterMask(DYKE_SEGMENTS.filter((seg) => s.dykesDug.includes(seg.id)).map((seg) => seg.path)));
+        }
+        comp.render(scene, glCanvas, {
+          camX: cam.x,
+          camY: cam.y,
+          scale: sz,
+          time: now,
+          dark,
+          dusk,
+          tide: tideLevel(s.tick),
+          lamps,
+        });
+      }
+
+      // The overlay: everything that must read, above the shader.
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.setTransform(z, 0, 0, z, -cam.x * z, -cam.y * z);
 
       // Labels: always, at a readable screen size (the desk has room).
       drawLabel(ctx, 'Walland Farm', fc.x, fc.y - 18, cam.zoom);
@@ -604,9 +697,10 @@ export function DeskMap() {
       }}
       onClick={onClick}
     >
+      <canvas ref={sceneRef} className="desk-canvas" />
+      <canvas ref={glRef} className="desk-canvas" />
       <canvas ref={canvasRef} className="desk-canvas" />
       <Tags />
-      <NightVeil />
       {placing && (
         <div className="placing-banner">
           Choose open marsh for the cutting house — {CUTTING_HOUSE_COST} coin. Click elsewhere to think better of it.
@@ -614,11 +708,4 @@ export function DeskMap() {
       )}
     </div>
   );
-}
-
-function NightVeil() {
-  const tick = useGameStore((s) => s.state.tick);
-  const phase = dayPhaseOf(tick);
-  const o = phase === 'night' ? 0.34 : phase === 'dusk' ? 0.16 : 0;
-  return o > 0 ? <div className="night-veil" style={{ opacity: o }} /> : null;
 }
