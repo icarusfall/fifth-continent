@@ -6,11 +6,28 @@ A single-player, browser-based god/builder game about smuggling, logistics, and
 the two kinds of magic you can use to hide a crime. Design spec and build brief:
 [the-fifth-continent-spec.md](./the-fifth-continent-spec.md).
 
-**437 tests green · save v26 · M5½ complete · the desk rework: D3, the day ahead.**
+**440 tests green · save v26 · M5½ complete · the desk rework: D4 (first half), the look.**
 
 ---
 
-## Status: the desk rework — D3, the day ahead ✅ (then D4, the look)
+## Status: the desk rework — D4, the look (first half) ✅ (then the building and cart art)
+
+The desk paints its own marsh: Romney's fields — irregular, low-contrast, each
+boundary a wet ditch, a faint dry line or none, hedged on the clay — with the
+coast inked once and the sea deepening east. The map is three layers now: the
+lit scene, a single WebGL2 shader pass (§15.1, option B), and a crisp overlay
+for every label, badge, ring, route and tag. Night is real: the farm's and
+Ryne's windows, the cutting house's fire, every cart's lantern, the lugger's
+signal shown and hidden on the water, the officer's lamp — and the reserved
+colours glow only where their owners are. The shader floods the flats as the
+tide rises (at high water the beach is under it), works surf along the sea's
+shore, ripples and glints the water, moves wind across the fields, blooms the
+lamps and lays their light on the water, drifts fog that thins near light, and
+grades the hour. Without WebGL2 the scene itself is the picture.
+
+---
+
+## Earlier: the desk rework — D3, the day ahead
 
 A strip along the foot of the table reads the next 24 hours: night and dusk
 shaded, the tide as a curve with the low road's drowned hours beneath it, the

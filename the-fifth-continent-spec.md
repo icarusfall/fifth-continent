@@ -3477,6 +3477,30 @@ a route      while the pointer rests on a route in a tag, the trip is drawn
 ```
 Hover any mark for its exact hour. Click the strip to see the hour named.
 
+*D4 — the look, first half (2026-10-02).* The desk paints its own marsh
+(`src/desk/look/terrain.ts`): the TERRAIN classes, warped so the tile grid
+never shows, as Romney's fields — a jittered lattice of fields in a narrow
+range of greens (clays on the upland), each boundary a wet ditch, a faint dry
+line, or nothing (two fields grazed as one: the lattice must not read as a
+grid), hedges on the clay; the coast and every water's edge inked once; the sea
+deepening east from each row's last land. A crisp world-plus-margin canvas
+over a coarse apron (§15.2). The map is now three layers: the SCENE (land,
+roads, water, sprites, then the night), the shader's output, and an OVERLAY of
+everything that must read — labels, badges, rings, routes, tags — so no text
+ripples. The night is cut in 2D (darkness, then each lamp punched out of it,
+then a warm breath at each): the fallback keeps its night. Lamps: the farm's
+windows, Ryne's, the Customs House, the cutting house's fire, every cart's
+lantern, the lugger's signal (shown and hidden), the officer's lamp — and in
+their owners' reserved colours only, Leiden's workshop (Phlogiston orange) and
+the wight-stone (Ichor green). Darkness eases over the game's own dusk and dawn
+hours. The WATER MASK (red = water, green = nearness to the sea by a chamfer
+distance, dug channels laid in) lets the shader flood the flats as `tideLevel`
+rises — at high water the beach is under it — and keeps the surf to the sea's
+shore. The shader is §15.1's, tuned calm: a quarter-tile ripple fixed in the
+world (not the screen), faint glints, wind across the fields, bloom, fog, the
+hour's grade. The scene renders at up to 1.5× density to keep each frame's
+texture upload affordable. *Still to come in D4:* the building and cart art.
+
 *Decisions taken (2026-10-01):* the phone UI frozen; carts clicked directly on
 the desk; the playable mock's direction approved ("a GREAT improvement");
 rendering option B (Canvas 2D plus one WebGL2 pass) over A (2D only) and C
