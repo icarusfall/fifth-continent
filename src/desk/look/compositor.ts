@@ -56,12 +56,12 @@ void main(){
   float m = mk.r;                                  // water
   float near = mk.g;                               // nearness to the sea
   // the tide over the flats: the higher the water, the further it reaches
-  float thr = 1.0 - uTide * 0.62;
+  float thr = 1.0 - uTide * 0.45; // high water reaches ~1.2 tiles up the beach, short of the huts
   float flood = (1.0 - m) * smoothstep(thr, thr + 0.07, near);
   float wetv = max(m, flood);
   vec2 rip = vec2(fbm(w*1.4 + vec2(uTime*0.18, 0.0)), fbm(w*1.4 + vec2(3.1, uTime*0.14))) - 0.5;
   // a ripple a fixed size in the world (a quarter-tile), not a fraction of the screen
-  vec3 col = texture(uScene, uv + rip * (0.22 * uTile * uScale / uRes) * wetv).rgb;
+  vec3 col = texture(uScene, uv + rip * (0.12 * uTile * uScale / uRes) * wetv).rgb;
   vec3 sea = mix(vec3(0.32, 0.43, 0.46), vec3(0.17, 0.22, 0.26), uDark);
   col = mix(col, sea, flood * 0.62);
   float fedge = flood * (1.0 - flood) * 4.0;
@@ -88,7 +88,7 @@ void main(){
   // fog that drifts, and thins near light
   float f = smoothstep(0.45, 0.86, fbm(w*0.2 + vec2(uTime*0.03, uTime*0.008)));
   vec3 fogC = mix(vec3(0.86, 0.85, 0.8), vec3(0.3, 0.34, 0.43), uDark);
-  col = mix(col, fogC, f * (0.1 + 0.26*uDark) * (1.0 - clamp(lit, 0.0, 1.0)));
+  col = mix(col, fogC, f * (0.1 + 0.26*uDark) * (1.0 - clamp(lit, 0.0, 1.0)) * (1.0 - 0.7 * wetv));
   // grade: cool moonlit shadows, warm dusk
   float lum = dot(col, vec3(0.3, 0.59, 0.11));
   col = mix(col, mix(vec3(lum)*vec3(0.72, 0.84, 1.12), col, clamp(lit*1.5, 0.0, 1.0)), uDark * 0.5);
