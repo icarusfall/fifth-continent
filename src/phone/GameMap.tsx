@@ -34,7 +34,7 @@ import type { Cart, EdgeId, GameState, Good, NodeId } from '../sim/types';
 import { useGameStore } from '../state/store';
 import { useUiStore } from '../state/ui';
 import { Sheet, useIsPhone } from './Sheet';
-import { firstMorningHint, isFreshGame } from './firstMorning';
+import { firstMorningHint, isFreshGame } from '../shared/firstMorning';
 import { CameraController } from '../shared/camera';
 import { APRON_TILES, pathPoints, pointAlong, TILE, tileCenter, WORLD_H, WORLD_W } from '../shared/geometry';
 import { getApronCanvas, getTerrainCanvas } from '../shared/paint';

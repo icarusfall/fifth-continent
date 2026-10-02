@@ -24,6 +24,7 @@ import { woolMismatches } from '../../sim/wool';
 import { GOOD_LABEL, spanOf, storeSummary } from '../../shared/format';
 import { GOOD_WHISPER, cargoCount, cartWhereabouts, coatOn, orderLabel } from '../../shared/words';
 import { act, compact, type Line, type Section, type Sheet, type Verb } from '../sheet';
+import { idleReason } from '../idle';
 
 export function handOf(cart: Cart): string {
   return cart.vessel === 'dyke' ? 'dyke-pilot' : cart.vessel === 'sea' ? 'lighterman' : 'carter';
@@ -225,6 +226,7 @@ export function cartSheet(state: GameState, cartId: string): Sheet | null {
       title: `the ${handOf(cart)}`,
       lines: [
         { text: `Standing order: ${orderLabel(state, cart.carter)}, and round again — ${carterWageOf(cart.carter)} coin a day.` },
+        ...(idleReason(state, cart) ? [{ text: `He ${idleReason(state, cart)}.`, tone: 'warn' as const }] : []),
         ...mismatches.map((m) => ({ text: m, tone: 'warn' as const })),
       ],
       verbs: [

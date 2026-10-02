@@ -44,6 +44,8 @@ import { useGameStore } from '../state/store';
 import { useDeskUi } from './deskUi';
 import type { DeskSelection } from './sheet';
 import { Tags } from './Tags';
+import { firstMorningHint } from '../shared/firstMorning';
+import { hintTarget } from './FirstMorning';
 import { draftStops } from './command';
 import { routeRisk, routesBetween, type Route } from './routes';
 
@@ -522,6 +524,9 @@ export function DeskMap() {
         strokeRoute(ctx, routePoints(hr.route), TONE_STROKE[tone], 4.4, cam.zoom, [12, 6]);
       }
       ring(hoverRef.current, 0.55, false);
+      // §10 — the first morning's pointer, rung on the map where it points.
+      const hint = firstMorningHint(s);
+      if (hint) ring(hintTarget(hint), 0.45 + 0.45 * Math.sin(performance.now() / 420), false);
       ring(ui.selection, 1, true);
 
       // Cart numbers: a badge per cart, the same number the stable and the

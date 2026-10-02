@@ -6,11 +6,20 @@ A single-player, browser-based god/builder game about smuggling, logistics, and
 the two kinds of magic you can use to hide a crime. Design spec and build brief:
 [the-fifth-continent-spec.md](./the-fifth-continent-spec.md).
 
-**440 tests green · save v26 · M5½ complete · the desk rework: D4 (first half), the look.**
+**445 tests green · save v26 · M5½ complete · the desk rework: D4 done, D5 playtest next.**
 
 ---
 
-## Status: the desk rework — D4, the look ✅ (then D5, your playtest)
+## Status: the desk rework — D4 ✅; D5, the playtest, is next
+
+Ready for the playtest: a new game on the desk now opens with the first
+morning's pointer pinned at the head of the table — one sentence, a ring on the
+map where it points — and the stable says why a hired hand stands still
+("waits on white fleece — the flock wants shearing").
+
+---
+
+## Earlier: the desk rework — D4, the look
 
 The second half of the look: the desk now draws its own buildings and carts.
 Roofs seen from above with a lean and the south wall showing, windows that

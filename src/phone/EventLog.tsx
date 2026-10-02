@@ -6,7 +6,7 @@ import { clockOf } from '../sim/time';
 import type { GameState } from '../sim/types';
 import { useUiStore } from '../state/ui';
 import { Sheet, useIsPhone } from './Sheet';
-import { firstMorningHint } from './firstMorning';
+import { firstMorningHint } from '../shared/firstMorning';
 
 function stamp(tick: number): string {
   const c = clockOf(tick);
