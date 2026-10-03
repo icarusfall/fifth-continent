@@ -6,11 +6,30 @@ A single-player, browser-based god/builder game about smuggling, logistics, and
 the two kinds of magic you can use to hide a crime. Design spec and build brief:
 [the-fifth-continent-spec.md](./the-fifth-continent-spec.md).
 
-**448 tests green · save v26 · M5½ complete · the desk rework: D5 playtest under way.**
+**456 tests green · save v26 · M5½ complete · the desk rework: D6, look and feel.**
 
 ---
 
-## Status: the desk rework — D5, the playtest, under way
+## Status: the desk rework — D6, look and feel
+
+- **The map answers back.** A sale rings coin over Ryne, shearing throws
+  wool off the flock, a load lands in the cart, the rent leaves the farm, and
+  the Customs House flares red when it counts a load.
+- **The tide reaches the river.** At high water the estuary spreads over its
+  banks below Ryne; at low water it shrinks to a channel between mud banks.
+- **Sea mist** gathers round the Shingle while the lugger stands off at night.
+- **The mail coach** comes down the turnpike from the City each morning,
+  pays at the toll gate, stands in Ryne through the early afternoon and goes
+  home before dusk.
+- **Sound**, off until you switch it on (top bar): wind and surf, gulls and
+  an owl, hooves on the road, and a cue for every one of the moments above.
+
+The phone's rework as a management sim is planned, not started:
+[docs/phone-management-sim.md](docs/phone-management-sim.md).
+
+---
+
+## Earlier: D5, the first playtest
 
 From the first playtest:
 - A beginner can no longer send an empty cart to Ryne. Until the first sale,

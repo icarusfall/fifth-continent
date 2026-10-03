@@ -27,6 +27,10 @@ export interface FrameParams {
   dusk: number;
   tide: number;
   lamps: Lamp[];
+  /** Sea mist off the Shingle on a lugger night (D6b): 0..1, and where, in world px. */
+  mist: number;
+  mistX: number;
+  mistY: number;
 }
 
 const MAX_LAMPS = 32;
@@ -37,7 +41,7 @@ in vec2 p; void main(){ gl_Position = vec4(p, 0.0, 1.0); }`;
 const FRAG = `#version 300 es
 precision highp float;
 uniform sampler2D uScene, uMask;
-uniform vec2 uRes, uCam; uniform float uScale, uTile, uTime, uDark, uDusk, uTide;
+uniform vec2 uRes, uCam, uMistC; uniform float uScale, uTile, uTime, uDark, uDusk, uTide, uMist;
 uniform vec4 uMaskRect; // x0, y0, w, h in world px
 uniform vec4 uL[${MAX_LAMPS}]; uniform vec3 uC[${MAX_LAMPS}]; uniform int uN;
 out vec4 o;
@@ -57,14 +61,24 @@ void main(){
   float near = mk.g;                               // nearness to the sea
   // the tide over the flats: the higher the water, the further it reaches
   float thr = 1.0 - uTide * 0.45; // high water reaches ~1.2 tiles up the beach, short of the huts
-  float flood = (1.0 - m) * smoothstep(thr, thr + 0.07, near);
+  float seaRaw = smoothstep(thr, thr + 0.07, near);
+  float flood = (1.0 - m) * seaRaw;
+  // the estuary: the river swells over its banks toward Ryne at high water,
+  // and at low water shrinks to a channel between banks of shining mud
+  float est = mk.b;
+  float bankRaw = smoothstep(1.0 - uTide * 0.9, 1.25 - uTide * 0.9, est);
+  flood = max(flood, (1.0 - m) * bankRaw);
+  float mud = m * smoothstep(1.02 - (1.0 - uTide) * 0.62, 1.17 - (1.0 - uTide) * 0.62, est);
   float wetv = max(m, flood);
   vec2 rip = vec2(fbm(w*1.4 + vec2(uTime*0.18, 0.0)), fbm(w*1.4 + vec2(3.1, uTime*0.14))) - 0.5;
   // a ripple a fixed size in the world (a quarter-tile), not a fraction of the screen
   vec3 col = texture(uScene, uv + rip * (0.12 * uTile * uScale / uRes) * wetv).rgb;
   vec3 sea = mix(vec3(0.32, 0.43, 0.46), vec3(0.17, 0.22, 0.26), uDark);
   col = mix(col, sea, flood * 0.62);
-  float fedge = flood * (1.0 - flood) * 4.0;
+  col = mix(col, mix(vec3(0.36, 0.31, 0.25), vec3(0.17, 0.16, 0.16), uDark), mud * 0.85);
+  // the leading edge of the advancing water only, never the old waterline
+  float wf = max(seaRaw, bankRaw);
+  float fedge = wf * (1.0 - wf) * 4.0 * (1.0 - m);
   col = mix(col, vec3(0.9, 0.88, 0.83), fedge * 0.45 * (1.0 - uDark*0.4));
   float glint = smoothstep(0.62, 0.8, noise(w*vec2(4.0, 11.0) + vec2(uTime*0.25, 0.0)) * noise(w*vec2(5.5, 9.0) - vec2(0.0, uTime*0.2)) * 2.0);
   col += wetv * glint * mix(vec3(0.07), vec3(0.04, 0.05, 0.09), uDark);
@@ -89,6 +103,16 @@ void main(){
   float f = smoothstep(0.45, 0.86, fbm(w*0.2 + vec2(uTime*0.03, uTime*0.008)));
   vec3 fogC = mix(vec3(0.86, 0.85, 0.8), vec3(0.3, 0.34, 0.43), uDark);
   col = mix(col, fogC, f * (0.1 + 0.26*uDark) * (1.0 - clamp(lit, 0.0, 1.0)) * (1.0 - 0.7 * wetv));
+  // sea mist on a lugger night: banks off the water round the Shingle, drifting
+  // landward, lit from within by the lugger's signal and the huts' lamps
+  if (uMist > 0.001) {
+    float md = length(world - uMistC) / uTile;
+    float reach = 1.0 - smoothstep(2.5, 10.0, md);
+    float bank = smoothstep(0.36, 0.7, fbm(w*0.32 + vec2(-uTime*0.05, uTime*0.015)));
+    float mist = uMist * reach * (0.2 + 0.8 * bank) * max(m, near * 0.8);
+    vec3 mistC = mix(vec3(0.82, 0.82, 0.8), vec3(0.42, 0.47, 0.56), uDark) + clamp(lit, 0.0, 1.5) * vec3(0.22, 0.17, 0.1);
+    col = mix(col, mistC, mist * 0.62);
+  }
   // grade: cool moonlit shadows, warm dusk
   float lum = dot(col, vec3(0.3, 0.59, 0.11));
   col = mix(col, mix(vec3(lum)*vec3(0.72, 0.84, 1.12), col, clamp(lit*1.5, 0.0, 1.0)), uDark * 0.5);
@@ -131,7 +155,7 @@ export class Compositor {
         const loc = gl.getAttribLocation(pr, 'p');
         gl.enableVertexAttribArray(loc);
         gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-        for (const n of ['uScene', 'uMask', 'uRes', 'uCam', 'uScale', 'uTile', 'uTime', 'uDark', 'uDusk', 'uTide', 'uMaskRect', 'uN'])
+        for (const n of ['uScene', 'uMask', 'uRes', 'uCam', 'uScale', 'uTile', 'uTime', 'uDark', 'uDusk', 'uTide', 'uMaskRect', 'uN', 'uMist', 'uMistC'])
           this.u[n] = gl.getUniformLocation(pr, n);
         this.u.uL = gl.getUniformLocation(pr, 'uL[0]');
         this.u.uC = gl.getUniformLocation(pr, 'uC[0]');
@@ -185,6 +209,8 @@ export class Compositor {
     gl.uniform1f(this.u.uDark, p.dark);
     gl.uniform1f(this.u.uDusk, p.dusk);
     gl.uniform1f(this.u.uTide, p.tide);
+    gl.uniform1f(this.u.uMist, p.mist);
+    gl.uniform2f(this.u.uMistC, p.mistX, p.mistY);
     gl.uniform4f(this.u.uMaskRect, ...this.maskRect);
     const lamps = p.lamps.slice(0, MAX_LAMPS);
     const l = new Float32Array(MAX_LAMPS * 4);

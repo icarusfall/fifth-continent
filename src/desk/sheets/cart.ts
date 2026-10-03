@@ -84,6 +84,8 @@ function cargoVerbs(state: GameState, cart: Cart, at: NodeId): Verb[] {
           label: `Sell ${GOOD_LABEL[good]}`,
           charge: q > 0 ? `${q} · ${q * RYNE_PRICE[good]} coin${q < n ? ' · all the town will take' : ''}` : undefined,
           blocked: q <= 0 ? 'The town has had its fill today. Dawn brings appetite.' : undefined,
+          // the last of the first morning's steps: shear, load, send, SELL
+          primary: good === 'fleece' && q > 0 && firstMorningHint(state) !== null,
           run: act({ type: 'sell', cartId: cart.id, good }),
         });
         if (CONTRABAND.includes(good) && RYNE_PRICE[good] > 0) {

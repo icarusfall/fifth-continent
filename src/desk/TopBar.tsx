@@ -18,6 +18,24 @@ import { benchReport } from '../shared/words';
 import { useGameStore } from '../state/store';
 import { useDeskUi } from './deskUi';
 import { rememberShell } from '../shell';
+import { useEffect, useState } from 'react';
+import { sound } from './sound/sound';
+
+/** The sound switch: off until asked, and remembered (D6c). */
+function SoundSwitch() {
+  const [on, setOn] = useState(sound.on);
+  useEffect(() => sound.subscribe(setOn), []);
+  return (
+    <button
+      className={`tb-btn quiet${on ? ' on' : ''}`}
+      onClick={() => sound.set(!on)}
+      title={on ? 'Sound on: the marsh, the sea and the till. Click to hush it.' : 'Sound off. Click to hear the marsh.'}
+      aria-pressed={on}
+    >
+      {on ? '♪ Sound' : '♪ Off'}
+    </button>
+  );
+}
 
 const PHASE_GLYPH: Record<string, string> = { dawn: '◒', day: '☀', dusk: '◓', night: '☾' };
 
@@ -136,6 +154,7 @@ export function TopBar() {
           </button>
         )}
       </span>
+      <SoundSwitch />
       <button
         className="tb-btn quiet"
         onClick={() => rememberShell('phone')}

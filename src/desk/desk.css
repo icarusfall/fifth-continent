@@ -148,6 +148,10 @@ kbd {
 .tb-btn.quiet {
   color: var(--paper-dim);
 }
+.tb-btn.quiet.on {
+  color: var(--lamp);
+  border-color: rgba(240, 207, 138, 0.45);
+}
 .speeds {
   display: inline-flex;
   gap: 3px;

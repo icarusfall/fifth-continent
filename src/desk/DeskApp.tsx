@@ -13,6 +13,7 @@ import { Stable } from './Stable';
 import { TopBar } from './TopBar';
 import { useDeskUi } from './deskUi';
 import { useJourneys, useLeaning } from './command';
+import { sound } from './sound/sound';
 
 // THE SMUGGLER'S TABLE (spec §20.4). The map is the table; the panels sit at
 // its edges and never cover the place being acted on: the stable on the left,
@@ -24,6 +25,8 @@ export default function DeskApp() {
   useDeskKeys();
   useJourneys();
   useLeaning();
+  // a player who left the sound on hears it again from their first click (D6c)
+  useEffect(() => sound.restore(), []);
   const lost = useGameStore((s) => s.state.lost);
   return (
     <div className="desk">
