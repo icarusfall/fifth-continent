@@ -12,6 +12,54 @@ import { rentAmount } from '../sim/tick';
 import type { Difficulty, NodeId } from '../sim/types';
 import { useGameStore } from '../state/store';
 import { useDeskUi } from './deskUi';
+import { tideHold } from './idle';
+import { spanOf } from '../shared/format';
+import { handOf } from './sheets/cart';
+
+/** Hired hands' tide holds are told once a session; they know the marsh. */
+const toldHands = new Set<string>();
+
+/**
+ * Caught by the tide (desk playtest, 2026-10-03): the moment a hauler halts
+ * on a drowned way, a slip says so — what happened, that nothing is lost,
+ * when it clears, and how to miss it next time.
+ */
+function useTideSlips() {
+  const pushSlip = useDeskUi((s) => s.pushSlip);
+  useEffect(() => {
+    let held = new Set<string>();
+    let seed = -1;
+    return useGameStore.subscribe((st) => {
+      const s = st.state;
+      const now = new Set<string>();
+      for (const cart of s.carts) {
+        const h = tideHold(s, cart);
+        if (!h) continue;
+        now.add(cart.id);
+        if (held.has(cart.id) || seed !== s.seed) continue;
+        if (cart.carter) {
+          if (toldHands.has(cart.id)) continue;
+          toldHands.add(cart.id);
+        }
+        pushSlip(
+          h.why === 'flood'
+            ? {
+                id: `tide-${cart.id}-${s.tick}`,
+                title: 'Caught by the tide',
+                body: `${cart.carter ? `The ${handOf(cart)} with ${cart.name.toLowerCase()}` : cart.name} was on ${h.road.toLowerCase()} when the sea came over it. It waits on high ground, nothing lost, and goes on when the water drops, in ${spanOf(h.clears)}. The high road never floods; the strip along the bottom shows when the low road will.`,
+              }
+            : {
+                id: `tide-${cart.id}-${s.tick}`,
+                title: 'Too little water',
+                body: `${cart.name} waits mid-channel on ${h.road}: the tub wants more tide under the keel. It goes on in ${spanOf(h.clears)}.`,
+              },
+        );
+      }
+      held = now;
+      seed = s.seed;
+    });
+  }, [pushSlip]);
+}
 
 /** Info cards that still stop the clock on the desk. */
 const PAUSE_PREFIXES = ['muster-', 'seizure-', 'distraint-', 'collected-', 'breach-'];
@@ -27,6 +75,7 @@ export function Dispatches() {
   const slips = useDeskUi((s) => s.slips);
   const pushSlip = useDeskUi((s) => s.pushSlip);
   const dropSlip = useDeskUi((s) => s.dropSlip);
+  useTideSlips();
 
   // An info card that is not a pause beat becomes a slip, and the world runs on.
   useEffect(() => {

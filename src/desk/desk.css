@@ -988,3 +988,8 @@ kbd {
 .sheet-help:focus .sheet-help-pop {
   display: block;
 }
+
+/* ---- caught by the tide ---- */
+.stable-row .idle.tide {
+  color: #bcd6dd;
+}

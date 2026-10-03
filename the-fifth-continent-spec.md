@@ -3628,6 +3628,17 @@ When every verb in a section is shut for the one reason, the reason is said
 once beneath them all. And the inspector scrolls the lit NEXT step into view
 whenever it changes.
 
+*D6e, caught by the tide (2026-10-03, the second playtest).* A cart halted
+on the drowned low road read as "stuck in the water": the only word was a
+log line. Now one rule (`tideHold` in `src/desk/idle.ts`) mirrors moveCarts:
+a hauler part-way along a tide-locked way at high water, or a tub with too
+little water under the keel. It feeds four places. A SLIP the moment it
+halts, saying that it waits on high ground, that nothing is lost, when the
+water drops, and that the high road never floods (a hired hand's hold is told
+once a session). On the MAP, water rings round the halted cart and a tag:
+"≈ waits on the tide · 3h50". THE STABLE and THE CART'S SHEET say the same
+in a line. Nothing about the rule itself changes.
+
 *Decisions taken (2026-10-01):* the phone UI frozen; carts clicked directly on
 the desk; the playable mock's direction approved ("a GREAT improvement");
 rendering option B (Canvas 2D plus one WebGL2 pass) over A (2D only) and C
