@@ -3619,6 +3619,15 @@ clinks; the rent a low bell; shearing three snips; a load two wooden thunks;
 the Crown's count two dull drum strokes. The same cue never sounds twice
 within 0.15 s. Sound states nothing the map does not already show.
 
+*D6d, room for the next step (2026-10-03, the second playtest).* With the
+farm's sheet under the cart's, the lit Shear fell below the fold. Three
+answers. The cart's how-to ("click a route on the map…") moves into a "?" by
+the sheet's title, opened on hover or focus. This is a sheet's `help`: how to
+drive it, never a reason something cannot be done (those are always shown).
+When every verb in a section is shut for the one reason, the reason is said
+once beneath them all. And the inspector scrolls the lit NEXT step into view
+whenever it changes.
+
 *Decisions taken (2026-10-01):* the phone UI frozen; carts clicked directly on
 the desk; the playable mock's direction approved ("a GREAT improvement");
 rendering option B (Canvas 2D plus one WebGL2 pass) over A (2D only) and C

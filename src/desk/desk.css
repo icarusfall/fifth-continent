@@ -937,3 +937,54 @@ kbd {
 .place-under .sheet-head h2 {
   font-size: 21px;
 }
+
+/* ---- how to drive it: a "?" by the title, opened on hover (desk playtest) ---- */
+.sheet-head {
+  position: relative;
+}
+.sheet-help {
+  display: inline-grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  margin-left: 8px;
+  border: 1px solid var(--rule);
+  border-radius: 50%;
+  font-family: var(--display-lc);
+  font-size: 11px;
+  letter-spacing: 0;
+  color: var(--paper-dim);
+  cursor: help;
+  vertical-align: 1px;
+}
+.sheet-help:hover,
+.sheet-help:focus {
+  color: var(--paper);
+  background: rgba(232, 225, 210, 0.12);
+  outline: none;
+}
+.sheet-help-pop {
+  display: none;
+  position: absolute;
+  left: 12px;
+  right: 40px;
+  top: 30px;
+  z-index: 3;
+  padding: 8px 10px;
+  background: #2b221d;
+  border: 1px solid var(--rule);
+  border-left: 2px solid var(--lamp);
+  border-radius: 4px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  font-family: var(--body, Georgia, serif);
+  font-size: 13px;
+  letter-spacing: 0;
+  line-height: 1.4;
+  color: var(--paper);
+  text-transform: none;
+  font-variant: normal;
+}
+.sheet-help:hover .sheet-help-pop,
+.sheet-help:focus .sheet-help-pop {
+  display: block;
+}

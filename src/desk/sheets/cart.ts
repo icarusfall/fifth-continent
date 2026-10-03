@@ -298,18 +298,6 @@ export function cartSheet(state: GameState, cartId: string): Sheet | null {
     });
   }
   sections.push({ key: 'last', title: 'and', lines: [], verbs: last });
-  sections.push({
-    key: 'command',
-    lines: [
-      {
-        text: cart.carter
-          ? `Click places on the map to write the ${handOf(cart)} a new round.`
-          : 'Click a route on the map to send it. Shift-click places to write a round, and hire a hand to ride it.',
-        tone: 'quiet',
-      },
-    ],
-    verbs: [],
-  });
 
   return {
     kicker: cart.carter ? `a cart · ${handOf(cart)} on the reins` : 'a cart · yours to drive',
@@ -317,5 +305,8 @@ export function cartSheet(state: GameState, cartId: string): Sheet | null {
     lines,
     fill: { count: cargoCount(cart.cargo), cap: cart.capacity },
     sections: compact(sections),
+    help: cart.carter
+      ? `Click places on the map to write the ${handOf(cart)} a new round.`
+      : 'Click a route on the map to send it, or a road here. Shift-click places to write a round, and hire a hand to ride it.',
   };
 }
