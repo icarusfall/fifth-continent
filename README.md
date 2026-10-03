@@ -6,13 +6,28 @@ A single-player, browser-based god/builder game about smuggling, logistics, and
 the two kinds of magic you can use to hide a crime. Design spec and build brief:
 [the-fifth-continent-spec.md](./the-fifth-continent-spec.md).
 
-**445 tests green · save v26 · M5½ complete · the desk rework: D4 done, D5 playtest next.**
+**448 tests green · save v26 · M5½ complete · the desk rework: D5 playtest under way.**
 
 ---
 
-## Status: the desk rework — D4 ✅; D5, the playtest, is next
+## Status: the desk rework — D5, the playtest, under way
 
-Ready for the playtest: a new game on the desk now opens with the first
+From the first playtest:
+- A beginner can no longer send an empty cart to Ryne. Until the first sale,
+  the roads wait until the wool is aboard.
+- The next step is lit on the sheet: Shear, then Load, then the road to Ryne.
+- A cart standing at a place shows the place's verbs beneath its own, so the
+  shears are there at the farm and the alehouse at Ryne.
+- A river now comes down from the north and meets the sea at Ryne, and the
+  low road fords it south of the town.
+- The northern clay is enclosure country: hedged fields, woods, a turnpike to
+  Applesham and the City, a toll gate and a great house.
+
+---
+
+## Earlier: D5 preparation
+
+A new game on the desk opens with the first
 morning's pointer pinned at the head of the table — one sentence, a ring on the
 map where it points — and the stable says why a hired hand stands still
 ("waits on white fleece — the flock wants shearing").

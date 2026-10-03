@@ -343,6 +343,7 @@ export function DeskMap() {
       art.sheep(sctx, s.farm, s.flockSize, performance.now() / 1000);
       art.farm(sctx, s.farm, lit, tnow);
       if ((s.fortifications.farm ?? 0) > 0) drawFortifications(sctx, s.farm, s.fortifications.farm ?? 0, fortVisibility(s, 'farm'));
+      art.uplands(sctx, lit);
       art.ryne(sctx, lit);
       art.customs(sctx, lit, s.revenue.officer.arrived, tnow);
       if (s.dutchman.unlocked) {
@@ -461,6 +462,8 @@ export function DeskMap() {
         ctx.restore();
       };
       label('Walland Farm', fc.x, fc.y - 18);
+      // where the turnpike leaves the map: the way to the law's own country
+      label('to Applesham · and the City ↑', 21.2 * TILE, 3.3 * TILE);
       label('Ryne', 28.5 * TILE, 19.6 * TILE);
       label('Customs House', 26.5 * TILE, 17.9 * TILE);
       if (s.dutchman.unlocked) {

@@ -45,11 +45,51 @@ function classAt(tx: number, ty: number): string {
   return terrainAt(Math.max(0, Math.min(MAP_WIDTH - 1, Math.floor(tx))), Math.max(0, Math.min(MAP_HEIGHT - 1, Math.floor(ty))));
 }
 
+// The river (desk playtest, 2026-10-03), drawn from a smooth centreline that
+// follows the sim's 'd' tiles: a one-tile river through the warped grid reads
+// as a staircase. Rises in the north, off the map; widens to its mouth at Ryne.
+const RIVER: Array<[number, number]> = [
+  [3.0, -12], [3.0, 0], [3.4, 4.2], [4.1, 7.6], [3.6, 10.5], [3.7, 14], [4.4, 16.2], [4.7, 18.6],
+  [5.7, 20.6], [7.1, 22.4], [9.4, 23.7], [12.4, 24.4], [15.4, 25.3], [19.2, 26.1], [23.4, 26.3],
+  [25.4, 25.4], [27.4, 24.6], [31.8, 24.5], [34, 24.5],
+];
+const RIVER_HALF_SOURCE = 0.42;
+const RIVER_HALF_MOUTH = 0.9;
+
+/** Distance from a point to the river's centreline, and how far down it lies (0..1). */
+function riverAt(tx: number, ty: number): { dist: number; along: number } {
+  let best = Infinity;
+  let along = 0;
+  for (let i = 0; i < RIVER.length - 1; i++) {
+    const [ax, ay] = RIVER[i];
+    const [bx, by] = RIVER[i + 1];
+    const dx = bx - ax;
+    const dy = by - ay;
+    const t = Math.max(0, Math.min(1, ((tx - ax) * dx + (ty - ay) * dy) / (dx * dx + dy * dy)));
+    const ex = ax + dx * t - tx;
+    const ey = ay + dy * t - ty;
+    const d = ex * ex + ey * ey;
+    if (d < best) {
+      best = d;
+      along = (i + t) / (RIVER.length - 1);
+    }
+  }
+  return { dist: Math.sqrt(best), along };
+}
+
 /** The class under a warped point — soft, organic edges from a tile grid. */
 function classWarped(tx: number, ty: number): string {
   const wx = (vnoise(tx / WARP_SCALE, ty / WARP_SCALE, 31) - 0.5) * 2 * WARP_AMP;
   const wy = (vnoise(tx / WARP_SCALE, ty / WARP_SCALE, 32) - 0.5) * 2 * WARP_AMP;
-  return classAt(tx + wx, ty + wy);
+  const c = classAt(tx + wx, ty + wy);
+  if (c === '~') return c;
+  const r = riverAt(tx, ty);
+  const half =
+    RIVER_HALF_SOURCE + (RIVER_HALF_MOUTH - RIVER_HALF_SOURCE) * r.along * r.along + (vnoise(tx / 1.7, ty / 1.7, 33) - 0.5) * 0.18;
+  if (r.dist < half) return 'd';
+  if (c !== 'd') return c;
+  // a warped 'd' outside the drawn river is the bank it runs between
+  return ty < 4.5 || (tx > 24.5 && ty > 18.5) ? 'c' : '.';
 }
 
 const rgb = (s: string): [number, number, number] => {
@@ -66,7 +106,12 @@ const WATER = rgb(DYKE);
 const INK_RGB = rgb(INK);
 
 const FIELD_GREENS = [MARSH, mix(MARSH, LIMEWASH, 0.08), mix(MARSH, MARSH_DARK, 0.22), mix(MARSH, '#8d9a63', 0.55), mix(MARSH, '#6f8257', 0.5)];
-const FIELD_CLAYS = [mix(CLAY, MARSH, 0.35), mix(CLAY, MARSH, 0.5), mix(CLAY, LIMEWASH, 0.08), mix(CLAY, MARSH_DARK, 0.3)];
+// The uplands (desk playtest, 2026-10-03): gentry country toward Applesham and
+// the City — enclosed, owned, ordered. Pasture greener and richer than the
+// marsh's, ploughland warm, the hedgerows dark and tree-studded, the woods deep.
+const UPLAND_FIELDS = [mix(MARSH, '#86924f', 0.6), mix(MARSH, '#9a9455', 0.55), mix(CLAY, MARSH, 0.45), mix(MARSH, MARSH_DARK, 0.15), mix(CLAY, '#b49a6a', 0.4)];
+const WOOD = mix(MARSH_DARK, INK, 0.2);
+const CANOPY = [mix(MARSH_DARK, '#5d7044', 0.5), mix(MARSH_DARK, MARSH, 0.35), mix(MARSH_DARK, INK, 0.1)];
 const DITCH_WATER = mix(DYKE, LIMEWASH, 0.08);
 const DITCH_DRY = mix(MARSH_DARK, INK, 0.15);
 const HEDGE = mix(MARSH_DARK, INK, 0.25);
@@ -117,7 +162,7 @@ function paint(x0: number, y0: number, w: number, h: number, res: number, detail
       } else if (c === 'd') {
         col = WATER;
       } else {
-        col = rgb(c === 'c' ? FIELD_CLAYS[0] : MARSH);
+        col = rgb(c === 'c' ? UPLAND_FIELDS[0] : MARSH);
       }
       // the coast and the water's edge, inked once, two pixels deep
       const here = wet(cls[i]);
@@ -154,8 +199,8 @@ function paint(x0: number, y0: number, w: number, h: number, res: number, detail
   for (let j = gy0; j < gy1; j++) {
     for (let i = gx0; i < gx1; i++) {
       const c = cellClass(i, j);
-      if (!isLand(c)) continue;
-      const pal = c === 'c' ? FIELD_CLAYS : FIELD_GREENS;
+      if (c !== '.') continue; // the uplands are enclosed separately, below
+      const pal = FIELD_GREENS;
       const q = [corner(i, j), corner(i + 1, j), corner(i + 1, j + 1), corner(i, j + 1)];
       f.fillStyle = pal[Math.floor(hash2(i, j, 13) * pal.length)];
       f.beginPath();
@@ -185,18 +230,14 @@ function paint(x0: number, y0: number, w: number, h: number, res: number, detail
   for (let j = gy0; j < gy1; j++) {
     for (let i = gx0; i < gx1; i++) {
       const c = cellClass(i, j);
-      if (!isLand(c)) continue;
+      if (c !== '.') continue;
       const edges: Array<[{ x: number; y: number }, { x: number; y: number }, string]> = [
         [corner(i, j), corner(i + 1, j), cellClass(i, j - 1)],
         [corner(i, j), corner(i, j + 1), cellClass(i - 1, j)],
       ];
       for (const [a, b, other] of edges) {
-        if (!isLand(other)) continue;
-        if (c === 'c' || other === 'c') {
-          f.strokeStyle = HEDGE;
-          f.lineWidth = 0.12;
-          f.setLineDash([0.18, 0.12]);
-        } else {
+        if (other !== '.') continue;
+        {
           // Some boundaries are wet ditches, some a faint dry line, and some
           // nothing at all — two fields grazed as one. That breaks the lattice.
           const roll = hash2(i * 3 + (b.x > a.x + 0.5 ? 0 : 1), j, 15);
@@ -219,6 +260,77 @@ function paint(x0: number, y0: number, w: number, h: number, res: number, detail
     }
   }
   f.setLineDash([]);
+
+  // The uplands: a regular, nearly square lattice of enclosures — the gentry's
+  // straight hedges against the marsh's crazy paving — some ploughed, some
+  // grazed, some left to wood, every hedge tree-studded.
+  const ex = 2.6;
+  const ey = 1.8;
+  const ec = (i: number, j: number) => ({
+    x: i * ex + (hash2(i, j, 21) - 0.5) * 0.25,
+    y: j * ey + (hash2(i, j, 22) - 0.5) * 0.25,
+  });
+  for (let j = Math.floor(y0 / ey) - 1; j < Math.ceil((y0 + h) / ey) + 1; j++) {
+    for (let i = Math.floor(x0 / ex) - 1; i < Math.ceil((x0 + w) / ex) + 1; i++) {
+      if (classAt((i + 0.5) * ex, (j + 0.5) * ey) !== 'c') continue;
+      const q = [ec(i, j), ec(i + 1, j), ec(i + 1, j + 1), ec(i, j + 1)];
+      const wood = hash2(i, j, 23) < 0.17;
+      f.fillStyle = wood ? WOOD : UPLAND_FIELDS[Math.floor(hash2(i, j, 24) * UPLAND_FIELDS.length)];
+      f.beginPath();
+      q.forEach((p, k) => (k ? f.lineTo(p.x, p.y) : f.moveTo(p.x, p.y)));
+      f.closePath();
+      f.fill();
+      if (detail && wood) {
+        // a copse: canopies crowded together
+        for (let k = 0; k < 16; k++) {
+          const tx = q[0].x + 0.3 + hash2(i * 7 + k, j, 25) * (ex - 0.6);
+          const ty = q[0].y + 0.3 + hash2(i, j * 7 + k, 26) * (ey - 0.6);
+          f.fillStyle = CANOPY[k % CANOPY.length];
+          f.beginPath();
+          f.arc(tx, ty, 0.28 + hash2(i, k, 27) * 0.14, 0, Math.PI * 2);
+          f.fill();
+          f.strokeStyle = 'rgba(36, 28, 24, 0.35)';
+          f.lineWidth = 0.035;
+          f.stroke();
+        }
+      } else if (detail && hash2(i, j, 28) < 0.5) {
+        // ploughland: straight furrows, the owner's hand
+        f.strokeStyle = 'rgba(36, 28, 24, 0.08)';
+        f.lineWidth = 0.05;
+        for (let k = 1; k < 6; k++) {
+          const yy = q[0].y + (k * ey) / 6;
+          f.beginPath();
+          f.moveTo(q[0].x + 0.15, yy);
+          f.lineTo(q[1].x - 0.15, yy);
+          f.stroke();
+        }
+      }
+      // the hedges, and the trees standing in them
+      f.strokeStyle = HEDGE;
+      f.lineWidth = 0.13;
+      f.lineCap = 'round';
+      f.beginPath();
+      q.forEach((p, k) => (k ? f.lineTo(p.x, p.y) : f.moveTo(p.x, p.y)));
+      f.closePath();
+      f.stroke();
+      if (detail) {
+        for (let e = 0; e < 2; e++) {
+          const a = q[e];
+          const b = q[e + 1];
+          const len = Math.hypot(b.x - a.x, b.y - a.y);
+          for (let tpos = 0.4; tpos < len; tpos += 0.75) {
+            if (hash2(i * 5 + e, j * 11 + Math.round(tpos * 10), 29) > 0.38) continue;
+            const t = tpos / len;
+            f.fillStyle = CANOPY[(i + j + e) % CANOPY.length];
+            f.beginPath();
+            f.arc(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, 0.2, 0, Math.PI * 2);
+            f.fill();
+          }
+        }
+      }
+    }
+  }
+
   // clip the fields to the land itself
   const landMask = f.createImageData(W, H);
   for (let i = 0; i < W * H; i++) landMask.data[i * 4 + 3] = isLand(cls[i]) ? 255 : 0;

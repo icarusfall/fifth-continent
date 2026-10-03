@@ -29,10 +29,13 @@ function VerbRow({ verb, sectionKey, run }: { verb: Verb; sectionKey: string; ru
   const open = useDeskUi((s) => !!s.whyOpen[key]);
   const toggle = useDeskUi((s) => s.toggleWhy);
   return (
-    <div className={`verb${verb.blocked ? ' blocked' : ''}${verb.danger ? ' danger' : ''}`}>
+    <div className={`verb${verb.blocked ? ' blocked' : ''}${verb.danger ? ' danger' : ''}${verb.primary && !verb.blocked ? ' primary' : ''}`}>
       <div className="verb-row">
         <button className="verb-btn" disabled={!!verb.blocked} onClick={() => run(verb.run)}>
-          <span className="verb-label">{verb.label}</span>
+          <span className="verb-label">
+            {verb.primary && !verb.blocked && <em className="next">next</em>}
+            {verb.label}
+          </span>
           {verb.charge && <span className="verb-charge">{verb.charge}</span>}
         </button>
         {verb.why && (
@@ -119,6 +122,15 @@ export function Inspector() {
   const queued = useGameStore((s) => s.pending.length);
   const setPaused = useGameStore((s) => s.setPaused);
   const sheet = selection ? sheetFor(selection, state, waiting) : null;
+  // A cart standing at a place shows the place's own verbs beneath it (desk
+  // playtest, 2026-10-03): at the farm the shears, at Ryne the alehouse. The
+  // cart and the place it stands in are one visit.
+  const selCart = selection?.kind === 'cart' ? state.carts.find((c) => c.id === selection.id) : null;
+  const placeAt = selCart?.location.kind === 'node' ? selCart.location.nodeId : null;
+  const placeFull = placeAt ? sheetFor({ kind: 'place', id: placeAt }, state, waiting) : null;
+  const placeUnder = placeFull
+    ? { ...placeFull, sections: placeFull.sections.filter((s) => !s.key.startsWith('carts-')) }
+    : null;
 
   const run = (r: Run) => {
     if ('action' in r) {
@@ -156,6 +168,11 @@ export function Inspector() {
           {selection?.kind === 'cart' && <JourneyNote cartId={selection.id} />}
           {selection?.kind === 'cart' && <RoundDraft />}
           <SheetView sheet={sheet} run={run} />
+          {placeUnder && (
+            <div className="place-under">
+              <SheetView sheet={placeUnder} run={run} />
+            </div>
+          )}
         </>
       ) : (
         <div className="sheet-body idle">

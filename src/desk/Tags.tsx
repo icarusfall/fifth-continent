@@ -9,6 +9,8 @@ import type { Cart, GameState, NodeId } from '../sim/types';
 import { useGameStore } from '../state/store';
 import { addDraftStop, sendByRoute } from './command';
 import { useDeskUi } from './deskUi';
+import { firstMorningHint } from '../shared/firstMorning';
+import { cargoCount } from '../shared/words';
 import { hoursOf, originOf, routeRisk, routesBetween, waysFor, type Route } from './routes';
 
 const TONE_LABEL: Record<string, string> = {
@@ -50,6 +52,16 @@ export function Tags() {
   const from = drafting ? draft.stops[draft.stops.length - 1] : originOf(cart);
   const crewed = !!cart.carter;
   const name = (n: NodeId) => nodeById(n, state.farm, state.cuttingHouse).name;
+  const empty = cargoCount(cart.cargo) === 0;
+  // Section 10 (desk playtest): before the first sale an empty cart is offered
+  // no road. The next step is the barn, and the sheet lights it.
+  if (empty && !crewed && !drafting && firstMorningHint(state) !== null) {
+    return (
+      <div className="tags" onPointerDown={(e) => e.stopPropagation()}>
+        <div className="tag-hint">The cart is empty. Shear, then load the wool, and the roads will open.</div>
+      </div>
+    );
+  }
 
   const choose = (e: React.MouseEvent, to: NodeId, route: Route) => {
     e.stopPropagation();
@@ -91,7 +103,9 @@ export function Tags() {
                   <i className="dot" aria-label={TONE_LABEL[risk.tone]} />
                   <span className="by">by {roadsOf(r)}</span>
                   <span className="hrs">{hoursOf(r.ticks)}</span>
-                  <span className="risk">{risk.words.join(' · ')}</span>
+                  <span className="risk">
+                    {[...(empty && !crewed && !drafting && to === 'ryne' ? ['empty, nothing aboard to sell'] : []), ...risk.words].join(' · ')}
+                  </span>
                 </button>
               );
             })}

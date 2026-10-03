@@ -112,6 +112,8 @@ export function farmSheet(state: GameState): Sheet {
           : stored >= FARM_STORE_CAPACITY
             ? 'The barn is full to the rafters. Move wool out first.'
             : undefined,
+      why: 'Wool on the sheep goes into the barn. A cart loads from the barn.',
+      primary: onBacks > 0 && (barn.fleece ?? 0) + (barn['dark-fleece'] ?? 0) === 0 && stored < FARM_STORE_CAPACITY,
       run: act({ type: 'shear' }),
     },
   ];
