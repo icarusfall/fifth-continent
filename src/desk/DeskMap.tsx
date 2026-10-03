@@ -25,6 +25,8 @@ import { TILE, pathPoints, pointAlong, tileCenter } from '../shared/geometry';
 import * as art from './look/art';
 import { Compositor } from './look/compositor';
 import { Fx } from './look/fx';
+import { coachAt, SmoothClock } from './look/traffic';
+import { sound } from './sound/sound';
 import { darknessAt, duskAt, lampsOf } from './look/light';
 import { deskApron, deskWorld, drawPainted, waterMask } from './look/terrain';
 import {
@@ -263,6 +265,8 @@ export function DeskMap() {
     const glCanvas = glRef.current!;
     const comp = new Compositor(glCanvas);
     const fx = new Fx();
+    const clock = new SmoothClock();
+    let mist = 0;
     glCanvas.hidden = !comp.ok; // without WebGL2 the scene itself is the picture
     const light = document.createElement('canvas');
     const lctx = light.getContext('2d')!;
@@ -346,6 +350,10 @@ export function DeskMap() {
       art.farm(sctx, s.farm, lit, tnow);
       if ((s.fortifications.farm ?? 0) > 0) drawFortifications(sctx, s.farm, s.fortifications.farm ?? 0, fortVisibility(s, 'farm'));
       art.uplands(sctx, lit);
+      // the mail from the City, on the game's own clock
+      const store = useGameStore.getState();
+      const mailCoach = coachAt(clock.at(s.tick, tnow, store.ticksPerSecond, store.paused || !!store.activeCard));
+      if (mailCoach) art.coach(sctx, mailCoach.x, mailCoach.y, mailCoach.angle, mailCoach.moving, tnow);
       art.ryne(sctx, lit);
       art.customs(sctx, lit, s.revenue.officer.arrived, tnow);
       if (s.dutchman.unlocked) {
@@ -382,6 +390,11 @@ export function DeskMap() {
       const dark = darknessAt(s.tick);
       const dusk = duskAt(s.tick);
       const lamps = lampsOf(s, now, cartPos, officerPos);
+      if (mailCoach && dark > 0.05) {
+        lamps.push({ x: mailCoach.x + Math.cos(mailCoach.angle) * 7, y: mailCoach.y + Math.sin(mailCoach.angle) * 7, r: 1.7 * TILE, i: 0.9, rgb: [0.98, 0.8, 0.52] });
+      }
+      // the sea mist gathers while the lugger stands off in the dark, and lifts with it
+      mist += ((s.dutchman.present ? dark : 0) - mist) * 0.015;
       if (dusk > 0.01) {
         sctx.setTransform(1, 0, 0, 1, 0, 0);
         sctx.globalCompositeOperation = 'multiply';
@@ -439,6 +452,9 @@ export function DeskMap() {
           dusk,
           tide: tideLevel(s.tick),
           lamps,
+          mist,
+          mistX: tileCenter(SHINGLE).x + 2 * TILE,
+          mistY: tileCenter(SHINGLE).y,
         });
       }
 
@@ -622,7 +638,20 @@ export function DeskMap() {
       }
 
       // the map answers back: coin, wool, rent and the Crown's count, where they happen
-      fx.observe(s, now);
+      for (const c of fx.observe(s, now)) sound.cue(c);
+      if (sound.on) {
+        const st = useGameStore.getState();
+        const view = cam.x + w / cam.zoom / 2; // the view's centre, world px
+        sound.ambient(
+          {
+            dark,
+            sea: Math.max(0, Math.min(1, (view / TILE - 18) / 14)),
+            moving: s.carts.filter((c) => c.location.kind === 'edge').length,
+            running: !st.paused && !st.activeCard,
+          },
+          now,
+        );
+      }
       fx.draw(ctx, (x, y) => cam.worldToScreen(x, y), dpr, cam.zoom, now);
     };
     raf = requestAnimationFrame(loop);

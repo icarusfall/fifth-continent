@@ -735,3 +735,90 @@ export function uplands(ctx: CanvasRenderingContext2D, lit: number): void {
   building(ctx, { x: 8.4 * T, y: 1.5 * T, w: 24, d: 11, wall: 6.5, roof: SLATE, wallCol: blend(LIMEWASH, CLAY, 0.22), style: 'hip', windows: 7, door: true, chimney: 1, lit, seed: 71 });
   ctx.restore();
 }
+
+// ---- the mail coach (D6b) ----
+
+const COACH_MAROON = blend('#6b2a26', INK, 0.15);
+const COACH_WHEEL = blend('#a33a2a', INK, 0.1);
+
+/** The mail from the City: a pair in harness, a maroon body, a black roof
+ *  piled with mail bags, the guard's lamp at night. Faces +x at angle 0. */
+export function coach(ctx: CanvasRenderingContext2D, x: number, y: number, angle: number, moving: boolean, t: number): void {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.lineJoin = 'round';
+  const step = moving ? Math.sin(t * 11) : 0;
+  ctx.fillStyle = SHADOW;
+  ctx.beginPath();
+  ctx.ellipse(4, 3, 20, 7, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // the pair, side by side
+  for (const side of [-3.2, 3.2]) {
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 0.9;
+    ctx.beginPath();
+    for (const [lx, ph] of [[11, 0], [12.5, Math.PI], [16.5, Math.PI], [18, 0]]) {
+      const s = Math.sin(ph + side) * step * 1.5;
+      ctx.moveTo(lx, side);
+      ctx.lineTo(lx + s, side + 2.2 * Math.sign(side));
+    }
+    ctx.stroke();
+    ctx.fillStyle = side < 0 ? blend(CLAY, INK, 0.55) : blend(CLAY, INK, 0.3);
+    ctx.lineWidth = OUT;
+    ctx.beginPath();
+    ctx.ellipse(14.5, side, 5, 2.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(20.5, side * 0.9, 2.5, 1.4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+  // the pole between them
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 0.9;
+  ctx.beginPath();
+  ctx.moveTo(6, 0);
+  ctx.lineTo(19, 0);
+  ctx.stroke();
+  // wheels, red: the front pair smaller
+  ctx.fillStyle = COACH_WHEEL;
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 0.6;
+  for (const [wx, ww] of [[-9.5, 7], [1.5, 5.5]]) {
+    for (const wy of [-7.2, 5.2]) {
+      ctx.beginPath();
+      ctx.rect(wx, wy, ww, 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+  }
+  // the body: maroon panels, a black upper and roof
+  ctx.fillStyle = COACH_MAROON;
+  ctx.lineWidth = OUT;
+  ctx.beginPath();
+  ctx.roundRect(-11, -5.6, 16, 11.2, 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = blend(INK, SLATE, 0.3);
+  ctx.beginPath();
+  ctx.roundRect(-9.5, -4.2, 11, 8.4, 1.5);
+  ctx.fill();
+  // the mail on the roof, strapped
+  ctx.fillStyle = blend(CLAY, LIMEWASH, 0.25);
+  ctx.lineWidth = 0.6;
+  for (const [bx, by] of [[-8, -2.8], [-4.5, -3], [-8, 0.6], [-4.2, 0.3]]) {
+    ctx.beginPath();
+    ctx.roundRect(bx, by, 3.2, 2.6, 0.8);
+    ctx.fill();
+    ctx.stroke();
+  }
+  // the box, and the coachman's hat
+  ctx.fillStyle = INK;
+  ctx.fillRect(4, -3.2, 2.6, 6.4);
+  ctx.beginPath();
+  ctx.arc(5.2, -1.2, 1.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}

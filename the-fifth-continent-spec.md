@@ -3586,6 +3586,39 @@ drown. Enclosure hedges are drawn on the northern clay only: Ryne's hill is a
 town's clay, not an estate's. The first morning lights its last step too:
 Sell white fleece at Ryne.
 
+*D6b, the night and the road (2026-10-03).* WEATHER TELLS THE TRUTH OR IS
+NOT DRAWN. The sim has no weather (its only fog is the wight-fog of a battle,
+§6.14). Under §20's rule that the map is the truth, a fog bank on the land
+would promise cover the Riding Officer does not grant. So the desk draws only
+atmosphere that matches a fact. SEA MIST gathers over the water round the
+Shingle while the lugger stands off in the dark, eases in over a few seconds,
+lifts when he goes, and is lit from inside by his signal: a second way to read
+"the lugger is here", never a claim about who can see what. No rain.
+THE MAIL COACH (`src/desk/look/traffic.ts`): every day it leaves the City's
+road (off the north edge) at 09:30. It halts ten minutes at the toll gate,
+takes the high road past the Customs House, stands in Ryne from 12:30 to
+15:00, and is gone north by 18:00, its guard's lamp lit after dusk. Maroon
+body, red wheels, the mail on its roof; never the reserved Revenue blue. It
+runs on the game's clock, eased between ticks, so it halts when the game is
+paused. It cannot be clicked and has no mechanic: it says only that the road
+north leads to people with more authority than an officer on a horse.
+
+*D6c, sound (2026-10-03).* Every voice is synthesised with WebAudio
+(`src/desk/sound/sound.ts`), so nothing is downloaded. It is OFF until the
+player turns it on; the top bar's switch is remembered (a UI preference, never
+in the save), and a remembered "on" waits for the first click, as browsers
+require.
+THE BED: wind over the marsh (band-passed noise, gusting, a little stronger at
+night) and surf (brown noise on a seven-second swell), whose weight follows
+how far east the view looks.
+THE WILD THINGS: every 9 to 25 seconds, gulls by day (more often toward the
+sea) or an owl at night.
+HOOVES: a soft clip-clop while any cart is on the road and the clock runs.
+CUES: the same moments the map answers (D6a) and nothing else. Coin is three
+clinks; the rent a low bell; shearing three snips; a load two wooden thunks;
+the Crown's count two dull drum strokes. The same cue never sounds twice
+within 0.15 s. Sound states nothing the map does not already show.
+
 *Decisions taken (2026-10-01):* the phone UI frozen; carts clicked directly on
 the desk; the playable mock's direction approved ("a GREAT improvement");
 rendering option B (Canvas 2D plus one WebGL2 pass) over A (2D only) and C

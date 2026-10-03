@@ -9,6 +9,7 @@ import { nodeById } from '../../sim/map';
 import type { GameState, NodeId } from '../../sim/types';
 import { tileCenter } from '../../shared/geometry';
 import { cargoCount } from '../../shared/words';
+import type { Cue } from '../sound/sound';
 
 type Kind = 'coin' | 'loss' | 'note' | 'heat';
 
@@ -78,14 +79,16 @@ export class Fx {
     return { texts: this.floaters.map((f) => f.text), tufts: this.tufts.length, rings: this.rings.length };
   }
 
-  /** Compare with the last frame and spawn what changed. `now` in seconds. */
-  observe(s: GameState, now: number): void {
+  /** Compare with the last frame and spawn what changed; returns the cues to
+   *  sound. `now` in seconds. */
+  observe(s: GameState, now: number): Cue[] {
     const cur = snap(s);
     const prev = this.last;
     this.last = cur;
+    const cues: Cue[] = [];
     // a different game, or time run backwards (a load): no fanfare
-    if (!prev || prev.seed !== cur.seed || cur.tick < prev.tick || cur.tick - prev.tick > 600) return;
-    if (cur.tick === prev.tick) return;
+    if (!prev || prev.seed !== cur.seed || cur.tick < prev.tick || cur.tick - prev.tick > 600) return cues;
+    if (cur.tick === prev.tick) return cues;
 
     // where cargo left a cart, and where it arrived in one
     const unloadedAt: NodeId[] = [];
@@ -96,6 +99,7 @@ export class Fx {
       if (c.n > p.n) {
         const o = this.at(s, c.at);
         this.floaters.push({ kind: 'note', text: `+${c.n - p.n} aboard`, wx: o.x + 10, wy: o.y - 4, born: now });
+        cues.push('load');
       }
     }
 
@@ -103,10 +107,12 @@ export class Fx {
       const where = unloadedAt.find((n) => n !== 'farm') ?? 'ryne';
       const o = this.at(s, where);
       this.floaters.push({ kind: 'coin', text: `+${cur.coin - prev.coin}`, wx: o.x, wy: o.y - 12, born: now });
+      cues.push('coin');
     }
     if (cur.rentPaid > prev.rentPaid) {
       const o = this.at(s, 'farm');
       this.floaters.push({ kind: 'loss', text: `rent −${cur.rentPaid - prev.rentPaid}`, wx: o.x, wy: o.y - 16, born: now });
+      cues.push('loss');
     }
 
     // shearing: the barn fills from the flock's backs
@@ -114,6 +120,7 @@ export class Fx {
     const dark = cur.barn.dark - prev.barn.dark;
     if (white > 0 || dark > 0) {
       const o = this.at(s, 'farm');
+      cues.push('shear');
       const n = Math.min(26, 6 + Math.round((white + dark) / 2));
       for (let i = 0; i < n; i++) {
         const a = -Math.PI / 2 + (Math.random() - 0.5) * 2.4;
@@ -134,10 +141,12 @@ export class Fx {
       const o = this.at(s, 'customs');
       this.rings.push({ wx: o.x, wy: o.y, born: now });
       this.floaters.push({ kind: 'heat', text: 'counted', wx: o.x, wy: o.y - 14, born: now });
+      cues.push('heat');
     }
 
     if (this.floaters.length > 24) this.floaters.splice(0, this.floaters.length - 24);
     if (this.tufts.length > 120) this.tufts.splice(0, this.tufts.length - 120);
+    return cues;
   }
 
   /**
