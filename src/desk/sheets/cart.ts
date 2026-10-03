@@ -24,7 +24,7 @@ import { woolMismatches } from '../../sim/wool';
 import { GOOD_LABEL, spanOf, storeSummary } from '../../shared/format';
 import { GOOD_WHISPER, cargoCount, cartWhereabouts, coatOn, orderLabel } from '../../shared/words';
 import { act, compact, type Line, type Section, type Sheet, type Verb } from '../sheet';
-import { idleReason } from '../idle';
+import { idleReason, tideHold } from '../idle';
 import { firstMorningHint } from '../../shared/firstMorning';
 
 export function handOf(cart: Cart): string {
@@ -239,6 +239,16 @@ export function cartSheet(state: GameState, cartId: string): Sheet | null {
     { text: `${cartWhereabouts(state, cart)[0].toUpperCase()}${cartWhereabouts(state, cart).slice(1)}.` },
     { text: `Aboard: ${storeSummary(cart.cargo, 'nothing')} (${cargoCount(cart.cargo)}/${cart.capacity}).` },
   ];
+  const held = tideHold(state, cart);
+  if (held) {
+    lines.push({
+      text:
+        held.why === 'flood'
+          ? `Caught by the tide on ${held.road.toLowerCase()}. It waits on high ground, nothing lost, and goes on when the water drops, in ${spanOf(held.clears)}. The high road never floods.`
+          : `Too little water under the keel on ${held.road}. It waits mid-channel for the tide, ${spanOf(held.clears)}.`,
+      tone: 'warn',
+    });
+  }
   const sections: Section[] = [];
 
   if (cart.carter) {

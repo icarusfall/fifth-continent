@@ -5,6 +5,10 @@
 
 import type { Cart, GameState } from '../sim/types';
 import { GOOD_LABEL } from '../shared/format';
+import { TICKS_PER_DAY, TUB_TIDE_MIN } from '../sim/balance';
+import { dykeWaterways } from '../sim/dykes';
+import { edgesFor } from '../sim/map';
+import { isFlooded, tideLevel } from '../sim/time';
 
 export function idleReason(state: GameState, cart: Cart): string | null {
   const order = cart.carter;
@@ -29,4 +33,39 @@ export function idleReason(state: GameState, cart: Cart): string | null {
     return 'waits on dark fleece — the books are square, so none grows';
   }
   return `waits on ${GOOD_LABEL[stop.take]}`;
+}
+
+/**
+ * A hauler halted mid-way by the tide (desk playtest, 2026-10-03): the low
+ * road under high water — the cart waits on high ground, nothing lost — or a
+ * tub with too little water under the keel. Mirrors moveCarts exactly; says
+ * how long until the way opens again, in ticks.
+ */
+export interface TideHold {
+  road: string;
+  why: 'flood' | 'shallow';
+  clears: number;
+}
+
+/** The hold in a few words, for the stable and the map's tag. */
+export function tideHoldWords(h: TideHold, span: string): string {
+  return h.why === 'flood' ? `waits on high ground: the tide drops in ${span}` : `waits for more water under the keel, ${span}`;
+}
+
+export function tideHold(state: GameState, cart: Cart): TideHold | null {
+  const loc = cart.location;
+  if (loc.kind !== 'edge' || loc.progress <= 0) return null;
+  const edge = [...edgesFor(state.farm, state.cuttingHouse), ...dykeWaterways(state)].find((e) => e.id === loc.edgeId);
+  if (!edge) return null;
+  const until = (open: (t: number) => boolean) => {
+    for (let t = 1; t <= TICKS_PER_DAY; t++) if (open(state.tick + t)) return t;
+    return TICKS_PER_DAY;
+  };
+  if (edge.id.startsWith('waterway-') && tideLevel(state.tick) < TUB_TIDE_MIN) {
+    return { road: edge.name, why: 'shallow', clears: until((t) => tideLevel(t) >= TUB_TIDE_MIN) };
+  }
+  if (edge.condition === 'tideLocked' && isFlooded(state.tick)) {
+    return { road: edge.name, why: 'flood', clears: until((t) => !isFlooded(t)) };
+  }
+  return null;
 }

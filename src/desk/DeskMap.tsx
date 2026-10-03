@@ -27,6 +27,8 @@ import { Compositor } from './look/compositor';
 import { Fx } from './look/fx';
 import { coachAt, SmoothClock } from './look/traffic';
 import { sound } from './sound/sound';
+import { tideHold } from './idle';
+import { spanOf } from '../shared/format';
 import { darknessAt, duskAt, lampsOf } from './look/light';
 import { deskApron, deskWorld, drawPainted, waterMask } from './look/terrain';
 import {
@@ -495,6 +497,45 @@ export function DeskMap() {
       if (s.wights.stone) {
         const wc = tileCenter(s.wights.stone);
         label('The Wight-Stone', wc.x, wc.y - 16);
+      }
+
+      // Caught by the tide: water rings round the halted cart, and a tag that
+      // says it waits and when it goes on (desk playtest, 2026-10-03).
+      for (const cart of s.carts) {
+        const h = tideHold(s, cart);
+        if (!h) continue;
+        const p = cartPos(s, cart);
+        if (!p) continue;
+        ctx.save();
+        for (let k = 0; k < 3; k++) {
+          const ph = (now * 0.45 + k / 3) % 1;
+          ctx.strokeStyle = `rgba(214, 228, 232, ${0.75 * (1 - ph)})`;
+          ctx.lineWidth = 1.6 / cam.zoom;
+          ctx.beginPath();
+          ctx.ellipse(p.x, p.y + 2, 10 + 18 * ph, 5 + 9 * ph, 0, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        const sp = cam.worldToScreen(p.x, p.y);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        const text = `${h.why === 'flood' ? 'waits on the tide' : 'waits for water'} · ${spanOf(h.clears)}`;
+        ctx.font = "13px 'Source Serif 4', Georgia, serif";
+        const tw = ctx.measureText(text).width + 26;
+        const tx = sp.x - tw / 2;
+        const ty = sp.y - 40;
+        ctx.fillStyle = 'rgba(36, 28, 24, 0.88)';
+        ctx.strokeStyle = 'rgba(160, 196, 206, 0.8)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(tx, ty, tw, 22, 11);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#bcd6dd';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('≈', tx + 8, ty + 11.5);
+        ctx.fillStyle = '#E8E1D2';
+        ctx.fillText(text, tx + 20, ty + 11.5);
+        ctx.restore();
       }
 
       // The hover, and the selection: rings in lamp light, sized for the screen.
