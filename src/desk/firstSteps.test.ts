@@ -29,6 +29,13 @@ describe('the first morning: shear, load, send (desk playtest)', () => {
     expect(verbs(cartSheet(s, s.carts[0].id)).find((v) => v.key === on[0])!.label).toMatch(/^To Ryne/);
   });
 
+  it('at Ryne before the first sale, selling the white wool is lit', () => {
+    const s = initialState(5);
+    s.carts[0].location = { kind: 'node', nodeId: 'ryne' };
+    s.carts[0].cargo = { fleece: 8 };
+    expect(lit(cartSheet(s, s.carts[0].id))).toEqual(['sell-fleece']);
+  });
+
   it('after the first sale an empty cart may go where it likes', () => {
     const s = initialState(5);
     s.coin = 20;

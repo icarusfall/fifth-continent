@@ -3,7 +3,7 @@
 // coast inked once, the sea deepening east. Calm and low-contrast (the
 // designer rejected busy camouflage); painted once to offscreen canvases. And
 // the WATER MASK the shader pass reads: red = water, green = nearness to the
-// sea, which the tide floods as it rises.
+// sea, which the tide floods as it rises, blue = the river's tidal estuary.
 
 import { MAP_HEIGHT, MAP_WIDTH, terrainAt } from '../../sim/map';
 import { hash2, TILE } from '../../shared/geometry';
@@ -55,8 +55,17 @@ const RIVER: Array<[number, number]> = [
 ];
 const RIVER_HALF_SOURCE = 0.42;
 const RIVER_HALF_MOUTH = 0.9;
+/** How far up the river the tide reaches, as a share of its length. */
+const TIDAL_FROM = 0.5;
+const TIDAL_FULL = 0.76;
+/** How far past its banks a spring tide spreads, in tiles. */
+const BANK_REACH = 0.55;
 
 /** Distance from a point to the river's centreline, and how far down it lies (0..1). */
+function riverHalf(along: number): number {
+  return RIVER_HALF_SOURCE + (RIVER_HALF_MOUTH - RIVER_HALF_SOURCE) * along * along;
+}
+
 function riverAt(tx: number, ty: number): { dist: number; along: number } {
   let best = Infinity;
   let along = 0;
@@ -84,8 +93,7 @@ function classWarped(tx: number, ty: number): string {
   const c = classAt(tx + wx, ty + wy);
   if (c === '~') return c;
   const r = riverAt(tx, ty);
-  const half =
-    RIVER_HALF_SOURCE + (RIVER_HALF_MOUTH - RIVER_HALF_SOURCE) * r.along * r.along + (vnoise(tx / 1.7, ty / 1.7, 33) - 0.5) * 0.18;
+  const half = riverHalf(r.along) + (vnoise(tx / 1.7, ty / 1.7, 33) - 0.5) * 0.18;
   if (r.dist < half) return 'd';
   if (c !== 'd') return c;
   // a warped 'd' outside the drawn river is the bank it runs between
@@ -272,7 +280,8 @@ function paint(x0: number, y0: number, w: number, h: number, res: number, detail
   });
   for (let j = Math.floor(y0 / ey) - 1; j < Math.ceil((y0 + h) / ey) + 1; j++) {
     for (let i = Math.floor(x0 / ex) - 1; i < Math.ceil((x0 + w) / ex) + 1; i++) {
-      if (classAt((i + 0.5) * ex, (j + 0.5) * ey) !== 'c') continue;
+      // the north only: Ryne's hill is clay too, but a town's, not an estate's
+      if ((j + 0.5) * ey > 8 || classAt((i + 0.5) * ex, (j + 0.5) * ey) !== 'c') continue;
       const q = [ec(i, j), ec(i + 1, j), ec(i + 1, j + 1), ec(i, j + 1)];
       const wood = hash2(i, j, 23) < 0.17;
       f.fillStyle = wood ? WOOD : UPLAND_FIELDS[Math.floor(hash2(i, j, 24) * UPLAND_FIELDS.length)];
@@ -384,13 +393,59 @@ function baseMask(): HTMLCanvasElement {
   const H = h * res;
   const sea = new Uint8Array(W * H);
   const water = new Uint8Array(W * H);
+  // blue: the estuary. On land, how readily a bank drowns at high water; in
+  // the river, how near its edge, where low water bares the mud first.
+  const estuary = new Uint8Array(W * H);
   for (let py = 0; py < H; py++) {
     for (let px = 0; px < W; px++) {
-      const c = classWarped(x0 + (px + 0.5) / res, y0 + (py + 0.5) / res);
-      sea[py * W + px] = c === '~' ? 1 : 0;
-      water[py * W + px] = c === '~' || c === 'd' ? 1 : 0;
+      const tx = x0 + (px + 0.5) / res;
+      const ty = y0 + (py + 0.5) / res;
+      const c = classWarped(tx, ty);
+      const i = py * W + px;
+      sea[i] = c === '~' ? 1 : 0;
+      water[i] = c === '~' || c === 'd' ? 1 : 0;
+      if (c === '~' || c === 's' || c === 't') continue;
+      const r = riverAt(tx, ty);
+      const tidal = Math.min(1, Math.max(0, (r.along - TIDAL_FROM) / (TIDAL_FULL - TIDAL_FROM)));
+      if (tidal <= 0) continue;
+      const half = riverHalf(r.along);
+      const e = c === 'd' ? Math.min(1, r.dist / half) : Math.max(0, 1 - (r.dist - half) / BANK_REACH);
+      estuary[i] = Math.round(255 * tidal * tidal * (3 - 2 * tidal) * e);
     }
   }
+  // soften it: the mask is coarse, and a sharp channel floods in steps...
+  const soft = new Float32Array(W * H);
+  for (let i = 0; i < W * H; i++) soft[i] = estuary[i];
+  const tmp = new Float32Array(W * H);
+  const RAD = 2;
+  for (let pass = 0; pass < 2; pass++) {
+    for (let py = 0; py < H; py++)
+      for (let px = 0; px < W; px++) {
+        let sum = 0;
+        let n = 0;
+        for (let k = -RAD; k <= RAD; k++) {
+          const x = px + k;
+          if (x < 0 || x >= W) continue;
+          sum += soft[py * W + x];
+          n++;
+        }
+        tmp[py * W + px] = sum / n;
+      }
+    for (let py = 0; py < H; py++)
+      for (let px = 0; px < W; px++) {
+        let sum = 0;
+        let n = 0;
+        for (let k = -RAD; k <= RAD; k++) {
+          const y = py + k;
+          if (y < 0 || y >= H) continue;
+          sum += tmp[y * W + px];
+          n++;
+        }
+        soft[py * W + px] = sum / n;
+      }
+  }
+  // ...on the banks only: in the river the value follows the smooth centreline already
+  for (let i = 0; i < W * H; i++) if (!water[i]) estuary[i] = Math.round(soft[i]);
   // Distance to the sea, in mask px, by a two-pass chamfer.
   const INF = 1e6;
   const dist = new Float32Array(W * H);
@@ -420,7 +475,7 @@ function baseMask(): HTMLCanvasElement {
   for (let i = 0; i < W * H; i++) {
     img.data[i * 4] = water[i] ? 255 : 0;
     img.data[i * 4 + 1] = Math.round(255 * Math.max(0, 1 - dist[i] / reach));
-    img.data[i * 4 + 2] = 0;
+    img.data[i * 4 + 2] = estuary[i];
     img.data[i * 4 + 3] = 255;
   }
   g.putImageData(img, 0, 0);

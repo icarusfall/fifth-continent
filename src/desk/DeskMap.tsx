@@ -24,6 +24,7 @@ import { CameraController } from '../shared/camera';
 import { TILE, pathPoints, pointAlong, tileCenter } from '../shared/geometry';
 import * as art from './look/art';
 import { Compositor } from './look/compositor';
+import { Fx } from './look/fx';
 import { darknessAt, duskAt, lampsOf } from './look/light';
 import { deskApron, deskWorld, drawPainted, waterMask } from './look/terrain';
 import {
@@ -261,6 +262,7 @@ export function DeskMap() {
     const sctx = scene.getContext('2d')!;
     const glCanvas = glRef.current!;
     const comp = new Compositor(glCanvas);
+    const fx = new Fx();
     glCanvas.hidden = !comp.ok; // without WebGL2 the scene itself is the picture
     const light = document.createElement('canvas');
     const lctx = light.getContext('2d')!;
@@ -618,6 +620,10 @@ export function DeskMap() {
         const t = hoverTileRef.current;
         drawTileHighlight(ctx, t.x, t.y, isPlaceable(t.x, t.y) && s.coin >= CUTTING_HOUSE_COST);
       }
+
+      // the map answers back: coin, wool, rent and the Crown's count, where they happen
+      fx.observe(s, now);
+      fx.draw(ctx, (x, y) => cam.worldToScreen(x, y), dpr, cam.zoom, now);
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);

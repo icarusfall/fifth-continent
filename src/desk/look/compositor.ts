@@ -57,14 +57,24 @@ void main(){
   float near = mk.g;                               // nearness to the sea
   // the tide over the flats: the higher the water, the further it reaches
   float thr = 1.0 - uTide * 0.45; // high water reaches ~1.2 tiles up the beach, short of the huts
-  float flood = (1.0 - m) * smoothstep(thr, thr + 0.07, near);
+  float seaRaw = smoothstep(thr, thr + 0.07, near);
+  float flood = (1.0 - m) * seaRaw;
+  // the estuary: the river swells over its banks toward Ryne at high water,
+  // and at low water shrinks to a channel between banks of shining mud
+  float est = mk.b;
+  float bankRaw = smoothstep(1.0 - uTide * 0.9, 1.25 - uTide * 0.9, est);
+  flood = max(flood, (1.0 - m) * bankRaw);
+  float mud = m * smoothstep(1.02 - (1.0 - uTide) * 0.62, 1.17 - (1.0 - uTide) * 0.62, est);
   float wetv = max(m, flood);
   vec2 rip = vec2(fbm(w*1.4 + vec2(uTime*0.18, 0.0)), fbm(w*1.4 + vec2(3.1, uTime*0.14))) - 0.5;
   // a ripple a fixed size in the world (a quarter-tile), not a fraction of the screen
   vec3 col = texture(uScene, uv + rip * (0.12 * uTile * uScale / uRes) * wetv).rgb;
   vec3 sea = mix(vec3(0.32, 0.43, 0.46), vec3(0.17, 0.22, 0.26), uDark);
   col = mix(col, sea, flood * 0.62);
-  float fedge = flood * (1.0 - flood) * 4.0;
+  col = mix(col, mix(vec3(0.36, 0.31, 0.25), vec3(0.17, 0.16, 0.16), uDark), mud * 0.85);
+  // the leading edge of the advancing water only, never the old waterline
+  float wf = max(seaRaw, bankRaw);
+  float fedge = wf * (1.0 - wf) * 4.0 * (1.0 - m);
   col = mix(col, vec3(0.9, 0.88, 0.83), fedge * 0.45 * (1.0 - uDark*0.4));
   float glint = smoothstep(0.62, 0.8, noise(w*vec2(4.0, 11.0) + vec2(uTime*0.25, 0.0)) * noise(w*vec2(5.5, 9.0) - vec2(0.0, uTime*0.2)) * 2.0);
   col += wetv * glint * mix(vec3(0.07), vec3(0.04, 0.05, 0.09), uDark);

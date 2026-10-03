@@ -3412,6 +3412,10 @@ D3  the day ahead
 D4  the look: field terrain, the lit night, the tide, mist; the shader pass;
     then building and cart art
 D5  the designer's playtest at a desk, then tuning
+D6  look and feel (2026-10-03; the designer's priority before the phone):
+    D6a the map answers back (fx), the tidal estuary, tidy-up
+    D6b weather and fog on smuggling nights; traffic on the turnpike
+    D6c sound: procedural ambience and event cues, muted by default
 ```
 
 *D1 as built (2026-10-01).* A place's verbs are DATA on the desk — a sheet of
@@ -3562,6 +3566,25 @@ leaves the high road northward past a toll gate and a milestone ("to Applesham
 · and the City"), and a great house sits in its park. It is a hint, with no
 mechanic yet, that bigger towns and more authority lie north (the Dragoons'
 road, §7).
+
+*D6a, the map answers back (2026-10-03).* Pure UI, read off the difference
+between one frame's state and the last (`src/desk/look/fx.ts`), never saved,
+silent across a load or a new game. Effects appear where the thing happens:
+- a sale rings "+N" coin over the place it was made (where a cart's cargo
+  fell; Ryne by default);
+- shearing throws tufts off the flock, white and dark in proportion;
+- a load reads "+N aboard" at the cart;
+- the rent leaves the farm as "rent −N";
+- a jump of a whole point or more in regional heat in one frame flares a red
+  ring at the Customs House, marked "counted".
+THE TIDAL ESTUARY: the water mask's blue channel marks the river's lower reach
+(from half way down its length, full strength by three quarters). At high
+water the river spreads up to about half a tile over its banks toward Ryne; at
+low water it shrinks to a channel between banks of shining mud. It is drawn
+from the same tide as the low road's drowning, so the ford can be seen to
+drown. Enclosure hedges are drawn on the northern clay only: Ryne's hill is a
+town's clay, not an estate's. The first morning lights its last step too:
+Sell white fleece at Ryne.
 
 *Decisions taken (2026-10-01):* the phone UI frozen; carts clicked directly on
 the desk; the playable mock's direction approved ("a GREAT improvement");
