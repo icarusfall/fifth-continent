@@ -57,6 +57,10 @@ export interface Sheet {
   lines: Line[];
   fill?: { count: number; cap: number };
   sections: Section[];
+  /** How to drive it, beyond its verbs: a "?" by the title, opened on hover or
+   *  focus (desk playtest: the instructions cost the panel its room). Never a
+   *  reason something cannot be done; those are always shown. */
+  help?: string;
 }
 
 export type DeskSelection =

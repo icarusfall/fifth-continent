@@ -3,6 +3,7 @@
 // reason shown when it cannot be done (never a tooltip), and its "what for"
 // folded beneath it. One renderer for every sheet.
 
+import { useEffect, useRef } from 'react';
 import { useGameStore } from '../state/store';
 import { useDeskUi } from './deskUi';
 import { sheetFor } from './sheets';
@@ -24,7 +25,7 @@ function Fill({ count, cap }: { count: number; cap: number }) {
   );
 }
 
-function VerbRow({ verb, sectionKey, run }: { verb: Verb; sectionKey: string; run: (r: Run) => void }) {
+function VerbRow({ verb, sectionKey, run, quietReason }: { verb: Verb; sectionKey: string; run: (r: Run) => void; quietReason?: boolean }) {
   const key = `${sectionKey}:${verb.key}`;
   const open = useDeskUi((s) => !!s.whyOpen[key]);
   const toggle = useDeskUi((s) => s.toggleWhy);
@@ -49,7 +50,7 @@ function VerbRow({ verb, sectionKey, run }: { verb: Verb; sectionKey: string; ru
           </button>
         )}
       </div>
-      {verb.blocked && <p className="verb-reason">{verb.blocked}</p>}
+      {verb.blocked && !quietReason && <p className="verb-reason">{verb.blocked}</p>}
       {open && verb.why && <p className="verb-why">{verb.why}</p>}
     </div>
   );
@@ -59,7 +60,14 @@ export function SheetView({ sheet, run }: { sheet: Sheet; run: (r: Run) => void 
   return (
     <>
       <header className="sheet-head">
-        <div className="kicker">{sheet.kicker}</div>
+        <div className="kicker">
+          {sheet.kicker}
+          {sheet.help && (
+            <span className="sheet-help" tabIndex={0} aria-label={sheet.help}>
+              ?<span className="sheet-help-pop" role="tooltip">{sheet.help}</span>
+            </span>
+          )}
+        </div>
         <h2>{sheet.title}</h2>
       </header>
       <div className="sheet-body">
@@ -67,22 +75,27 @@ export function SheetView({ sheet, run }: { sheet: Sheet; run: (r: Run) => void 
           <LineView key={i} line={l} />
         ))}
         {sheet.fill && <Fill {...sheet.fill} />}
-        {sheet.sections.map((s) => (
-          <section key={s.key} className="sheet-section">
-            {s.title && <h3>{s.title}</h3>}
-            {s.lines.map((l, i) => (
-              <LineView key={i} line={l} />
-            ))}
-            {s.fill && <Fill {...s.fill} />}
-            {s.verbs.length > 0 && (
-              <div className="verbs">
-                {s.verbs.map((v) => (
-                  <VerbRow key={v.key} verb={v} sectionKey={s.key} run={run} />
-                ))}
-              </div>
-            )}
-          </section>
-        ))}
+        {sheet.sections.map((s) => {
+          // every verb shut for the one reason: say it once, under them all
+          const shared = s.verbs.length > 1 && s.verbs.every((v) => v.blocked && v.blocked === s.verbs[0].blocked) ? s.verbs[0].blocked : null;
+          return (
+            <section key={s.key} className="sheet-section">
+              {s.title && <h3>{s.title}</h3>}
+              {s.lines.map((l, i) => (
+                <LineView key={i} line={l} />
+              ))}
+              {s.fill && <Fill {...s.fill} />}
+              {s.verbs.length > 0 && (
+                <div className="verbs">
+                  {s.verbs.map((v) => (
+                    <VerbRow key={v.key} verb={v} sectionKey={s.key} run={run} quietReason={!!shared} />
+                  ))}
+                  {shared && <p className="verb-reason">{shared}</p>}
+                </div>
+              )}
+            </section>
+          );
+        })}
       </div>
     </>
   );
@@ -132,6 +145,32 @@ export function Inspector() {
     ? { ...placeFull, sections: placeFull.sections.filter((s) => !s.key.startsWith('carts-')) }
     : null;
 
+  // The lit next step is brought into view whenever it changes, so a beginner
+  // never scrolls to find it (desk playtest: the shears sat below the fold).
+  const panelRef = useRef<HTMLElement>(null);
+  const litKey = [sheet, placeUnder]
+    .flatMap((sh) => (sh ? sh.sections.flatMap((s) => s.verbs.filter((v) => v.primary && !v.blocked).map((v) => `${s.key}:${v.key}`)) : []))
+    .join('|');
+  useEffect(() => {
+    const reveal = () => {
+      const panel = panelRef.current;
+      const el = panel?.querySelector<HTMLElement>('.verb.primary');
+      if (!panel || !el) return;
+      const p = panel.getBoundingClientRect();
+      const r = el.getBoundingClientRect();
+      const behavior: ScrollBehavior = document.visibilityState === 'visible' ? 'smooth' : 'auto';
+      if (r.bottom > p.bottom - 8) panel.scrollBy({ top: r.bottom - p.bottom + 24, behavior });
+      else if (r.top < p.top + 8) panel.scrollBy({ top: r.top - p.top - 24, behavior });
+    };
+    // once laid out, and again once the panel and its fonts have settled
+    const raf = requestAnimationFrame(reveal);
+    const late = setTimeout(reveal, 450);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(late);
+    };
+  }, [litKey, selection]);
+
   const run = (r: Run) => {
     if ('action' in r) {
       enqueue(r.action);
@@ -154,7 +193,7 @@ export function Inspector() {
   };
 
   return (
-    <aside className="panel inspector" aria-label="Selection">
+    <aside className="panel inspector" aria-label="Selection" ref={panelRef}>
       {paused && queued > 0 && (
         <button className="queued" onClick={() => setPaused(false)}>
           Paused — {queued} order{queued === 1 ? '' : 's'} wait{queued === 1 ? 's' : ''} for the clock. Run it.
