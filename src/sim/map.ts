@@ -29,35 +29,40 @@ import type { MapEdge, MapNode, NodeId, EdgeId } from './types';
 export const MAP_WIDTH = 40;
 export const MAP_HEIGHT = 30;
 
+// The Rother-ish river (desk playtest, 2026-10-03): it rises in the northern
+// uplands west of the farm — so the high road never meets it — runs south past
+// the farm, turns east below the low road and the southern sewers, and meets
+// the sea just south of Ryne, which stands on its mouth. The low road fords it
+// there: the tidal crossing is WHY that road drowns and the high road does not.
 // prettier-ignore
 export const TERRAIN: readonly string[] = [
-  'cccccccccccccccccccccccccccccccccccs~~~~',                     // row 0
-  'cccccccccccccccccccccccccccccccccccs~~~~',                     // row 1
-  'cccccccccccccccccccccccccccccccccccs~~~~',                     // row 2
-  'cccccccccccccccccccc...............s~~~~',                     // row 3
-  'cccccccccccc.......................s~~~~',                     // row 4
-  '..................................s~~~~~',                     // row 5
-  '..................................s~~~~~',                     // row 6
-  '..................................s~~~~~',                     // row 7
-  '..................................s~~~~~',                     // row 8
-  '..................................s~~~~~',                     // row 9
-  '.................................s~~~~~~',                     // row 10
-  '.................................s~~~~~~',                     // row 11
-  '.................................s~~~~~~',                     // row 12
-  '.................................s~~~~~~',                     // row 13
-  '.................................s~~~~~~',                     // row 14
-  '................................s~~~~~~~',                     // row 15
-  '................................s~~~~~~~',                     // row 16
-  '..ddddddddddddddddd.............s~~~~~~~',                     // row 17
-  '................................s~~~~~~~',                     // row 18
-  '.........................cccccccs~~~~~~~',                     // row 19
-  '.........................cctttts~~~~~~~~',                     // row 20
-  '.........................cctttts~~~~~~~~',                     // row 21
-  '.........................cctttts~~~~~~~~',                     // row 22
-  '.........................cctttts~~~~~~~~',                     // row 23
-  '.........................ccccccs~~~~~~~~',                     // row 24
-  '.........................cccccs~~~~~~~~~',                     // row 25
-  '.........................cccc.s~~~~~~~~~',                     // row 26
+  'ccddcccccccccccccccccccccccccccccccs~~~~',                     // row 0
+  'ccddcccccccccccccccccccccccccccccccs~~~~',                     // row 1
+  'ccddcccccccccccccccccccccccccccccccs~~~~',                     // row 2
+  'ccddcccccccccccccccc...............s~~~~',                     // row 3
+  'ccddcccccccc.......................s~~~~',                     // row 4
+  '...d..............................s~~~~~',                     // row 5
+  '...d..............................s~~~~~',                     // row 6
+  '...dd.............................s~~~~~',                     // row 7
+  '...dd.............................s~~~~~',                     // row 8
+  '...d..............................s~~~~~',                     // row 9
+  '...d.............................s~~~~~~',                     // row 10
+  '...d.............................s~~~~~~',                     // row 11
+  '...d.............................s~~~~~~',                     // row 12
+  '...d.............................s~~~~~~',                     // row 13
+  '...d.............................s~~~~~~',                     // row 14
+  '...dd...........................s~~~~~~~',                     // row 15
+  '...dd...........................s~~~~~~~',                     // row 16
+  '....d...........................s~~~~~~~',                     // row 17
+  '....d...........................s~~~~~~~',                     // row 18
+  '....d....................cccccccs~~~~~~~',                     // row 19
+  '.....d...................cctttts~~~~~~~~',                     // row 20
+  '.....dd..................cctttts~~~~~~~~',                     // row 21
+  '......dd.................cctttts~~~~~~~~',                     // row 22
+  '.......ddd...............cctttts~~~~~~~~',                     // row 23
+  '.........ddddd...........cdddddd~~~~~~~~',                     // row 24
+  '.............dddddd.....dddcccs~~~~~~~~~',                     // row 25
+  '.................ddddddddcccc.s~~~~~~~~~',                     // row 26
   '..............................s~~~~~~~~~',                     // row 27
   '..............................s~~~~~~~~~',                     // row 28
   '..............................s~~~~~~~~~',                     // row 29

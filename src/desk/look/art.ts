@@ -264,12 +264,13 @@ export function ryne(ctx: CanvasRenderingContext2D, lit: number): void {
   ctx.fillStyle = blend(INK, CLAY, 0.35);
   ctx.strokeStyle = INK;
   ctx.lineWidth = OUT;
-  ctx.fillRect(30.0 * TILE, 22.2 * TILE, 3.0 * TILE, 5);
-  ctx.strokeRect(30.0 * TILE, 22.2 * TILE, 3.0 * TILE, 5);
-  for (const dx of [1.5, 2.5]) {
+  // the quay stands on the river's mouth, Ryne's whole reason for being here
+  ctx.fillRect(28.4 * TILE, 23.9 * TILE, 2.6 * TILE, 4);
+  ctx.strokeRect(28.4 * TILE, 23.9 * TILE, 2.6 * TILE, 4);
+  for (const dx of [0.7, 1.8]) {
     ctx.fillStyle = blend(INK, CLAY, 0.45);
     ctx.beginPath();
-    ctx.ellipse((30.0 + dx) * TILE, 22.2 * TILE + 9, 6, 2.4, 0, 0, Math.PI * 2);
+    ctx.ellipse((28.4 + dx) * TILE, 24.6 * TILE + 2, 6, 2.2, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
   }
@@ -661,5 +662,76 @@ export function sheep(ctx: CanvasRenderingContext2D, site: { x: number; y: numbe
     ctx.ellipse(sx + 2.5 * facing, sy - 0.3, 1.05, 0.8, 0, 0, Math.PI * 2);
     ctx.fill();
   }
+  ctx.restore();
+}
+
+/**
+ * The uplands' tell (desk playtest, 2026-10-03): this is the way to Applesham
+ * and the City — gentry country, the law's country. A turnpike leaves the high
+ * road northward off the map, through a toll gate past a milestone; a great
+ * house stands in its park among the enclosures.
+ */
+export function uplands(ctx: CanvasRenderingContext2D, lit: number): void {
+  const T = TILE;
+  const road: Array<[number, number]> = [[17, 5.2], [17.3, 3.5], [17.1, 1.6], [17.6, -0.5], [17.4, -6], [18, -14]];
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  for (const [w, col] of [[6.2, 'rgba(36, 28, 24, 0.55)'], [4.4, blend(CLAY, LIMEWASH, 0.4)]] as Array<[number, string]>) {
+    ctx.strokeStyle = col;
+    ctx.lineWidth = w;
+    ctx.beginPath();
+    road.forEach(([x, y], i) => (i ? ctx.lineTo(x * T, y * T) : ctx.moveTo(x * T, y * T)));
+    ctx.stroke();
+  }
+  // the toll gate: a bar across the road and the keeper's cottage
+  building(ctx, { x: 18.3 * T, y: 1.4 * T, w: 7, d: 5, wall: 3.5, roof: ROOF, windows: 1, lit: lit * 0.8, seed: 70 });
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(16.7 * T, 2.2 * T);
+  ctx.lineTo(17.7 * T, 2.2 * T);
+  ctx.stroke();
+  ctx.strokeStyle = LIMEWASH;
+  ctx.lineWidth = 0.6;
+  ctx.setLineDash([1.2, 1.2]);
+  ctx.beginPath();
+  ctx.moveTo(16.7 * T, 2.2 * T);
+  ctx.lineTo(17.7 * T, 2.2 * T);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  // the milestone
+  ctx.fillStyle = blend(LIMEWASH, INK, 0.3);
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 0.7;
+  ctx.beginPath();
+  ctx.roundRect(16.3 * T, 3.4 * T, 2.4, 3.2, 1);
+  ctx.fill();
+  ctx.stroke();
+  // the great house in its park: a lawn, a carriage sweep, a few great trees
+  ctx.fillStyle = blend(MARSH, LIMEWASH, 0.18);
+  ctx.beginPath();
+  ctx.ellipse(8.4 * T, 1.9 * T, 2.6 * T, 1.5 * T, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = blend(CLAY, LIMEWASH, 0.35);
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(8.4 * T, 2.6 * T);
+  ctx.quadraticCurveTo(10.8 * T, 3.4 * T, 12.6 * T, 4.6 * T);
+  ctx.stroke();
+  for (const [tx, ty] of [[6.4, 1.2], [6.9, 2.7], [10.3, 1.0], [10.6, 2.4]]) {
+    ctx.fillStyle = SHADOW;
+    ctx.beginPath();
+    ctx.arc(tx * T + 2, ty * T + 2, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = blend(MARSH_DARK, MARSH, 0.3);
+    ctx.strokeStyle = 'rgba(36,28,24,0.5)';
+    ctx.lineWidth = 0.6;
+    ctx.beginPath();
+    ctx.arc(tx * T, ty * T, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+  building(ctx, { x: 8.4 * T, y: 1.5 * T, w: 24, d: 11, wall: 6.5, roof: SLATE, wallCol: blend(LIMEWASH, CLAY, 0.22), style: 'hip', windows: 7, door: true, chimney: 1, lit, seed: 71 });
   ctx.restore();
 }

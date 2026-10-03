@@ -60,7 +60,7 @@ describe('the farm site and buildable ground', () => {
     expect(isPlaceable(2, 1)).toBe(false); // clay upland
     expect(isPlaceable(38, 10)).toBe(false); // the sea
     expect(isPlaceable(28, 22)).toBe(false); // Ryne
-    expect(isPlaceable(5, 17)).toBe(false); // a dyke
+    expect(isPlaceable(3, 10)).toBe(false); // the river
     expect(isPlaceable(-1, 5)).toBe(false); // off the map
     expect(isPlaceable(5, 400)).toBe(false); // off the map
   });

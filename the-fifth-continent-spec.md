@@ -3533,6 +3533,36 @@ the cart's sheet say what he waits on: the lugger, the town's appetite, or the
 good his stop takes, naming the cause where the game knows it (the flock wants
 shearing; the books are square, so no dark wool grows).
 
+*D5, the first playtest (2026-10-03: the designer and a ten-year-old, from a
+new game).* Four findings, four answers.
+(1) SHEAR, LOAD, SEND. Loading looked no weightier than sending, so an
+explorer sent an empty cart to Ryne and waited for it to come back with
+nothing. Until the first sale (the first-morning gate, §10), a cart with nothing
+aboard is offered no road: its roads are blocked with "load the wool first",
+and its map tags say only "shear, then load the wool, and the roads will open".
+After the first sale an empty cart goes where it likes. Each sheet may also
+light ONE verb as the NEXT STEP (a lamp-coloured button marked "next"): Shear
+while the barn holds no wool; then Load on the cart; then, before the first
+sale, the first open road to Ryne. A pointer only, not a new rule.
+(2) THE CART AND THE PLACE ARE ONE VISIT. A cart standing at a place shows that
+place's sheet beneath its own (without the place's "carts here" list): at the
+farm the shears, at Ryne the alehouse.
+(3) THE RIVER. The old inland pool is gone. A river rises in the north, off
+the map west of the farm, runs south down the marsh's west side, turns east,
+and meets the sea at Ryne. Ryne stands on its mouth and the quay is on the
+river. The low road fords it just south of the town, which is why the tide
+drowns it; the high road comes in from the north and never meets the water.
+In the sim it is 'd' tiles (unplaceable). The desk draws it from a smooth
+centreline that widens toward the mouth.
+(4) THE UPLANDS ARE SOMEONE ELSE'S COUNTRY. The marsh is commons and grazing:
+irregular "crazy-paving" fields cut by ditches. The clay to the north is
+enclosure, the gentry's land: a regular grid of hedged fields with trees in
+the hedgerows, ploughland among pasture, and blocks of woodland. A turnpike
+leaves the high road northward past a toll gate and a milestone ("to Applesham
+· and the City"), and a great house sits in its park. It is a hint, with no
+mechanic yet, that bigger towns and more authority lie north (the Dragoons'
+road, §7).
+
 *Decisions taken (2026-10-01):* the phone UI frozen; carts clicked directly on
 the desk; the playable mock's direction approved ("a GREAT improvement");
 rendering option B (Canvas 2D plus one WebGL2 pass) over A (2D only) and C

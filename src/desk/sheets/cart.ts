@@ -25,6 +25,7 @@ import { GOOD_LABEL, spanOf, storeSummary } from '../../shared/format';
 import { GOOD_WHISPER, cargoCount, cartWhereabouts, coatOn, orderLabel } from '../../shared/words';
 import { act, compact, type Line, type Section, type Sheet, type Verb } from '../sheet';
 import { idleReason } from '../idle';
+import { firstMorningHint } from '../../shared/firstMorning';
 
 export function handOf(cart: Cart): string {
   return cart.vessel === 'dyke' ? 'dyke-pilot' : cart.vessel === 'sea' ? 'lighterman' : 'carter';
@@ -39,14 +40,19 @@ function cargoVerbs(state: GameState, cart: Cart, at: NodeId): Verb[] {
       const barn = state.stores.farm ?? {};
       const barnRoom = FARM_STORE_CAPACITY - cargoCount(barn);
       if (held < CART_CAPACITY) {
+        let first = held === 0;
         for (const [good, n] of Object.entries(barn) as Array<[Good, number]>) {
           if (n <= 0) continue;
+          const wool = good === 'fleece' || good === 'dark-fleece';
           verbs.push({
             key: `load-${good}`,
             label: `Load ${GOOD_LABEL[good]}`,
             charge: `${Math.min(n, CART_CAPACITY - held)} of ${n}`,
+            why: good === 'fleece' ? 'White wool is the wool the stapler in Ryne will buy.' : undefined,
+            primary: first && wool,
             run: act({ type: 'loadCart', cartId: cart.id, good, qty: CART_CAPACITY }),
           });
+          if (wool) first = false;
         }
       }
       for (const [good, n] of aboard) {
@@ -187,6 +193,12 @@ function roadVerbs(state: GameState, cart: Cart, at: NodeId): Verb[] {
   const flooded = isFlooded(state.tick);
   const tide = spanOf(ticksUntilTideTurn(state.tick));
   const verbs: Verb[] = [];
+  // Section 10 (desk playtest, 2026-10-03): before the first sale an empty cart
+  // goes nowhere. A beginner sending it "to see what happens" waits hours for
+  // it to come back with nothing. Load first; the road waits.
+  const beginner = firstMorningHint(state) !== null;
+  const empty = cargoCount(cart.cargo) === 0;
+  let primaryGiven = false;
   for (const e of edgesFor(state.farm, state.cuttingHouse)) {
     if (e.id === 'sea-lane') continue;
     if (e.a !== at && e.b !== at) continue;
@@ -197,11 +209,19 @@ function roadVerbs(state: GameState, cart: Cart, at: NodeId): Verb[] {
       e.condition === 'tideLocked' ? (flooded ? `drowned — clears in ${tide}` : `floods in ${tide}`) : undefined,
       coat(e.id),
     ].filter(Boolean);
+    const primary = beginner && !empty && !drowned && to === 'ryne' && !primaryGiven;
+    if (primary) primaryGiven = true;
     verbs.push({
       key: e.id,
       label: `To ${name(to)} by ${e.name.toLowerCase()}`,
       charge: notes.join(' · ') || undefined,
-      blocked: drowned ? `Under the tide. Clears in ${tide}.` : undefined,
+      blocked:
+        beginner && empty
+          ? 'Load the wool first: an empty cart sells nothing at Ryne.'
+          : drowned
+            ? `Under the tide. Clears in ${tide}.`
+            : undefined,
+      primary,
       run: send(e.id),
     });
   }

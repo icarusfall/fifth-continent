@@ -36,6 +36,9 @@ export interface Verb {
   blocked?: string;
   /** The one that costs something you will feel. */
   danger?: boolean;
+  /** The NEXT STEP (desk playtest, 2026-10-03): lit, so a beginner reads the
+   *  order shear, load, send off the sheet itself. One per sheet at most. */
+  primary?: boolean;
   run: Run;
 }
 
